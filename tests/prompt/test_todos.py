@@ -20,29 +20,34 @@ def test_pending_target_completion_callback():
     """Expect: When a forward-referenced destination node is added, any pending
     commands referencing that destination are post-processed (e.g., context resolution,
     variable/materialization steps)."""
-    from langtree.prompt.structure import RunStructure, PromptTreeNode
     from pydantic import Field
-    
+
+    from langtree.prompt.structure import PromptTreeNode, RunStructure
+
     run_structure = RunStructure()
-    
+
     class TaskEarly(PromptTreeNode):
         """
         Early task referencing later target.
         """
-        data: str = Field(default="test data", description="! @all->task.late@{{result=data}}")
-    
+
+        data: str = Field(
+            default="test data", description="! @all->task.late@{{result=data}}"
+        )
+
     class TaskLate(PromptTreeNode):
         """Late task."""
+
         result: str = "default"
-    
+
     # Add early task first - creates pending target
     run_structure.add(TaskEarly)
     assert len(run_structure._pending_target_registry.pending_targets) > 0
-    
+
     # Add late task - should resolve pending target
     run_structure.add(TaskLate)
     assert len(run_structure._pending_target_registry.pending_targets) == 0
-    
+
     # Verify both nodes exist
     assert run_structure.get_node("task.early") is not None
     assert run_structure.get_node("task.late") is not None

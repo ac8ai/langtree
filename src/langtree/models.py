@@ -1,31 +1,32 @@
 from enum import Enum
-from attrs import frozen
 
+from attrs import frozen
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
-from langchain_core.rate_limiters import InMemoryRateLimiter, BaseRateLimiter
+from langchain_core.rate_limiters import BaseRateLimiter, InMemoryRateLimiter
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-
-
 
 api_calls_per_second = 1
 _default_rate_limiter = InMemoryRateLimiter(
     requests_per_second=api_calls_per_second,
-    check_every_n_seconds=max(0.1, 1.0/api_calls_per_second),
+    check_every_n_seconds=max(0.1, 1.0 / api_calls_per_second),
     max_bucket_size=1,
 )
 
+
 class Provider(Enum):
-    anthropic = 'anthropic'
-    google = 'google'
-    openai = 'OpenAI' # TODO: switch to "openai" after bumping a version of library
+    anthropic = "anthropic"
+    google = "google"
+    openai = "OpenAI"  # TODO: switch to "openai" after bumping a version of library
+
 
 @frozen
 class ModelParam:
     provider: Provider
     model: str
     temperature: float | None = None
+
 
 embed_model_classes = {Provider.openai: OpenAIEmbeddings}
 EmbeddingModel = OpenAIEmbeddings
@@ -35,6 +36,8 @@ chat_models_classes = {
     Provider.google: ChatGoogleGenerativeAI,
     Provider.anthropic: ChatAnthropic,
 }
+
+
 class LLMProvider:
     """Lightweight registry/factory for chat & embedding model instances.
 
@@ -53,7 +56,9 @@ class LLMProvider:
     def __init__(self, default_model_params: dict[str, ModelParam] | None = None):
         self._model_params = (default_model_params or {}).copy()
 
-    def get_embed_model(self, name: str, rate_limiter: BaseRateLimiter | None = None) -> EmbeddingModel:
+    def get_embed_model(
+        self, name: str, rate_limiter: BaseRateLimiter | None = None
+    ) -> EmbeddingModel:
         """Get an embedding model by its registered name.
 
         Params:
@@ -67,7 +72,9 @@ class LLMProvider:
             KeyError: If the model name is not registered.
         """
         if name not in self._model_params:
-            raise KeyError(f"Model {name} is not defined in the provider. Available models: {self.list_models()}")
+            raise KeyError(
+                f"Model {name} is not defined in the provider. Available models: {self.list_models()}"
+            )
         model_params = self._model_params[name]
         model_class = embed_model_classes[model_params.provider]
         embed_model = model_class(
@@ -75,7 +82,9 @@ class LLMProvider:
         )
         return embed_model
 
-    def get_llm(self, name: str, rate_limiter: BaseRateLimiter | None = None) -> BaseChatModel:
+    def get_llm(
+        self, name: str, rate_limiter: BaseRateLimiter | None = None
+    ) -> BaseChatModel:
         """Get a chat (LLM) model by its registered name.
 
         Params:
@@ -89,7 +98,9 @@ class LLMProvider:
             KeyError: If the model name is not registered.
         """
         if name not in self._model_params:
-            raise KeyError(f"Model {name} is not defined in the provider. Available models: {self.list_models()}")
+            raise KeyError(
+                f"Model {name} is not defined in the provider. Available models: {self.list_models()}"
+            )
         model_params = self._model_params[name]
         model_class = chat_models_classes[model_params.provider]
         llm = model_class(
@@ -118,7 +129,9 @@ class LLMProvider:
             KeyError: If the model name is not registered.
         """
         if name not in self._model_params:
-            raise KeyError(f"Model {name} is not defined in the provider. Available models: {self.list_models()}")
+            raise KeyError(
+                f"Model {name} is not defined in the provider. Available models: {self.list_models()}"
+            )
         self.set_model(name, model_params)
 
     def set_model(self, name: str, model_params: ModelParam) -> None:

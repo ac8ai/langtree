@@ -7,8 +7,9 @@ Focus Areas:
 """
 
 import pytest
+
 from langtree.prompt import PromptTreeNode
-from langtree.prompt.utils import get_root_tag, extract_commands
+from langtree.prompt.utils import extract_commands, get_root_tag
 
 
 class TestNamingConventionValidation:
@@ -20,45 +21,61 @@ class TestNamingConventionValidation:
         # Snake case should fail
         class task_early(PromptTreeNode):
             """Task with snake_case name - should be rejected."""
+
             pass
 
         with pytest.raises(ValueError) as exc_info:
             get_root_tag(task_early)
 
         error_msg = str(exc_info.value).lower()
-        assert "camelcase" in error_msg or "naming convention" in error_msg or "invalid" in error_msg
+        assert (
+            "camelcase" in error_msg
+            or "naming convention" in error_msg
+            or "invalid" in error_msg
+        )
 
     def test_camelcase_without_capital_first_letter_should_fail(self):
         """camelCase (lowercase first letter) should be rejected."""
 
         class taskEarly(PromptTreeNode):
             """Task with camelCase name - should be rejected."""
+
             pass
 
         with pytest.raises(ValueError) as exc_info:
             get_root_tag(taskEarly)
 
         error_msg = str(exc_info.value).lower()
-        assert "camelcase" in error_msg or "naming convention" in error_msg or "invalid" in error_msg
+        assert (
+            "camelcase" in error_msg
+            or "naming convention" in error_msg
+            or "invalid" in error_msg
+        )
 
     def test_mixed_case_with_underscores_should_fail(self):
         """Mixed case with underscores should be rejected."""
 
         class Task_early(PromptTreeNode):
             """Task with mixed case - should be rejected."""
+
             pass
 
         with pytest.raises(ValueError) as exc_info:
             get_root_tag(Task_early)
 
         error_msg = str(exc_info.value).lower()
-        assert "camelcase" in error_msg or "naming convention" in error_msg or "invalid" in error_msg
+        assert (
+            "camelcase" in error_msg
+            or "naming convention" in error_msg
+            or "invalid" in error_msg
+        )
 
     def test_invalid_task_prefix_tasks_should_fail(self):
         """Task prefix ending with 's' should be rejected."""
 
         class Tasks(PromptTreeNode):
             """Task class with invalid 'Tasks' prefix - should be rejected."""
+
             pass
 
         with pytest.raises(ValueError) as exc_info:
@@ -72,40 +89,51 @@ class TestNamingConventionValidation:
 
         class Taskx(PromptTreeNode):
             """Task class with lowercase 'x' after Task - should be rejected."""
+
             pass
 
         with pytest.raises(ValueError) as exc_info:
             get_root_tag(Taskx)
 
         error_msg = str(exc_info.value).lower()
-        assert "task" in error_msg and ("prefix" in error_msg or "invalid" in error_msg or "capital" in error_msg)
+        assert "task" in error_msg and (
+            "prefix" in error_msg or "invalid" in error_msg or "capital" in error_msg
+        )
 
     def test_lowercase_task_should_fail(self):
         """All lowercase 'task' should be rejected."""
 
         class task(PromptTreeNode):
             """All lowercase task - should be rejected."""
+
             pass
 
         with pytest.raises(ValueError) as exc_info:
             get_root_tag(task)
 
         error_msg = str(exc_info.value).lower()
-        assert "camelcase" in error_msg or "naming convention" in error_msg or "invalid" in error_msg
+        assert (
+            "camelcase" in error_msg
+            or "naming convention" in error_msg
+            or "invalid" in error_msg
+        )
 
     def test_valid_task_classes_should_pass(self):
         """Properly formatted Task classes should be accepted."""
 
         class TaskEarly(PromptTreeNode):
             """Properly named Task class."""
+
             pass
 
         class TaskDocumentProcessor(PromptTreeNode):
             """Another properly named Task class."""
+
             pass
 
         class TaskProcessor(PromptTreeNode):
             """Third properly named Task class."""
+
             pass
 
         # Should not raise errors for valid naming
@@ -123,6 +151,7 @@ class TestNamingConventionValidation:
 
         class TaskA(PromptTreeNode):
             """Task with single capital letter."""
+
             pass
 
         result = get_root_tag(TaskA)
@@ -133,6 +162,7 @@ class TestNamingConventionValidation:
 
         class Task2Analysis(PromptTreeNode):
             """Task with numbers in name."""
+
             pass
 
         result = get_root_tag(Task2Analysis)

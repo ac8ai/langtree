@@ -12,8 +12,9 @@ Focus Areas:
 
 import pytest
 from pydantic import Field
-from langtree.prompt import PromptTreeNode, RunStructure
+
 from langtree.commands.parser import CommandParseError
+from langtree.prompt import PromptTreeNode, RunStructure
 from langtree.prompt.exceptions import FieldValidationError
 
 
@@ -25,6 +26,7 @@ class TestBareCollectionTypeRejection:
 
         class TaskWithBareList(PromptTreeNode):
             """! @each[items]->task.processor@{{value.item=items}}*"""
+
             items: list  # ❌ Bare list - should be rejected
 
         class TaskProcessor(PromptTreeNode):
@@ -45,6 +47,7 @@ class TestBareCollectionTypeRejection:
 
         class TaskWithBareDict(PromptTreeNode):
             """! @each[metadata]->task.processor@{{value.key=metadata}}*"""
+
             metadata: dict  # ❌ Bare dict - should be rejected
 
         class TaskProcessor(PromptTreeNode):
@@ -65,6 +68,7 @@ class TestBareCollectionTypeRejection:
 
         class TaskWithBareSet(PromptTreeNode):
             """! @each[tags]->task.processor@{{value.tag=tags}}*"""
+
             tags: set  # ❌ Bare set - should be rejected
 
         class TaskProcessor(PromptTreeNode):
@@ -87,9 +91,10 @@ class TestBareCollectionTypeRejection:
             """
             Task with properly typed collections.
             """
+
             items: list[str] = Field(
                 default=[],
-                description="! @each[items]->task.processor@{{value.processed_items=items}}*"
+                description="! @each[items]->task.processor@{{value.processed_items=items}}*",
             )  # ✅ Properly typed
             metadata: dict[str, int] = {}  # ✅ Properly typed
             tags: set[str] = set()  # ✅ Properly typed
@@ -116,6 +121,7 @@ class TestDPCLStructuralValidation:
 
         class TaskWithBadInclusionPath(PromptTreeNode):
             """! @each[nonexistent_field]->task.processor@{{value.item=items}}*"""
+
             items: list[str]  # Field exists, but inclusion path wrong
 
         class TaskProcessor(PromptTreeNode):
@@ -130,13 +136,18 @@ class TestDPCLStructuralValidation:
         error_msg = str(exc_info.value).lower()
         assert "nonexistent_field" in error_msg
         # Structural validation catches this before field existence validation
-        assert ("must start from iteration root" in error_msg or "does not exist" in error_msg or "not found" in error_msg)
+        assert (
+            "must start from iteration root" in error_msg
+            or "does not exist" in error_msg
+            or "not found" in error_msg
+        )
 
     def test_nonexistent_rhs_field_should_fail(self):
         """DPCL commands with nonexistent RHS fields should fail."""
 
         class TaskWithBadRHS(PromptTreeNode):
             """! @each[items]->task.processor@{{value.processed_items=nonexistent_rhs}}*"""
+
             items: list[str]  # Inclusion path is correct
             # Missing: nonexistent_rhs field
 
@@ -148,13 +159,19 @@ class TestDPCLStructuralValidation:
         # Should fail because 'nonexistent_rhs' doesn't exist
         # Structural validation catches this before field existence validation
         from langtree.prompt.exceptions import VariableSourceValidationError
-        with pytest.raises((CommandParseError, VariableSourceValidationError)) as exc_info:
+
+        with pytest.raises(
+            (CommandParseError, VariableSourceValidationError)
+        ) as exc_info:
             structure.add(TaskWithBadRHS)
 
         error_msg = str(exc_info.value).lower()
         assert "nonexistent_rhs" in error_msg
         # Accept either structural validation error or field existence error
-        assert ("must start from iteration root" in error_msg or "does not exist" in error_msg)
+        assert (
+            "must start from iteration root" in error_msg
+            or "does not exist" in error_msg
+        )
 
     def test_forward_references_should_be_allowed(self):
         """Forward references to future nodes should be allowed."""
@@ -163,9 +180,10 @@ class TestDPCLStructuralValidation:
             """
             Task with forward reference to later node.
             """
+
             items: list[str] = Field(
                 default=[],
-                description="! @each[items]->task.late@{{value.results=items}}*"
+                description="! @each[items]->task.late@{{value.results=items}}*",
             )
 
         class TaskLate(PromptTreeNode):  # Defined after being referenced
@@ -175,7 +193,7 @@ class TestDPCLStructuralValidation:
 
         # Should NOT fail - forward references are OK
         structure.add(TaskEarly)  # References task.late before it exists
-        structure.add(TaskLate)   # Now task.late exists
+        structure.add(TaskLate)  # Now task.late exists
 
         # Both nodes should be added successfully
         assert structure.get_node("task.early") is not None
@@ -188,9 +206,10 @@ class TestDPCLStructuralValidation:
             """
             Task with valid DPCL structural references.
             """
+
             items: list[str] = Field(
                 default=[],
-                description="! @each[items]->task.processor@{{value.processed_items=items}}*"
+                description="! @each[items]->task.processor@{{value.processed_items=items}}*",
             )  # ✅ Inclusion path exists, RHS path is valid subchain
 
         class TaskProcessor(PromptTreeNode):
@@ -215,6 +234,7 @@ class TestRuntimeVariableEnumeration:
 
         class TaskWithVariables(PromptTreeNode):
             """Template with variables: {field_var} and {another_var}"""
+
             field_var: str = "default"
             another_var: int = 42
 
@@ -227,7 +247,7 @@ class TestRuntimeVariableEnumeration:
         # Should return simple list of expanded variable names
         expected_vars = {
             "prompt__with_variables__field_var",
-            "prompt__with_variables__another_var"
+            "prompt__with_variables__another_var",
         }
         assert set(runtime_vars) == expected_vars
 
@@ -236,6 +256,7 @@ class TestRuntimeVariableEnumeration:
 
         class TaskNoVariables(PromptTreeNode):
             """Template with no variables"""
+
             field: str = "static"
 
         structure = RunStructure()

@@ -13,65 +13,79 @@ Tests follow TDD approach: define expected behavior first, then implement to pas
 import pytest
 from pydantic import BaseModel, Field
 
-from langtree.prompt import PromptTreeNode, RunStructure
-from langtree.prompt.exceptions import FieldValidationError, VariableSourceValidationError
-from langtree.prompt.utils import get_root_tag
 from langtree.commands.parser import CommandParseError
+from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt.exceptions import (
+    FieldValidationError,
+    VariableSourceValidationError,
+)
+from langtree.prompt.utils import get_root_tag
 
 
 # Common task classes referenced by tests
 class TaskDocumentProcessor(PromptTreeNode):
     """Generic analyzer task referenced by test commands."""
+
     pass
 
 
 class TaskProcessor(PromptTreeNode):
     """Generic processor task referenced by test commands."""
+
     pass
 
 
 class TaskProcessorFour(PromptTreeNode):
     """Four-level processor task."""
+
     pass
 
 
 class TaskStructureAThreeLevels(PromptTreeNode):
     """Three-level structure task."""
+
     pass
 
 
 class TaskProcessorFive(PromptTreeNode):
     """Five-level processor task."""
+
     pass
 
 
 class TaskDocumentProcessorSeven(PromptTreeNode):
     """Seven-level analyzer task."""
+
     pass
 
 
 class TaskStructureAMinimalSpacing(PromptTreeNode):
     """Minimal spacing structure task."""
+
     pass
 
 
 class TaskTarget(PromptTreeNode):
     """Target task for general processing."""
+
     pass
 
 
 class TaskStructureA(PromptTreeNode):
     """Structure A task."""
+
     pass
 
 
 class TaskStructureBZeroLayers(PromptTreeNode):
     """Structure B zero layers task."""
+
     pass
 
 
 class TaskStructureATwoLayers(PromptTreeNode):
     """Structure A two layers task."""
+
     pass
 
 
@@ -87,16 +101,22 @@ class TestFieldExistenceValidationRHS:
 
     def test_nonexistent_field_in_variable_mapping_fails(self):
         """Test that nonexistent fields in variable mappings cause immediate validation failure."""
+
         class Section(PromptTreeNode):
             title: str
             content: str
 
         class TaskWithNonexistentField(PromptTreeNode):
             """Task referencing nonexistent field in variable mapping."""
+
             # Command in 'sections' field - can use inclusion_path starting with 'sections'
             # This should fail: sections.nonexistent_field doesn't exist on Section objects
-            sections: list[Section] = Field(description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.nonexistent_field}}*")
-            valid_list: list[Section] = []  # Needed to satisfy "at least one must match" rule
+            sections: list[Section] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.nonexistent_field}}*"
+            )
+            valid_list: list[
+                Section
+            ] = []  # Needed to satisfy "at least one must match" rule
 
         # Should fail immediately during tree building - field validation
         with pytest.raises(VariableSourceValidationError) as exc_info:
@@ -107,15 +127,19 @@ class TestFieldExistenceValidationRHS:
 
     def test_existing_field_in_variable_mapping_passes(self):
         """Test that existing fields in variable mappings pass validation."""
+
         class Section(PromptTreeNode):
             title: str
             content: str
 
         class TaskWithExistingField(PromptTreeNode):
             """Task referencing existing field in variable mapping."""
+
             # Command in 'sections' field - can use inclusion_path starting with 'sections'
             # This should pass: sections.title exists on Section objects and we have a matching level
-            sections: list[Section] = Field(description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.title}}*")
+            sections: list[Section] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.title}}*"
+            )
             # Need a list field to satisfy "at least one must match" rule (1 level for @each[sections])
             valid_list: list[Section] = []
 
@@ -125,15 +149,19 @@ class TestFieldExistenceValidationRHS:
 
     def test_nested_field_access_validation(self):
         """Test validation of nested field access in variable mappings."""
+
         class SubSection(PromptTreeNode):
             title: str
             content: str
 
         class TaskWithNestedAccess(PromptTreeNode):
             """Task with nested field access."""
+
             # Command in 'sections' field - can use inclusion_path starting with 'sections'
             # This should pass: sections.title should be valid nested access
-            sections: list[SubSection] = Field(description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.title}}*")
+            sections: list[SubSection] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.title}}*"
+            )
             # Need a list field to satisfy "at least one must match" rule (1 level for @each[sections])
             valid_list: list[SubSection] = []
 
@@ -143,15 +171,19 @@ class TestFieldExistenceValidationRHS:
 
     def test_invalid_nested_field_access_fails(self):
         """Test that invalid nested field access fails validation."""
+
         class SubSection(PromptTreeNode):
             title: str
             content: str
 
         class TaskWithInvalidNested(PromptTreeNode):
             """Task with invalid nested field access."""
+
             # Command in 'sections' field - can use inclusion_path starting with 'sections'
             # This should fail: sections.nonexistent doesn't exist
-            sections: list[SubSection] = Field(description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.nonexistent}}*")
+            sections: list[SubSection] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.nonexistent}}*"
+            )
             # Need a list field to satisfy "at least one must match" rule (1 level for @each[sections])
             valid_list: list[SubSection] = []
 
@@ -177,12 +209,16 @@ class TestLoopNestingValidation:
 
     def test_single_level_iteration_matching(self):
         """Test that single-level iteration requires at least one matching nesting level."""
+
         class TaskSingleLevel(PromptTreeNode):
             """Task with single-level iteration."""
+
             # Command in 'sections' field - creates 1 level of iteration
             # At least one mapping must match: value.items has 1 level ✅
             # This should pass: value.items matches 1 level, value.title is fewer (allowed)
-            sections: list[str] = Field(description="! @each[sections]->task.analyzer@{{value.items=sections,value.title=sections}}*")
+            sections: list[str] = Field(
+                description="! @each[sections]->task.analyzer@{{value.items=sections,value.title=sections}}*"
+            )
             items: list[str] = []
             title: str = ""  # 0 levels - allowed as long as one mapping matches
 
@@ -191,6 +227,7 @@ class TestLoopNestingValidation:
 
     def test_multi_level_iteration_matching(self):
         """Test multi-level iteration nesting validation."""
+
         class SubSection(PromptTreeNode):
             paragraphs: list[str]
             title: str
@@ -200,8 +237,11 @@ class TestLoopNestingValidation:
 
         class TaskMultiLevel(PromptTreeNode):
             """Task with multi-level iteration."""
+
             # Command in 'sections' field can use inclusion_path starting with 'sections'
-            sections: list[SubSection] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs}}*")
+            sections: list[SubSection] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs}}*"
+            )
 
             # results field has 2 levels to match the iteration structure
             results: list[ResultGroup] = []
@@ -210,16 +250,20 @@ class TestLoopNestingValidation:
 
     def test_no_mapping_matches_iteration_level_fails(self):
         """Test that when no mapping matches iteration level, validation fails."""
+
         class SubSection(PromptTreeNode):
             paragraphs: list[str]
             title: str
 
         class TaskNoMatchingLevel(PromptTreeNode):
             """Task where no mapping matches iteration level - should fail."""
+
             # Command in 'sections' field uses inclusion_path starting with 'sections'
             # But all mappings have fewer levels than the 2-level iteration: sections→paragraphs
             # This violates "at least one must match" rule
-            sections: list[SubSection] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.title=sections.paragraphs,value.simple=sections.paragraphs}}*")
+            sections: list[SubSection] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.title=sections.paragraphs,value.simple=sections.paragraphs}}*"
+            )
 
             # title field has 0 nesting levels (should have 2 to match sections→paragraphs iteration)
             title: str = ""
@@ -229,11 +273,14 @@ class TestLoopNestingValidation:
 
         # Accept either iteration level mismatch or subchain validation error
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["at least one", "iteration", "nesting", "level"]), \
-            f"Expected nesting/iteration validation error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["at least one", "iteration", "nesting", "level"]
+        ), f"Expected nesting/iteration validation error, got: {exc_info.value}"
 
     def test_excessive_nesting_fails(self):
         """Test that LHS with more nesting levels than iteration fails."""
+
         class SubSection(PromptTreeNode):
             paragraphs: list[str]
 
@@ -245,10 +292,13 @@ class TestLoopNestingValidation:
 
         class TaskExcessiveNesting(PromptTreeNode):
             """Task with excessive LHS nesting."""
+
             # Command in 'sections' field - creates 1 level of iteration
             # One valid mapping (1 level) and one excessive mapping (3 levels)
             # This should fail: value.deeply_nested has 3 levels but iteration is only 1
-            sections: list[SubSection] = Field(description="! @each[sections]->task.analyzer@{{value.valid_field=sections,value.deeply_nested=sections}}*")
+            sections: list[SubSection] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_field=sections,value.deeply_nested=sections}}*"
+            )
             valid_field: list[str] = []  # 1 level - matches iteration
             deeply_nested: list[Level1Node] = []  # 3 levels - exceeds iteration
 
@@ -260,14 +310,20 @@ class TestLoopNestingValidation:
 
     def test_rhs_must_start_from_iteration_root(self):
         """Test that RHS must start from iteration root path."""
+
         class TaskRHSValidation(PromptTreeNode):
             """Task testing RHS path validation."""
+
             # Command in 'sections' field - RHS must share iterable parts from 'sections'
             # One valid mapping (matches level and root) + one invalid RHS root
             # Using prompt scope which should follow strict subchain rules (unlike value scope)
-            sections: list[str] = Field(description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=other_field}}*")
+            sections: list[str] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=other_field}}*"
+            )
             other_field: str = ""
-            valid_list: list[str] = []  # Need this to satisfy "at least one matches" rule
+            valid_list: list[
+                str
+            ] = []  # Need this to satisfy "at least one matches" rule
 
         # Parser validation catches this early as CommandParseError
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
@@ -277,14 +333,16 @@ class TestLoopNestingValidation:
 
     def test_inclusion_path_must_start_with_iterable(self):
         """Test that inclusion paths must start with iterable fields."""
+
         class SubSection(PromptTreeNode):
             items: list[str]
 
         class TaskInvalidStart(PromptTreeNode):
             """Task with inclusion path not starting with iterable."""
+
             title: str = Field(
                 default="test",
-                description="! @each[title.subsections.items]->task.processor@{{value.item=title}}*"
+                description="! @each[title.subsections.items]->task.processor@{{value.item=title}}*",
             )  # Non-iterable start, but also RHS field
             subsections: list[SubSection] = []
 
@@ -293,6 +351,7 @@ class TestLoopNestingValidation:
 
         # Should fail because inclusion path starts with non-iterable 'title'
         from langtree.commands.parser import CommandParseError
+
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskInvalidStart)
 
@@ -301,15 +360,17 @@ class TestLoopNestingValidation:
 
     def test_inclusion_path_must_end_with_iterable(self):
         """Test that inclusion paths must end with iterable fields."""
+
         class SubSection(PromptTreeNode):
             items: list[str]
             title: str
 
         class TaskInvalidEnd(PromptTreeNode):
             """Task with inclusion path not ending with iterable."""
+
             sections: list[SubSection] = Field(
                 default=[],
-                description="! @each[sections.title]->task.processor@{{value.name=sections}}*"
+                description="! @each[sections.title]->task.processor@{{value.name=sections}}*",
             )
             title: str = "test"  # Add as field for RHS validation
 
@@ -336,10 +397,14 @@ class TestTaskTargetCompletenessValidation:
 
     def test_incomplete_task_target_fails(self):
         """Test that incomplete task targets (just 'task') fail validation."""
+
         class TaskIncompleteTarget(PromptTreeNode):
             """Task with incomplete target reference."""
+
             # Commands in respective fields with incomplete task targets - should fail
-            sections: list[str] = Field(description="! @each[sections]->task@{{value.title=sections}}*")
+            sections: list[str] = Field(
+                description="! @each[sections]->task@{{value.title=sections}}*"
+            )
             data: str = Field(description="! @all->task@{{prompt.data=data}}*")
 
         with pytest.raises(FieldValidationError) as exc_info:
@@ -350,12 +415,20 @@ class TestTaskTargetCompletenessValidation:
 
     def test_complete_task_target_passes(self):
         """Test that complete task targets pass validation."""
+
         class TaskCompleteTarget(PromptTreeNode):
             """Task with complete target reference."""
+
             # Commands in respective fields with complete task targets - should pass
-            sections: list[str] = Field(description="! @each[sections]->task.analyzer@{{value.valid_list=sections}}*")
-            data: str = Field(description="! @all->task.processor@{{prompt.data=data}}*")
-            valid_list: list[str] = []  # Needed to satisfy "at least one must match" rule
+            sections: list[str] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections}}*"
+            )
+            data: str = Field(
+                description="! @all->task.processor@{{prompt.data=data}}*"
+            )
+            valid_list: list[
+                str
+            ] = []  # Needed to satisfy "at least one must match" rule
 
         # Should pass validation
         self.structure.add(TaskCompleteTarget)
@@ -371,6 +444,7 @@ class TestVariableMappingConstraints:
 
     def test_multiple_mappings_with_mixed_nesting_levels(self):
         """Test constraint: at least one mapping must match iteration level, none can exceed."""
+
         class SubSection(PromptTreeNode):
             paragraphs: list[str]
             title: str
@@ -380,50 +454,64 @@ class TestVariableMappingConstraints:
 
         class TaskMixedMappings(PromptTreeNode):
             """Task with multiple mappings where LHS fields have different nesting levels."""
+
             # Command in 'sections' field - creates 2 levels with sections.paragraphs
             # This should pass: results field has 2 levels (matching iteration), items has 1 level (fewer)
-            sections: list[SubSection] = Field(description="""
+            sections: list[SubSection] = Field(
+                description="""
             ! @each[sections.paragraphs]->task.analyzer@{{
                 value.results=sections.paragraphs,
                 value.items=sections.paragraphs
             }}*
-            """)
+            """
+            )
 
             results: list[ResultGroup] = []  # 2 levels - should match iteration (2)
-            items: list[str] = []    # 1 level - fewer than iteration (2)
+            items: list[str] = []  # 1 level - fewer than iteration (2)
 
         self.structure.add(TaskMixedMappings)
 
     def test_no_mapping_matches_iteration_level_fails(self):
         """Test constraint failure: no mapping matches the iteration level."""
+
         class SubSection(PromptTreeNode):
             paragraphs: list[str]
             title: str
 
         class TaskNoMatchingLevel(PromptTreeNode):
             """Task where no mapping matches iteration level."""
+
             # Command in 'sections' field - creates 2 levels with sections.paragraphs
             # But all mappings are 0 or 1 level - none match the 2-level requirement
-            sections: list[SubSection] = Field(description="""
+            sections: list[SubSection] = Field(
+                description="""
             ! @each[sections.paragraphs]->task.analyzer@{{
                 value.items=sections.paragraphs,
                 value.content=sections.paragraphs.text
             }}*
-            """)
+            """
+            )
 
         # This test now catches RHS path validation error during semantic validation
         # The LHS-RHS nesting validation will be deferred to assembly stage
         from langtree.prompt.exceptions import VariableSourceValidationError
 
-        with pytest.raises((FieldValidationError, VariableSourceValidationError)) as exc_info:
+        with pytest.raises(
+            (FieldValidationError, VariableSourceValidationError)
+        ) as exc_info:
             self.structure.add(TaskNoMatchingLevel)
 
         # Accept either nesting level error or RHS path validation error
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in [
-            "iteration level", "requires at least one",  # LHS-RHS nesting errors
-            "does not exist", "cannot access"             # RHS path validation errors
-        ]), f"Expected validation error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in [
+                "iteration level",
+                "requires at least one",  # LHS-RHS nesting errors
+                "does not exist",
+                "cannot access",  # RHS path validation errors
+            ]
+        ), f"Expected validation error, got: {exc_info.value}"
 
 
 class TestSpecificationEdgeCases:
@@ -435,17 +523,22 @@ class TestSpecificationEdgeCases:
 
     def test_wildcard_with_proper_nesting(self):
         """Test wildcard (*) usage with proper nesting validation."""
+
         class TaskWildcard(PromptTreeNode):
             """Task using wildcard mapping."""
+
             sections: list[str] = []
 
             # Wildcard should respect nesting rules
-            wildcard_mapping: str = Field(description="! @->task.analyzer@{{prompt.context=*}}")
+            wildcard_mapping: str = Field(
+                description="! @->task.analyzer@{{prompt.context=*}}"
+            )
 
         self.structure.add(TaskWildcard)
 
     def test_complex_nested_iteration_all_levels(self):
         """Test complex nested iteration with all levels specified."""
+
         class Paragraph(PromptTreeNode):
             sentences: list[str]
 
@@ -460,13 +553,16 @@ class TestSpecificationEdgeCases:
 
         class TaskComplexNesting(PromptTreeNode):
             """Task with complex nested iteration."""
+
             # Command in 'sections' field - creates 3 levels with sections.paragraphs.sentences
             # All three levels must be iterable: sections, paragraphs, sentences
-            sections: list[SubSection] = Field(description="""
+            sections: list[SubSection] = Field(
+                description="""
             ! @each[sections.paragraphs.sentences]->task.analyzer@{{
                 value.results=sections.paragraphs.sentences
             }}*
-            """)
+            """
+            )
 
             # Field that has 3 levels of nesting to match the iteration
             results: list[Level1Node] = []  # 3 levels - should match iteration
@@ -490,16 +586,24 @@ class TestInheritanceAndNamingValidation:
 
         class TaskWithBaseModel(PromptTreeNode):
             """Task that tries to use BaseModel inheritance."""
+
             sections: list[InvalidSection] = []
 
-            valid_command: str = Field(description="! @->task.analyzer@{{prompt.data=valid_command}}")
+            valid_command: str = Field(
+                description="! @->task.analyzer@{{prompt.data=valid_command}}"
+            )
 
         # Should fail because InvalidSection inherits from BaseModel, not PromptTreeNode
-        with pytest.raises(Exception) as exc_info:  # Type may vary - could be validation error
+        with pytest.raises(
+            Exception
+        ) as exc_info:  # Type may vary - could be validation error
             self.structure.add(TaskWithBaseModel)
 
         # Check that it's caught for inheritance reasons
-        assert any(keyword in str(exc_info.value).lower() for keyword in ['basemodel', 'inheritance', 'prompttreenode'])
+        assert any(
+            keyword in str(exc_info.value).lower()
+            for keyword in ["basemodel", "inheritance", "prompttreenode"]
+        )
 
     def test_root_task_naming_convention_enforced(self):
         """Test that root classes must follow TaskSomethingCamelCased naming."""
@@ -507,15 +611,22 @@ class TestInheritanceAndNamingValidation:
         # These should fail - don't start with Task
         class AnalyzerNode(PromptTreeNode):
             """Invalid root class name."""
+
             data: str = Field(description="! @->task.processor@{{prompt.input=data}}")
 
         class ProcessorEngine(PromptTreeNode):
             """Another invalid root class name."""
-            content: str = Field(description="! @->task.analyzer@{{value.data=content}}")
+
+            content: str = Field(
+                description="! @->task.analyzer@{{value.data=content}}"
+            )
 
         class SimpleHandler(PromptTreeNode):
             """Yet another invalid root class name."""
-            input_data: str = Field(description="! @->task.handler@{{prompt.context=input_data}}")
+
+            input_data: str = Field(
+                description="! @->task.handler@{{prompt.context=input_data}}"
+            )
 
         # Should fail because they don't start with 'Task'
         for invalid_class in [AnalyzerNode, ProcessorEngine, SimpleHandler]:
@@ -529,18 +640,29 @@ class TestInheritanceAndNamingValidation:
 
         class TaskDocumentProcessor(PromptTreeNode):
             """Valid task name."""
+
             data: str = Field(description="! @->task.processor@{{prompt.input=data}}")
 
         class TaskDataProcessor(PromptTreeNode):
             """Valid task name with multiple words."""
-            content: str = Field(description="! @->task.analyzer@{{value.data=content}}")
+
+            content: str = Field(
+                description="! @->task.analyzer@{{value.data=content}}"
+            )
 
         class TaskComplexAnalysisEngine(PromptTreeNode):
             """Valid task name with many words."""
-            input_data: str = Field(description="! @->task.handler@{{prompt.context=input_data}}")
+
+            input_data: str = Field(
+                description="! @->task.handler@{{prompt.context=input_data}}"
+            )
 
         # These should all pass
-        for valid_class in [TaskDocumentProcessor, TaskDataProcessor, TaskComplexAnalysisEngine]:
+        for valid_class in [
+            TaskDocumentProcessor,
+            TaskDataProcessor,
+            TaskComplexAnalysisEngine,
+        ]:
             # Should not raise any exception
             self.structure.add(valid_class)
 
@@ -564,6 +686,7 @@ class TestFieldContextScopingValidation:
 
     def test_inclusion_path_must_start_with_field_context(self):
         """Test that inclusion_path must start with field where command is defined."""
+
         class Section(PromptTreeNode):
             paragraphs: list[str] = []
 
@@ -572,8 +695,11 @@ class TestFieldContextScopingValidation:
 
         class TaskFieldContextValid(PromptTreeNode):
             """Task with valid field context scoping."""
+
             # ✅ Command in 'sections' field can use inclusion_path starting with 'sections'
-            sections: list[Section] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs}}*")
+            sections: list[Section] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs}}*"
+            )
             results: list[ResultGroup] = []
 
         # Should pass validation
@@ -582,6 +708,7 @@ class TestFieldContextScopingValidation:
 
     def test_inclusion_path_wrong_field_context_fails(self):
         """Test that inclusion_path with wrong field context fails."""
+
         class Paragraph(PromptTreeNode):
             text: str
 
@@ -596,24 +723,34 @@ class TestFieldContextScopingValidation:
 
         class TaskFieldContextInvalid(PromptTreeNode):
             """Task with invalid field context scoping."""
+
             sections: list[Section] = []
             # ❌ Command in 'command' field cannot use inclusion_path starting with 'sections'
-            command: list[CommandResult] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs.text}}*")
+            command: list[CommandResult] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs.text}}*"
+            )
             results: list[ResultSummary] = []
 
         # Should fail validation
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskFieldContextInvalid)
 
-        assert "field context" in str(exc_info.value).lower() or "scoping" in str(exc_info.value).lower()
+        assert (
+            "field context" in str(exc_info.value).lower()
+            or "scoping" in str(exc_info.value).lower()
+        )
         assert "inclusion_path" in str(exc_info.value).lower()
 
     def test_destination_can_reference_other_subtrees(self):
         """Test that destination can reference other subtrees."""
+
         class TaskCrossSubtreeDestination(PromptTreeNode):
             """Task with cross-subtree destination."""
+
             # ✅ destination can reference other subtrees
-            sections: list[str] = Field(description="! @each[sections]->other.analyzer@{{value.results=sections}}*")
+            sections: list[str] = Field(
+                description="! @each[sections]->other.analyzer@{{value.results=sections}}*"
+            )
             results: list[str] = []
 
         # Should pass validation
@@ -622,10 +759,14 @@ class TestFieldContextScopingValidation:
 
     def test_target_path_can_reference_other_subtrees(self):
         """Test that target_path can reference other subtrees."""
+
         class TaskCrossSubtreeTarget(PromptTreeNode):
             """Task with cross-subtree target_path."""
+
             # ✅ target_path can reference other subtrees, but need one mapping that matches iteration level
-            sections: list[str] = Field(description="! @each[sections]->task.analyzer@{{other.results=sections,value.items=sections}}*")
+            sections: list[str] = Field(
+                description="! @each[sections]->task.analyzer@{{other.results=sections,value.items=sections}}*"
+            )
             items: list[str] = []  # 1 level to match iteration level
 
         # Should pass validation
@@ -647,6 +788,7 @@ class TestSubchainValidation:
 
     def test_source_path_exact_subchain_match(self):
         """Test that source_path exactly matching inclusion_path passes."""
+
         class Section(PromptTreeNode):
             paragraphs: list[str] = []
 
@@ -655,8 +797,11 @@ class TestSubchainValidation:
 
         class TaskValidSubchain(PromptTreeNode):
             """Task with valid subchain matching."""
+
             # ✅ source_path 'sections.paragraphs' exactly matches inclusion_path
-            sections: list[Section] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs}}*")
+            sections: list[Section] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs}}*"
+            )
             results: list[ResultGroup] = []
 
         # Should pass validation
@@ -665,6 +810,7 @@ class TestSubchainValidation:
 
     def test_source_path_subchain_with_field_access_passes(self):
         """Test that source_path as subchain with field access passes."""
+
         class Paragraph(PromptTreeNode):
             text: str = ""
 
@@ -677,8 +823,11 @@ class TestSubchainValidation:
 
         class TaskSubchainFieldAccess(PromptTreeNode):
             """Task with subchain + field access."""
+
             # ✅ source_path with field access is allowed - all must be subchains of sections.paragraphs
-            sections: list[Section] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs,value.content=sections.paragraphs.text}}*")
+            sections: list[Section] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=sections.paragraphs,value.content=sections.paragraphs.text}}*"
+            )
             results: list[ParagraphGroup] = []
             title: str = ""
 
@@ -688,6 +837,7 @@ class TestSubchainValidation:
 
     def test_source_path_not_subchain_fails(self):
         """Test that source_path that is not a subchain of inclusion_path fails."""
+
         class Section(PromptTreeNode):
             paragraphs: list[str] = []
 
@@ -696,20 +846,29 @@ class TestSubchainValidation:
 
         class TaskInvalidSubchain(PromptTreeNode):
             """Task with source_path that is not a subchain of inclusion_path."""
+
             # ❌ source_path 'paragraphs' is NOT a subchain of 'sections.paragraphs'
             # Add paragraphs field so field existence validation passes, but subchain validation fails
-            sections: list[Section] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=paragraphs}}*")
-            paragraphs: list[str] = []  # Exists but is NOT a subchain of 'sections.paragraphs'
+            sections: list[Section] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=paragraphs}}*"
+            )
+            paragraphs: list[
+                str
+            ] = []  # Exists but is NOT a subchain of 'sections.paragraphs'
             results: list[ResultGroup] = []
 
         # Should fail validation (caught by parser's iteration matching)
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskInvalidSubchain)
 
-        assert any(keyword in str(exc_info.value).lower() for keyword in ["subchain", "iteration root", "source path"])
+        assert any(
+            keyword in str(exc_info.value).lower()
+            for keyword in ["subchain", "iteration root", "source path"]
+        )
 
     def test_source_path_completely_different_fails(self):
         """Test that source_path with completely different path fails."""
+
         class Section(PromptTreeNode):
             paragraphs: list[str] = []
 
@@ -718,17 +877,25 @@ class TestSubchainValidation:
 
         class TaskDifferentPath(PromptTreeNode):
             """Task with source_path using completely different path."""
+
             # ❌ source_path 'other_field' is NOT a subchain of inclusion_path 'sections.paragraphs'
             # Use simple field instead of nested path to test subchain validation
-            sections: list[Section] = Field(description="! @each[sections.paragraphs]->task.analyzer@{{value.results=other_field}}*")
-            other_field: str = ""  # Exists but is NOT a subchain of 'sections.paragraphs'
+            sections: list[Section] = Field(
+                description="! @each[sections.paragraphs]->task.analyzer@{{value.results=other_field}}*"
+            )
+            other_field: str = (
+                ""  # Exists but is NOT a subchain of 'sections.paragraphs'
+            )
             results: list[ResultGroup] = []
 
         # Should fail validation
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskDifferentPath)
 
-        assert any(keyword in str(exc_info.value).lower() for keyword in ["subchain", "iteration root", "source path"])
+        assert any(
+            keyword in str(exc_info.value).lower()
+            for keyword in ["subchain", "iteration root", "source path"]
+        )
 
 
 class TestComplexIterationPathValidation:
@@ -744,6 +911,7 @@ class TestComplexIterationPathValidation:
 
     def test_mixed_iterable_noniterable_segments_passes(self):
         """Test that mixed iterable/non-iterable segments pass validation."""
+
         class Category(PromptTreeNode):
             items: list[str] = []
 
@@ -761,9 +929,12 @@ class TestComplexIterationPathValidation:
 
         class TaskComplexPath(PromptTreeNode):
             """Task with complex iteration path."""
+
             # ✅ sections.metadata.categories.items - mixed iterable/non-iterable
             # Iteration levels: sections(1) + categories(2) + items(3) = 3 levels (metadata is non-iterable)
-            sections: list[Section] = Field(description="! @each[sections.metadata.categories.items]->task.analyzer@{{value.results=sections.metadata.categories.items}}*")
+            sections: list[Section] = Field(
+                description="! @each[sections.metadata.categories.items]->task.analyzer@{{value.results=sections.metadata.categories.items}}*"
+            )
             results: list[Level1Node] = []  # 3 levels to match actual iteration levels
 
         # Should pass validation
@@ -798,42 +969,51 @@ class TestComplexNestedValueScopeValidation:
 
         class ParagraphData(PromptTreeNode):
             """Level 7 - non-iterable data container."""
+
             text: str
             confidence: float
 
         class Paragraph(PromptTreeNode):
             """Level 6 - iterable container."""
+
             data: ParagraphData
             summary: str
 
         class Section(PromptTreeNode):
             """Level 5 - iterable container."""
+
             paragraphs: list[Paragraph] = []
             title: str
 
         class ProcessingSettings(PromptTreeNode):
             """Level 4 - non-iterable configuration."""
+
             sections: list[Section] = []
             algorithm: str
 
         class ProcessingConfig(PromptTreeNode):
             """Level 3 - non-iterable configuration."""
+
             settings: ProcessingSettings
             version: str
 
         class DocumentMetadata(PromptTreeNode):
             """Level 2 - non-iterable metadata."""
+
             config: ProcessingConfig
             author: str
 
         class TaskDocumentProcessorSevenBad(PromptTreeNode):
             """Root task demonstrating subchain validation violation."""
+
             # ❌ WRONG: RHS path is NOT a subchain of inclusion_path
             # inclusion_path: documents.config.settings.sections.paragraphs
             # Invalid RHS: documents.config.settings.sections.title (does NOT start with inclusion_path)
-            documents: list[DocumentMetadata] = Field(description="""! @each[documents.config.settings.sections.paragraphs]->task.processor@{{
+            documents: list[DocumentMetadata] = Field(
+                description="""! @each[documents.config.settings.sections.paragraphs]->task.processor@{{
                 value.paragraph_summary=documents.config.settings.sections.title
-            }}*""")
+            }}*"""
+            )
             # documents.config.settings.sections.title is NOT a subchain of documents.config.settings.sections.paragraphs
 
         # Should fail - nesting depth mismatch
@@ -841,8 +1021,10 @@ class TestComplexNestedValueScopeValidation:
             self.structure.add(TaskDocumentProcessorSevenBad)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["nesting", "level", "iteration", "depth"]), \
-            f"Expected nesting depth mismatch error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["nesting", "level", "iteration", "depth"]
+        ), f"Expected nesting depth mismatch error, got: {exc_info.value}"
 
     def test_same_iteration_count_different_total_levels_passes(self):
         """Test structures with SAME iteration count but DIFFERENT total levels and non-iterable spacing.
@@ -867,9 +1049,11 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskStructure5Levels(PromptTreeNode):
             # ✅ CORRECT: @each[companies.metadata.departments.items] MUST be on companies field
-            companies: list[Company] = Field(description="""! @each[companies.metadata.departments.items]->task.processor_4_levels@{{
+            companies: list[Company] = Field(
+                description="""! @each[companies.metadata.departments.items]->task.processor_4_levels@{{
                 value.item_data=companies.metadata.departments.items.name
-            }}*""")  # iteration level 1
+            }}*"""
+            )  # iteration level 1
 
             # 5 total levels: companies.metadata.departments.items
             # 3 iterations: companies(1)→departments(2)→items(3)
@@ -887,9 +1071,11 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskStructure4Levels(PromptTreeNode):
             # ✅ CORRECT: @each[batches.items.tokens] MUST be on batches field
-            batches: list[Batch] = Field(description="""! @each[batches.items.tokens]->task.structure_5_levels@{{
+            batches: list[Batch] = Field(
+                description="""! @each[batches.items.tokens]->task.structure_5_levels@{{
                 value.token_data=batches.items.tokens.text
-            }}*""")  # iteration level 1
+            }}*"""
+            )  # iteration level 1
 
             # 4 total levels: batches.items.tokens
             # 3 iterations: batches(1)→items(2)→tokens(3)
@@ -915,44 +1101,53 @@ class TestComplexNestedValueScopeValidation:
 
         class ParagraphData(PromptTreeNode):
             """Level 7 - non-iterable data container."""
+
             text: str
             confidence: float
 
         class Paragraph(PromptTreeNode):
             """Level 6 - iterable container."""
+
             data: ParagraphData
             summary: str
 
         class Section(PromptTreeNode):
             """Level 5 - iterable container."""
+
             paragraphs: list[Paragraph] = []
             title: str
 
         class ProcessingSettings(PromptTreeNode):
             """Level 4 - non-iterable configuration."""
+
             sections: list[Section] = []
             algorithm: str
 
         class ProcessingConfig(PromptTreeNode):
             """Level 3 - non-iterable configuration."""
+
             settings: ProcessingSettings
             version: str
 
         class DocumentMetadata(PromptTreeNode):
             """Level 2 - non-iterable metadata."""
+
             config: ProcessingConfig
             author: str
 
         class TaskDocumentProcessorSevenGood(PromptTreeNode):
             """Root task with correct node-based nesting assignments."""
+
             # ✅ CORRECT: Command must be on the field that starts the inclusion_path
             # inclusion_path: documents.config.settings.sections.paragraphs
             # Valid subchains: all RHS must start with inclusion_path
-            documents: list[DocumentMetadata] = Field(description="""! @each[documents.config.settings.sections.paragraphs]->task.processor@{{
+            documents: list[DocumentMetadata] = Field(
+                description="""! @each[documents.config.settings.sections.paragraphs]->task.processor@{{
                 value.paragraph_content=documents.config.settings.sections.paragraphs,
                 value.paragraph_summary=documents.config.settings.sections.paragraphs.summary,
                 value.paragraph_data_text=documents.config.settings.sections.paragraphs.data.text
-            }}*""")
+            }}*"""
+            )
             # All RHS paths are valid subchains starting with inclusion_path ✅
 
         # Should pass validation - proper subchain matching
@@ -968,27 +1163,33 @@ class TestComplexNestedValueScopeValidation:
 
         class Token(PromptTreeNode):
             """Level 4 - iterable data."""
+
             text: str
             pos_tag: str
 
         class BatchItem(PromptTreeNode):
             """Level 3 - iterable container."""
+
             tokens: list[Token] = []
             item_id: str
 
         class BatchConfig(PromptTreeNode):
             """Level 2 - non-iterable configuration."""
+
             items: list[BatchItem] = []
             algorithm: str
 
         class TaskProcessorFive(PromptTreeNode):
             """Root task with 5-level structure."""
+
             # CORRECT: @each on iterable batches field
-            batches: list[BatchConfig] = Field(description="""! @each[batches.items.tokens]->task.analyzer_seven@{{
+            batches: list[BatchConfig] = Field(
+                description="""! @each[batches.items.tokens]->task.analyzer_seven@{{
                 value.token_data=batches.items.tokens,
                 value.token_text=batches.items.tokens.text,
                 value.token_pos=batches.items.tokens.pos_tag
-            }}*""")
+            }}*"""
+            )
 
         # Should pass validation - same 3 iteration count as seven-level structure
         self.structure.add(TaskProcessorFive)
@@ -1014,11 +1215,14 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskCrossTreeTest(PromptTreeNode):
             """Test cross-tree references with matching iteration counts."""
-            documents: list[Document] = Field(description="""! @each[documents.sentences.tokens]->task.processor_five@{{
+
+            documents: list[Document] = Field(
+                description="""! @each[documents.sentences.tokens]->task.processor_five@{{
                 value.cross_tree_tokens=documents.sentences.tokens,
                 value.cross_tree_token_text=documents.sentences.tokens.text,
                 value.cross_tree_confidence=documents.sentences.tokens.confidence
-            }}*""")
+            }}*"""
+            )
 
         # Should pass - both have 3 iteration levels despite different structures
         self.structure.add(TaskCrossTreeTest)
@@ -1032,71 +1236,91 @@ class TestComplexNestedValueScopeValidation:
         RULE: @each[path] command must be placed on the field that starts the path
         FIX: Move command to 'documents' field OR change path to start with 'analysis'
         """
+
         class SimpleDoc(PromptTreeNode):
             content: str
 
         class TaskWrongField(PromptTreeNode):
             """Task demonstrating field context scoping violation."""
+
             documents: list[SimpleDoc] = []
 
             # ❌ WRONG: @each[documents.content] on analysis field (not documents field)
             # CORRECT: Should be on documents field: documents: list[SimpleDoc] = Field(description="! @each[documents.content]...")
-            analysis: str = Field(description="""! @each[documents.content]->task.processor@{{
+            analysis: str = Field(
+                description="""! @each[documents.content]->task.processor@{{
                 value.content=documents.content
-            }}*""")
+            }}*"""
+            )
 
         # Should fail - field context scoping violation
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskWrongField)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["field", "context", "scoping", "inclusion"]), \
-            f"Expected field context scoping error keywords, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["field", "context", "scoping", "inclusion"]
+        ), f"Expected field context scoping error keywords, got: {exc_info.value}"
 
     def test_each_command_on_non_iterable_field_fails(self):
         """Test that @each command on non-iterable field fails validation."""
+
         class ProcessorConfig(PromptTreeNode):
             batches: list[str] = []
             settings: str
 
         class TaskNonIterableField(PromptTreeNode):
             """Task with @each on non-iterable field."""
+
             # ❌ WRONG: config is single object (non-iterable), can't use @each
-            config: ProcessorConfig = Field(description="""! @each[config.batches]->task.processor@{{
+            config: ProcessorConfig = Field(
+                description="""! @each[config.batches]->task.processor@{{
                 value.batch_data=config.batches
-            }}*""")
+            }}*"""
+            )
 
         # Should fail - @each on non-iterable field
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskNonIterableField)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "each", "field", "list"])
+        assert any(
+            keyword in error_msg for keyword in ["iterable", "each", "field", "list"]
+        )
 
     def test_value_scope_wrong_subchain_fails(self):
         """Test that value scope with wrong subchain paths fails validation."""
+
         class Section(PromptTreeNode):
             content: str
 
         class TaskWrongSubchain(PromptTreeNode):
             """Task with value scope using wrong subchain paths."""
+
             sections: list[Section] = []
             other_field: str = ""
 
             # ❌ WRONG: value.content=other_field is not a subchain of sections.content
-            analysis: str = Field(description="""! @each[sections.content]->task.processor@{{
+            analysis: str = Field(
+                description="""! @each[sections.content]->task.processor@{{
                 value.content=other_field
-            }}*""")
+            }}*"""
+            )
 
         # Should fail - wrong subchain path in value scope
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskWrongSubchain)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["subchain", "source", "path", "inclusion"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["subchain", "source", "path", "inclusion"]
+        )
 
     def test_value_scope_excessive_nesting_fails(self):
         """Test that value scope with excessive LHS nesting fails validation."""
+
         class SimpleItem(PromptTreeNode):
             text: str
 
@@ -1108,19 +1332,25 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskExcessiveNesting(PromptTreeNode):
             """Task with excessive LHS nesting in value scope."""
+
             items: list[SimpleItem] = []
 
             # ❌ WRONG: value.deeply_nested has 3 levels but @each[items.text] creates only 1 iteration level
-            deeply_nested: list[Level1Node] = Field(description="""! @each[items.text]->task.processor@{{
+            deeply_nested: list[Level1Node] = Field(
+                description="""! @each[items.text]->task.processor@{{
                 value.deeply_nested=items.text
-            }}*""")
+            }}*"""
+            )
 
         # Should fail - excessive nesting beyond iteration level
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskExcessiveNesting)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["nesting", "level", "iteration", "exceeds"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["nesting", "level", "iteration", "exceeds"]
+        )
 
     def test_node_hierarchy_depth_validation_passes(self):
         """Test deep node hierarchy navigation with proper subchain validation."""
@@ -1147,14 +1377,17 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskNodeHierarchy(PromptTreeNode):
             """Test pure node hierarchy traversal."""
+
             # ✅ CORRECT: Command must be on the field that starts the inclusion_path
             # inclusion_path: companies.departments.teams.members
             # Valid subchains: companies.departments.teams.members.name, companies.departments.teams.members.role
-            companies: list[Company] = Field(description="""! @each[companies.departments.teams.members]->task.analyzer@{{
+            companies: list[Company] = Field(
+                description="""! @each[companies.departments.teams.members]->task.analyzer@{{
                 value.person_data=companies.departments.teams.members,
                 value.person_name=companies.departments.teams.members.name,
                 value.person_role=companies.departments.teams.members.role
-            }}*""")
+            }}*"""
+            )
 
         # Should pass - proper node hierarchy traversal with valid subchains
         self.structure.add(TaskNodeHierarchy)
@@ -1168,6 +1401,7 @@ class TestComplexNestedValueScopeValidation:
         RULE: RHS must be subchain of inclusion_path (companies.departments.teams.members)
         FIX: Use companies.departments.teams.members.X or exact inclusion_path
         """
+
         class Person(PromptTreeNode):
             name: str
             role: str
@@ -1185,22 +1419,29 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskInvalidBranch(PromptTreeNode):
             """Test invalid node branch access."""
+
             companies: list[Company] = []
 
             # ❌ WRONG: companies.departments.teams.project is NOT a subchain of companies.departments.teams.members
             # inclusion_path: companies.departments.teams.members
             # Invalid RHS: companies.departments.teams.project (branches off at 'teams' level, not 'members')
-            invalid_analysis: str = Field(description="""! @each[companies.departments.teams.members]->task.analyzer@{{
+            invalid_analysis: str = Field(
+                description="""! @each[companies.departments.teams.members]->task.analyzer@{{
                 value.project_info=companies.departments.teams.project
-            }}*""")
+            }}*"""
+            )
 
         # Should fail - accessing invalid branch that's not a subchain
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskInvalidBranch)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["subchain", "source", "path", "inclusion"]), \
+        assert any(
+            keyword in error_msg
+            for keyword in ["subchain", "source", "path", "inclusion"]
+        ), (
             f"Expected subchain validation error for invalid branch access, got: {exc_info.value}"
+        )
 
     def test_mixed_node_structure_complexity_passes(self):
         """Test complex mixed node structure with multiple non-iterable layers."""
@@ -1237,15 +1478,18 @@ class TestComplexNestedValueScopeValidation:
 
         class TaskComplexNodes(PromptTreeNode):
             """Test complex node structure with deep non-iterable chains."""
+
             # ✅ CORRECT: Command must be on the field that starts the inclusion_path
             # inclusion_path: schools.grades.class_info.schedule.subjects.students
             # 3 iterations: schools → subjects → students
             # Non-iterable chain: grades.class_info.schedule between schools and subjects
-            schools: list[School] = Field(description="""! @each[schools.grades.class_info.schedule.subjects.students]->task.analyzer@{{
+            schools: list[School] = Field(
+                description="""! @each[schools.grades.class_info.schedule.subjects.students]->task.analyzer@{{
                 value.student_performance=schools.grades.class_info.schedule.subjects.students.performance,
                 value.performance_score=schools.grades.class_info.schedule.subjects.students.performance.score,
                 value.student_feedback=schools.grades.class_info.schedule.subjects.students.performance.feedback
-            }}*""")
+            }}*"""
+            )
 
         # Should pass - complex node navigation with valid subchains
         self.structure.add(TaskComplexNodes)
@@ -1270,6 +1514,7 @@ class TestDocumentedConfusionModes:
         RULE: @each[field.path] MUST be placed on the 'field' that starts the path
         CORRECT: @each[documents.path] goes on documents field only
         """
+
         class Doc(PromptTreeNode):
             content: str
 
@@ -1277,11 +1522,16 @@ class TestDocumentedConfusionModes:
             documents: list[Doc] = []
 
             # ❌ CONFUSION: @each[documents.content] on analysis field instead of documents field
-            analysis: str = Field(description="! @each[documents.content]->task.processor@{{value.data=documents.content}}*")
+            analysis: str = Field(
+                description="! @each[documents.content]->task.processor@{{value.data=documents.content}}*"
+            )
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskWrongFieldPlacement)
-        assert "field" in str(exc_info.value).lower() or "inclusion" in str(exc_info.value).lower()
+        assert (
+            "field" in str(exc_info.value).lower()
+            or "inclusion" in str(exc_info.value).lower()
+        )
 
     def test_confusion_mode_2_each_on_non_iterable_field(self):
         """CONFUSION MODE 2: @each command on non-iterable field.
@@ -1290,17 +1540,22 @@ class TestDocumentedConfusionModes:
         RULE: @each requires the base field to be iterable (list, etc.)
         CORRECT: Only use @each on list[SomeType] fields
         """
+
         class Config(PromptTreeNode):
             items: list[str] = []
 
         class TaskNonIterableBase(PromptTreeNode):
             # ❌ CONFUSION: config is single object, not list - can't use @each
-            config: Config = Field(description="! @each[config.items]->task.processor@{{value.data=config.items}}*")
+            config: Config = Field(
+                description="! @each[config.items]->task.processor@{{value.data=config.items}}*"
+            )
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskNonIterableBase)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "list", "each", "field"])
+        assert any(
+            keyword in error_msg for keyword in ["iterable", "list", "each", "field"]
+        )
 
     def test_confusion_mode_2a_each_on_non_iterable_base_field_only(self):
         """CONFUSION MODE 2A: Test ONLY @each on non-iterable base field error.
@@ -1308,6 +1563,7 @@ class TestDocumentedConfusionModes:
         Isolates the error of using @each[config.items] where 'config' is single object.
         Command is on proper iterable field to avoid that parallel error.
         """
+
         class Config(PromptTreeNode):
             items: list[str] = []
 
@@ -1315,12 +1571,16 @@ class TestDocumentedConfusionModes:
             # Test only: config is single object, not list - can't use @each
             config: Config = Config()
             # Put command on iterable field to avoid parallel @each-on-string error
-            results: list[str] = Field(description="! @each[config.items]->task.processor@{{value.data=config.items}}*")
+            results: list[str] = Field(
+                description="! @each[config.items]->task.processor@{{value.data=config.items}}*"
+            )
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskNonIterableBaseOnly)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "list", "base", "field"])
+        assert any(
+            keyword in error_msg for keyword in ["iterable", "list", "base", "field"]
+        )
 
     def test_confusion_mode_2b_each_on_string_field_only(self):
         """CONFUSION MODE 2B: Test ONLY @each command on string field error.
@@ -1328,6 +1588,7 @@ class TestDocumentedConfusionModes:
         Isolates the error of putting @each command on non-iterable field.
         Base field is iterable to avoid that parallel error.
         """
+
         class Config(PromptTreeNode):
             items: list[str] = []
 
@@ -1335,12 +1596,16 @@ class TestDocumentedConfusionModes:
             # Test only: @each command on string field
             configs: list[Config] = []  # Base field is iterable - no error here
             # Put command on string field to test this specific error
-            analysis: str = Field(description="! @each[configs.items]->task.processor@{{value.data=configs.items}}*")
+            analysis: str = Field(
+                description="! @each[configs.items]->task.processor@{{value.data=configs.items}}*"
+            )
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskStringFieldOnly)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "string", "each", "field"])
+        assert any(
+            keyword in error_msg for keyword in ["iterable", "string", "each", "field"]
+        )
 
     def test_confusion_mode_3_prompt_vs_value_scope_misuse(self):
         """CONFUSION MODE 3: Using prompt scope instead of value scope for data forwarding.
@@ -1349,6 +1614,7 @@ class TestDocumentedConfusionModes:
         RULE: value scope is for direct data forwarding, prompt scope is for template variables
         CORRECT: Fix validation logic, don't change test scope to avoid validation
         """
+
         class Item(PromptTreeNode):
             text: str
 
@@ -1356,14 +1622,19 @@ class TestDocumentedConfusionModes:
             items: list[Item] = []
 
             # ✅ CORRECT: Use value scope for direct data forwarding
-            analysis: str = Field(description="! @each[items.text]->task.processor@{{value.content=items.text}}*")
+            analysis: str = Field(
+                description="! @each[items.text]->task.processor@{{value.content=items.text}}*"
+            )
 
         # EXPECTED BUG: @each command on string field (analysis) instead of iterable field
         # Should fail - demonstrates invalid @each placement on non-iterable field
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskCorrectValueScope)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "list", "each", "field", "string"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["iterable", "list", "each", "field", "string"]
+        )
 
     def test_confusion_mode_4_subchain_validation_violation(self):
         """CONFUSION MODE 4: RHS source_path not a subchain of inclusion_path.
@@ -1372,6 +1643,7 @@ class TestDocumentedConfusionModes:
         RULE: All RHS source_paths must be subchains of inclusion_path
         CORRECT: RHS must start with inclusion_path or be exact match
         """
+
         class Section(PromptTreeNode):
             paragraphs: list[str] = []
             title: str
@@ -1381,12 +1653,17 @@ class TestDocumentedConfusionModes:
             other_field: str = ""
 
             # ❌ CONFUSION: other_field is NOT a subchain of sections.paragraphs
-            analysis: str = Field(description="! @each[sections.paragraphs]->task.processor@{{value.data=other_field}}*")
+            analysis: str = Field(
+                description="! @each[sections.paragraphs]->task.processor@{{value.data=other_field}}*"
+            )
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskSubchainViolation)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["subchain", "source", "inclusion", "path"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["subchain", "source", "inclusion", "path"]
+        )
 
     def test_confusion_mode_5_nesting_level_mismatch_node_based(self):
         """CONFUSION MODE 5: LHS node nesting depth doesn't match RHS iteration levels.
@@ -1395,6 +1672,7 @@ class TestDocumentedConfusionModes:
         RULE: LHS field nesting must match RHS iteration count (node-based, not Python lists)
         CORRECT: Use nested node structures or simple fields for simple iterations
         """
+
         class Level3(PromptTreeNode):
             data: str
 
@@ -1409,14 +1687,18 @@ class TestDocumentedConfusionModes:
 
             # ❌ CONFUSION: simple_field (0 nesting) from items.level2.level3.data (3 levels deep)
             # This creates nesting level mismatch
-            simple_field: str = Field(description="! @each[items.level2.level3]->task.processor@{{value.simple_field=items.level2.level3.data}}*")
+            simple_field: str = Field(
+                description="! @each[items.level2.level3]->task.processor@{{value.simple_field=items.level2.level3.data}}*"
+            )
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskNestingMismatch)
         # Note: This might not fail yet if nesting level validation isn't fully implemented
         # But documents the expected behavior
         # Validate that some error occurred (even if not the specific nesting error yet)
-        assert exc_info.value is not None, "Expected some validation error for nesting mismatch"
+        assert exc_info.value is not None, (
+            "Expected some validation error for nesting mismatch"
+        )
 
     def test_confusion_mode_6_python_lists_vs_node_nesting(self):
         """CONFUSION MODE 6: Using Python list nesting instead of node hierarchy nesting.
@@ -1425,6 +1707,7 @@ class TestDocumentedConfusionModes:
         RULE: DPCL validation is about navigating node hierarchies, not Python type nesting
         CORRECT: Create node chains and navigate through them
         """
+
         class DeepNode(PromptTreeNode):
             content: str
 
@@ -1438,14 +1721,19 @@ class TestDocumentedConfusionModes:
             nodes: list[TopNode] = []
 
             # ✅ CORRECT: Navigate node hierarchy, not Python list nesting
-            analysis: str = Field(description="! @each[nodes.middle.deep]->task.processor@{{value.content=nodes.middle.deep.content}}*")
+            analysis: str = Field(
+                description="! @each[nodes.middle.deep]->task.processor@{{value.content=nodes.middle.deep.content}}*"
+            )
 
         # EXPECTED BUG: @each command on string field (analysis) instead of iterable field
         # Should fail - demonstrates invalid @each placement on non-iterable field
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskNodeBasedNesting)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "list", "each", "field", "string"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["iterable", "list", "each", "field", "string"]
+        )
 
     def test_confusion_mode_7_iteration_count_verification(self):
         """CONFUSION MODE 7: Not properly verifying iteration counts match in cross-references.
@@ -1454,6 +1742,7 @@ class TestDocumentedConfusionModes:
         RULE: When testing cross-tree references, must verify iteration counts actually match
         CORRECT: Count iterations explicitly: root→iter1→iter2→iter3 = 3 iterations
         """
+
         # Structure A: 3 iterations - companies→departments→teams
         class Team(PromptTreeNode):
             name: str
@@ -1480,7 +1769,9 @@ class TestDocumentedConfusionModes:
 
         class TaskStructureB(PromptTreeNode):
             # ✅ CORRECT: Command in proper field with cross-tree reference
-            schools: list[School] = Field(description="! @each[schools.classes.students]->task.structure_a@{{value.data=schools.classes.students.name}}*")  # iteration 1
+            schools: list[School] = Field(
+                description="! @each[schools.classes.students]->task.structure_a@{{value.data=schools.classes.students.name}}*"
+            )  # iteration 1
             # VERIFIED: 3 iterations total - LHS from schools tree, RHS targets companies tree
 
         # Should pass - verified matching iteration counts
@@ -1496,17 +1787,22 @@ class TestDocumentedConfusionModes:
         EXPECTED BEHAVIOR: Should validate that LHS and RHS have matching iteration structures
         STATUS: Known validation gap that needs implementation
         """
+
         # Structure A: 3 iterations with non-iterables between levels
         class Team(PromptTreeNode):
             name: str
 
-        class DeptToTeamBridge(PromptTreeNode):  # Non-iterable between Department and Team
+        class DeptToTeamBridge(
+            PromptTreeNode
+        ):  # Non-iterable between Department and Team
             teams: list[Team] = []  # iteration 3
 
         class Department(PromptTreeNode):
             bridge_to_teams: DeptToTeamBridge  # non-iterable
 
-        class CompanyToDeptBridge(PromptTreeNode):  # Non-iterable between Company and Department
+        class CompanyToDeptBridge(
+            PromptTreeNode
+        ):  # Non-iterable between Company and Department
             departments: list[Department] = []  # iteration 2
 
         class Company(PromptTreeNode):
@@ -1534,7 +1830,9 @@ class TestDocumentedConfusionModes:
 
         class TaskStructureCTwoLevels(PromptTreeNode):
             # ❌ BUG: 2 iterations with 3 non-iterables referencing 3-iteration structure with 2 non-iterables
-            divisions: list[Division] = Field(description="! @each[divisions.bridge1.bridge2.bridge3.units]->task.structure_a_three_levels@{{value.companies.bridge_to_depts.departments.bridge_to_teams.teams=divisions.bridge1.bridge2.bridge3.units.name}}*")  # iteration 1
+            divisions: list[Division] = Field(
+                description="! @each[divisions.bridge1.bridge2.bridge3.units]->task.structure_a_three_levels@{{value.companies.bridge_to_depts.departments.bridge_to_teams.teams=divisions.bridge1.bridge2.bridge3.units.name}}*"
+            )  # iteration 1
             # Path: divisions.bridge1.bridge2.bridge3.units (2 iterations, 3 non-iterables)
 
         # Add first task
@@ -1543,12 +1841,16 @@ class TestDocumentedConfusionModes:
         # This SHOULD fail when adding 2nd task due to iteration count mismatch (2 vs 3)
         # But validation gap means no error is raised, causing this test to FAIL
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
-            self.structure.add(TaskStructureCTwoLevels)   # 2 iterations, cross-refs to 3-iteration task
+            self.structure.add(
+                TaskStructureCTwoLevels
+            )  # 2 iterations, cross-refs to 3-iteration task
 
         # Should detect iteration count mismatch (2 != 3), not non-iterable spacing difference
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iteration", "level", "mismatch", "count"]), \
-            f"Expected iteration count mismatch error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["iteration", "level", "mismatch", "count"]
+        ), f"Expected iteration count mismatch error, got: {exc_info.value}"
 
     def test_confusion_mode_7c_matching_iterations_different_spacing_passes(self):
         """CONFUSION MODE 7c: Matching iteration counts should pass despite different non-iterable spacing.
@@ -1557,6 +1859,7 @@ class TestDocumentedConfusionModes:
         TEST: Validates that non-iterable spacing is NOT considered when matching structures
         DESIGN: 3=3 iterations but vastly different spacing patterns
         """
+
         # Structure A: 3 iterations with minimal non-iterable spacing
         class TeamMinimal(PromptTreeNode):
             name: str
@@ -1604,8 +1907,12 @@ class TestDocumentedConfusionModes:
             # Path: companies.spacer_x.spacer_y.departments.spacer_a.spacer_b.spacer_c.teams (3 iterations, 5 non-iterables)
 
         # Should pass - same iteration count (3=3), spacing difference should be ignored
-        self.structure.add(TaskStructureAMinimalSpacing)   # 3 iterations, minimal spacing
-        self.structure.add(TaskStructureDMaximalSpacing)   # 3 iterations, maximal spacing
+        self.structure.add(
+            TaskStructureAMinimalSpacing
+        )  # 3 iterations, minimal spacing
+        self.structure.add(
+            TaskStructureDMaximalSpacing
+        )  # 3 iterations, maximal spacing
         assert self.structure.get_node("task.structure_a_minimal_spacing") is not None
         assert self.structure.get_node("task.structure_d_maximal_spacing") is not None
 
@@ -1616,6 +1923,7 @@ class TestDocumentedConfusionModes:
         RULE: Cross-tree references should be one-way to avoid loops
         CORRECT: TaskA → TaskB (one direction only)
         """
+
         class Item(PromptTreeNode):
             data: str
 
@@ -1623,7 +1931,9 @@ class TestDocumentedConfusionModes:
             items: list[Item] = []
 
             # ✅ CORRECT: One-way reference to target (no circular dependency)
-            analysis: str = Field(description="! @each[items]->task.target@{{value.processed=items.data}}*")
+            analysis: str = Field(
+                description="! @each[items]->task.target@{{value.processed=items.data}}*"
+            )
 
         class TaskTarget(PromptTreeNode):
             processed_items: list[str] = []
@@ -1634,7 +1944,10 @@ class TestDocumentedConfusionModes:
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskSource)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "list", "each", "field", "string"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["iterable", "list", "each", "field", "string"]
+        )
 
     def test_confusion_mode_9_tdd_methodology_violation(self):
         """CONFUSION MODE 9: Changing tests to match broken implementation instead of fixing implementation.
@@ -1643,6 +1956,7 @@ class TestDocumentedConfusionModes:
         RULE: In TDD, fix implementation to match tests, not tests to match broken implementation
         CORRECT: Keep tests correct, fix validation logic to make tests pass
         """
+
         class DataItem(PromptTreeNode):
             content: str
 
@@ -1651,14 +1965,19 @@ class TestDocumentedConfusionModes:
 
             # ✅ CORRECT: Keep value scope in test, fix validation to support it
             # Don't change to prompt scope just to avoid validation errors
-            analysis: str = Field(description="! @each[items]->task.processor@{{value.data=items.content}}*")
+            analysis: str = Field(
+                description="! @each[items]->task.processor@{{value.data=items.content}}*"
+            )
 
         # EXPECTED BUG: @each command on string field (analysis) instead of iterable field
         # Should fail - demonstrates invalid @each placement on non-iterable field
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskCorrectTDD)
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["iterable", "list", "each", "field", "string"])
+        assert any(
+            keyword in error_msg
+            for keyword in ["iterable", "list", "each", "field", "string"]
+        )
 
     def test_confusion_mode_10_unequal_non_iterable_spacing_demonstration(self):
         """CONFUSION MODE 10: Not demonstrating unequal non-iterable spacing between iterations.
@@ -1667,6 +1986,7 @@ class TestDocumentedConfusionModes:
         RULE: When testing spacing differences, make the spacing levels explicit and different
         CORRECT: Structure A has X non-iterables between iterations, Structure B has Y (X ≠ Y)
         """
+
         # Structure A: 2 non-iterables between iterations 1-2
         class DeepData(PromptTreeNode):
             value: str
@@ -1682,7 +2002,9 @@ class TestDocumentedConfusionModes:
 
         class TaskStructureATwoLayers(PromptTreeNode):
             # Path: roots.middle1.middle2.items (2 non-iterables: middle1, middle2)
-            roots: list[TopLevel] = Field(description="! @each[roots.middle1.middle2.items]->task.structure_b_zero_layers@{{value.data=roots.middle1.middle2.items.value}}*")  # iteration 1
+            roots: list[TopLevel] = Field(
+                description="! @each[roots.middle1.middle2.items]->task.structure_b_zero_layers@{{value.data=roots.middle1.middle2.items.value}}*"
+            )  # iteration 1
 
         # Structure B: 0 non-iterables between iterations 1-2
         class DirectItem(PromptTreeNode):
@@ -1693,7 +2015,9 @@ class TestDocumentedConfusionModes:
 
         class TaskStructureBZeroLayers(PromptTreeNode):
             # Path: containers.items (0 non-iterables: direct connection)
-            containers: list[DirectContainer] = Field(description="! @each[containers.items]->task.structure_a_two_layers@{{value.data=containers.items.value}}*")  # iteration 1
+            containers: list[DirectContainer] = Field(
+                description="! @each[containers.items]->task.structure_a_two_layers@{{value.data=containers.items.value}}*"
+            )  # iteration 1
 
         # Should pass - demonstrates different non-iterable spacing (2 vs 0)
         self.structure.add(TaskStructureATwoLayers)
@@ -1708,29 +2032,38 @@ class TestDocumentedConfusionModes:
         like field_name.inner_field, it should naturally fail because 'inner_field'
         doesn't exist as a field in the outer list structure.
         """
+
         class Item(PromptTreeNode):
             value: str
 
         class ItemGroup(PromptTreeNode):
             """Proper PromptTreeNode to replace list[Item]."""
+
             items: list[Item] = []
 
         class TaskWithListListStructure(PromptTreeNode):
             """Task showing natural failure when accessing non-existent fields in nested structures."""
+
             # Use proper PromptTreeNode hierarchy instead of list[list[Item]]
             nested_data: list[ItemGroup] = []
 
             # Try to access a non-existent field in the nested structure
             # This should fail because 'inner_items' doesn't exist in ItemGroup
-            some_field: str = Field(description="! @each[nested_data.inner_items]->task.processor@{{value.data=nested_data.inner_items}}*")
+            some_field: str = Field(
+                description="! @each[nested_data.inner_items]->task.processor@{{value.data=nested_data.inner_items}}*"
+            )
 
         # Should fail naturally because 'inner_items' field doesn't exist
-        with pytest.raises((FieldValidationError, VariableSourceValidationError)) as exc_info:
+        with pytest.raises(
+            (FieldValidationError, VariableSourceValidationError)
+        ) as exc_info:
             self.structure.add(TaskWithListListStructure)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["does not exist", "field", "inner_items"]), \
-            f"Expected field existence validation error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["does not exist", "field", "inner_items"]
+        ), f"Expected field existence validation error, got: {exc_info.value}"
 
     def test_confusion_mode_11_error_message_clarity_for_llms(self):
         """CONFUSION MODE 11: Complex subchain validation with nested iterables.
@@ -1740,6 +2073,7 @@ class TestDocumentedConfusionModes:
         - Target: iterableA.noniterable.iterableC.another_noniterable
         Should fail because iterableB ≠ iterableC (different iterable fields of same parent)
         """
+
         class ItemB(PromptTreeNode):
             content: str
 
@@ -1748,12 +2082,14 @@ class TestDocumentedConfusionModes:
 
         class MiddleNode(PromptTreeNode):
             """Non-iterable node with multiple iterable children."""
+
             regular_field: str = ""
             iterableB: list[ItemB] = []
             iterableC: list[ItemC] = []
 
         class OuterItem(PromptTreeNode):
             """Outer iterable container."""
+
             noniterable: MiddleNode
 
         class TaskComplexSubchain(PromptTreeNode):
@@ -1767,8 +2103,12 @@ class TestDocumentedConfusionModes:
 
         error_msg = str(exc_info.value).lower()
         # Should detect the mismatched iterable paths
-        assert any(keyword in error_msg for keyword in ["subchain", "iterableb", "iterablec", "mismatch"]), \
+        assert any(
+            keyword in error_msg
+            for keyword in ["subchain", "iterableb", "iterablec", "mismatch"]
+        ), (
             f"Error should mention subchain violation or path mismatch, got: {exc_info.value}"
+        )
 
 
 class TestAllCommandRHSScopingValidation:
@@ -1790,10 +2130,14 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_rhs_containing_field_passes(self):
         """Test that @all with RHS matching containing field passes validation."""
+
         class TaskValidContainingField(PromptTreeNode):
             """Task with @all command RHS matching containing field."""
+
             # ✅ VALID: RHS 'data' matches containing field name 'data'
-            data: str = Field(description="! @all->task.processor@{{prompt.data=data}}*")
+            data: str = Field(
+                description="! @all->task.processor@{{prompt.data=data}}*"
+            )
 
         # Should pass validation
         self.structure.add(TaskValidContainingField)
@@ -1801,10 +2145,14 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_rhs_wildcard_passes(self):
         """Test that @all with wildcard (*) RHS passes validation."""
+
         class TaskValidWildcard(PromptTreeNode):
             """Task with @all command using wildcard RHS."""
+
             # ✅ VALID: RHS '*' represents entire current node
-            analysis: str = Field(description="! @all->task.processor@{{prompt.context=*}}*")
+            analysis: str = Field(
+                description="! @all->task.processor@{{prompt.context=*}}*"
+            )
 
         # Should pass validation
         self.structure.add(TaskValidWildcard)
@@ -1812,66 +2160,92 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_rhs_different_simple_field_fails(self):
         """Test that @all with different simple field fails validation."""
+
         class TaskDifferentField(PromptTreeNode):
             """Task with @all command referencing wrong simple field."""
+
             # ❌ INVALID: RHS 'field2' does not match containing field 'field1'
-            field1: str = Field(description="! @all->task.processor@{{prompt.context=field2}}*")
+            field1: str = Field(
+                description="! @all->task.processor@{{prompt.context=field2}}*"
+            )
             field2: str = "different field"
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskDifferentField)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["containing field", "rhs must be", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["containing field", "rhs must be", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_rhs_complex_path_fails(self):
         """Test that @all with complex path fails validation."""
+
         class TaskComplexPath(PromptTreeNode):
             """Task with @all command using complex path."""
+
             # ❌ INVALID: RHS 'prompt.config' does not match containing field 'field1'
-            field1: str = Field(description="! @all->task.processor@{{value.result=prompt.config}}*")
+            field1: str = Field(
+                description="! @all->task.processor@{{value.result=prompt.config}}*"
+            )
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskComplexPath)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["containing field", "rhs must be", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["containing field", "rhs must be", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_rhs_scope_path_fails(self):
         """Test that @all with scope path fails validation."""
+
         class TaskScopePath(PromptTreeNode):
             """Task with @all command referencing scope path."""
+
             # ❌ INVALID: RHS 'task.data' does not match containing field 'field1'
-            field1: str = Field(description="! @all->task.processor@{{prompt.context=task.data}}*")
+            field1: str = Field(
+                description="! @all->task.processor@{{prompt.context=task.data}}*"
+            )
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskScopePath)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["containing field", "rhs must be", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["containing field", "rhs must be", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_rhs_multiple_mappings_mixed_validity(self):
         """Test @all with multiple variable mappings - mixed valid/invalid patterns."""
+
         class TaskMixedValidity(PromptTreeNode):
             """Task with @all command having mixed valid/invalid RHS patterns."""
+
             # ❌ INVALID: First mapping OK (containing field), second mapping references different field
-            data: str = Field(description="! @all->task.processor@{{prompt.context=data, prompt.extra=field2}}*")
+            data: str = Field(
+                description="! @all->task.processor@{{prompt.context=data, prompt.extra=field2}}*"
+            )
             field2: str = "other field"
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskMixedValidity)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["containing field", "rhs must be", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["containing field", "rhs must be", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_rhs_implicit_mapping_containing_field_passes(self):
         """Test @all with implicit mapping (field name inference) passes when matching containing field."""
+
         class TaskValidImplicitMapping(PromptTreeNode):
             """Task with @all command using implicit mapping."""
+
             # ✅ VALID: Implicit mapping infers RHS as 'data' which matches containing field
             data: str = Field(description="! @all->task.processor@{{prompt.data}}*")
 
@@ -1881,11 +2255,13 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_docstring_wildcard_passes(self):
         """Test that @all in docstring with wildcard passes validation."""
+
         class TaskDocstringWildcard(PromptTreeNode):
             """! @all->task.processor@{{prompt.context=*}}*
 
             Task with @all command in docstring using wildcard.
             """
+
             field1: str = "some data"
             field2: str = "other data"
 
@@ -1895,11 +2271,13 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_docstring_implicit_mapping_passes(self):
         """Test that @all in docstring with implicit mapping passes validation."""
+
         class TaskDocstringImplicit(PromptTreeNode):
             """! @all->task.processor@{{prompt=*}}*
 
             Task with @all command in docstring using implicit mapping.
             """
+
             field1: str = "some data"
             field2: str = "other data"
 
@@ -1909,11 +2287,13 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_docstring_specific_field_fails(self):
         """Test that @all in docstring referencing specific field fails validation."""
+
         class TaskDocstringSpecificField(PromptTreeNode):
             """! @all->task.processor@{{prompt.context=field1}}*
 
             Task with @all command in docstring referencing specific field.
             """
+
             field1: str = "some data"
             field2: str = "other data"
 
@@ -1922,16 +2302,20 @@ class TestAllCommandRHSScopingValidation:
             self.structure.add(TaskDocstringSpecificField)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["docstring", "wildcard", "data locality"]), \
-            f"Expected @all docstring RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["docstring", "wildcard", "data locality"]
+        ), f"Expected @all docstring RHS scoping error, got: {exc_info.value}"
 
     def test_all_docstring_multiple_fields_fails(self):
         """Test that @all in docstring with multiple field references fails validation."""
+
         class TaskDocstringMultipleFields(PromptTreeNode):
             """! @all->task.processor@{{prompt.field1=field1, prompt.field2=field2}}*
 
             Task with @all command in docstring referencing multiple specific fields.
             """
+
             field1: str = "some data"
             field2: str = "other data"
 
@@ -1940,27 +2324,37 @@ class TestAllCommandRHSScopingValidation:
             self.structure.add(TaskDocstringMultipleFields)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["docstring", "wildcard", "data locality"]), \
-            f"Expected @all docstring RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["docstring", "wildcard", "data locality"]
+        ), f"Expected @all docstring RHS scoping error, got: {exc_info.value}"
 
     def test_all_field_subfield_path_fails(self):
         """Test that @all with subfield path fails validation."""
+
         class TaskSubfieldPath(PromptTreeNode):
             """Task with @all command using subfield path."""
+
             # ❌ INVALID: RHS 'field1.subfield' extends beyond containing field
-            field1: str = Field(description="! @all->task.processor@{{prompt.context=field1.subfield}}*")
+            field1: str = Field(
+                description="! @all->task.processor@{{prompt.context=field1.subfield}}*"
+            )
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskSubfieldPath)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["containing field", "rhs must be", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["containing field", "rhs must be", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_field_implicit_mapping_wrong_field_fails(self):
         """Test that @all implicit mapping with wrong field name fails validation."""
+
         class TaskWrongImplicitField(PromptTreeNode):
             """Task with @all command using implicit mapping for wrong field."""
+
             # ❌ INVALID: Implicit mapping infers 'field2' but command is on 'field1'
             field1: str = Field(description="! @all->task.processor@{{prompt.field2}}*")
             field2: str = "other field"
@@ -1969,13 +2363,17 @@ class TestAllCommandRHSScopingValidation:
             self.structure.add(TaskWrongImplicitField)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["containing field", "rhs must be", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["containing field", "rhs must be", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_field_empty_mappings_fails(self):
         """Test that @all with empty mappings fails validation."""
+
         class TaskEmptyMappings(PromptTreeNode):
             """Task with @all command having empty mappings."""
+
             # This should fail at parser level, but test here for completeness
             field1: str = Field(description="! @all->task.processor@{{}}*")
 
@@ -1988,10 +2386,14 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_multiple_valid_mappings_same_field_passes(self):
         """Test that @all with multiple mappings to same field passes validation."""
+
         class TaskMultipleSameField(PromptTreeNode):
             """Task with @all command having multiple mappings to same field."""
+
             # ✅ VALID: All mappings reference the same containing field
-            data: str = Field(description="! @all->task.processor@{{prompt.context=data, value.result=data}}*")
+            data: str = Field(
+                description="! @all->task.processor@{{prompt.context=data, value.result=data}}*"
+            )
 
         # Should pass validation
         self.structure.add(TaskMultipleSameField)
@@ -1999,10 +2401,14 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_mixed_wildcard_field_mappings_passes(self):
         """Test that @all with mixed wildcard and field mappings passes validation."""
+
         class TaskMixedWildcardField(PromptTreeNode):
             """Task with @all command mixing containing field mappings."""
+
             # ✅ VALID: All mappings reference the containing field 'data'
-            data: str = Field(description="! @all->task.processor@{{prompt.context=data, value.field=data}}*")
+            data: str = Field(
+                description="! @all->task.processor@{{prompt.context=data, value.field=data}}*"
+            )
 
         # Should pass validation - all mappings reference containing field
         self.structure.add(TaskMixedWildcardField)
@@ -2010,67 +2416,91 @@ class TestAllCommandRHSScopingValidation:
 
     def test_all_nested_field_path_fails(self):
         """Test that @all with nested field path fails RHS scoping validation."""
+
         class SubData(PromptTreeNode):
             value: str = "nested value"
 
         class TaskNestedFieldPath(PromptTreeNode):
             """Task with @all command using nested field path that exists structurally."""
+
             # ❌ INVALID: RHS 'data.value' violates @all scoping - only 'data' or '*' allowed
             # Field structure is valid (data.value exists) but @all RHS scoping forbids it
-            data: SubData = Field(description="! @all->task.processor@{{prompt.context=data.value}}*")
+            data: SubData = Field(
+                description="! @all->task.processor@{{prompt.context=data.value}}*"
+            )
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskNestedFieldPath)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["@all", "rhs", "containing field", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["@all", "rhs", "containing field", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_sibling_field_reference_fails(self):
         """Test that @all with sibling field reference fails RHS scoping validation."""
+
         class TaskSiblingField(PromptTreeNode):
             """Task with @all command referencing sibling field."""
+
             # ❌ INVALID: RHS 'other_data' violates @all scoping - must be 'main_data' or '*'
             # Both fields exist structurally but @all RHS scoping forbids sibling references
-            main_data: str = Field(description="! @all->task.processor@{{prompt.context=other_data}}*")
+            main_data: str = Field(
+                description="! @all->task.processor@{{prompt.context=other_data}}*"
+            )
             other_data: str = "sibling data"
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskSiblingField)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["@all", "rhs", "containing field", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["@all", "rhs", "containing field", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_longer_path_from_containing_field_fails(self):
         """Test that @all with longer path from containing field fails RHS scoping validation."""
+
         class NestedData(PromptTreeNode):
             items: list[str] = []
 
         class TaskLongerPath(PromptTreeNode):
             """Task with @all command using longer path from containing field."""
+
             # ❌ INVALID: RHS 'data.items' violates @all scoping - only 'data' or '*' allowed
             # Field structure is valid but @all RHS scoping forbids extending beyond containing field
-            data: NestedData = Field(description="! @all->task.processor@{{prompt.context=data.items}}*")
+            data: NestedData = Field(
+                description="! @all->task.processor@{{prompt.context=data.items}}*"
+            )
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskLongerPath)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["@all", "rhs", "containing field", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["@all", "rhs", "containing field", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"
 
     def test_all_external_node_reference_fails(self):
         """Test that @all with external node reference fails RHS scoping validation."""
+
         class TaskExternalRef(PromptTreeNode):
             """Task with @all command referencing external node structure."""
+
             # ❌ INVALID: RHS 'task.data.field' violates @all scoping - references external structure
             # This is a valid structural reference but violates @all locality principle
-            data: str = Field(description="! @all->task.processor@{{prompt.context=task.data.field}}*")
+            data: str = Field(
+                description="! @all->task.processor@{{prompt.context=task.data.field}}*"
+            )
 
         with pytest.raises(FieldValidationError) as exc_info:
             self.structure.add(TaskExternalRef)
 
         error_msg = str(exc_info.value).lower()
-        assert any(keyword in error_msg for keyword in ["@all", "rhs", "containing field", "only reference"]), \
-            f"Expected @all RHS scoping error, got: {exc_info.value}"
+        assert any(
+            keyword in error_msg
+            for keyword in ["@all", "rhs", "containing field", "only reference"]
+        ), f"Expected @all RHS scoping error, got: {exc_info.value}"

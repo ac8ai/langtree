@@ -12,9 +12,10 @@ Focus Areas:
 """
 
 import pytest
+
 from langtree.prompt import PromptTreeNode, RunStructure
-from langtree.prompt.resolution import resolve_runtime_variables
 from langtree.prompt.exceptions import RuntimeVariableError
+from langtree.prompt.resolution import resolve_runtime_variables
 
 
 class TestRuntimeVariableValidationBehavior:
@@ -25,6 +26,7 @@ class TestRuntimeVariableValidationBehavior:
 
         class TaskWithFields(PromptTreeNode):
             """Task with specific fields defined."""
+
             valid_field: str = "value"
             another_field: int = 42
 
@@ -34,7 +36,9 @@ class TestRuntimeVariableValidationBehavior:
 
         # Should raise detailed error for undefined field variable when validation enabled
         with pytest.raises(RuntimeVariableError) as exc_info:
-            resolve_runtime_variables("Content: {undefined_field}", structure, node, validate=True)
+            resolve_runtime_variables(
+                "Content: {undefined_field}", structure, node, validate=True
+            )
 
         error_msg = str(exc_info.value)
         assert "undefined_field" in error_msg
@@ -49,6 +53,7 @@ class TestRuntimeVariableValidationBehavior:
 
         class TaskWithAssemblyVar(PromptTreeNode):
             """! assembly_var="test_value" """
+
             field_var: str = "field_value"
 
         structure = RunStructure()
@@ -57,6 +62,7 @@ class TestRuntimeVariableValidationBehavior:
 
         # Assembly variable should be rejected in runtime contexts
         from langtree.prompt.exceptions import RuntimeVariableError
+
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables("Content: {assembly_var}", structure, node)
 
@@ -82,6 +88,7 @@ class TestRuntimeVariableValidationBehavior:
             {COLLECTED_CONTEXT}
 
             """
+
             field_var: str = "value"
 
         structure = RunStructure()
@@ -89,7 +96,9 @@ class TestRuntimeVariableValidationBehavior:
         node = structure.get_node("task.with_reserved")
 
         # Reserved variables should be left unchanged (no validation error)
-        result = resolve_runtime_variables("Content: {PROMPT_SUBTREE} and {COLLECTED_CONTEXT}", structure, node)
+        result = resolve_runtime_variables(
+            "Content: {PROMPT_SUBTREE} and {COLLECTED_CONTEXT}", structure, node
+        )
         assert "{PROMPT_SUBTREE}" in result
         assert "{COLLECTED_CONTEXT}" in result
 
@@ -105,7 +114,9 @@ class TestRuntimeVariableValidationBehavior:
 
         # Double underscores should be rejected
         with pytest.raises(RuntimeVariableError) as exc_info:
-            resolve_runtime_variables("Content: {var__with__underscores}", structure, node)
+            resolve_runtime_variables(
+                "Content: {var__with__underscores}", structure, node
+            )
 
         assert "double underscores" in str(exc_info.value).lower()
 
@@ -127,7 +138,12 @@ class TestRuntimeVariableValidationBehavior:
 
         # Should fail on first invalid variable encountered when validation enabled
         with pytest.raises(RuntimeVariableError) as exc_info:
-            resolve_runtime_variables("Valid: {valid_field}, Invalid: {invalid_field}", structure, node, validate=True)
+            resolve_runtime_variables(
+                "Valid: {valid_field}, Invalid: {invalid_field}",
+                structure,
+                node,
+                validate=True,
+            )
 
         # Should mention the invalid variable
         assert "invalid_field" in str(exc_info.value)
@@ -146,4 +162,7 @@ class TestRuntimeVariableValidationBehavior:
         content = "Known: {known_field}, Unknown: {unknown_field}"
         expanded = resolve_runtime_variables(content, structure, node, validate=False)
         # Both expand to namespaced form - existence check happens at runtime
-        assert expanded == "Known: {prompt__with_limited_context__known_field}, Unknown: {prompt__with_limited_context__unknown_field}"
+        assert (
+            expanded
+            == "Known: {prompt__with_limited_context__known_field}, Unknown: {prompt__with_limited_context__unknown_field}"
+        )

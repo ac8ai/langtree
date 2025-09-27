@@ -8,16 +8,17 @@ that can occur during DPCL parsing, validation, and execution planning.
 
 class DPCLError(Exception):
     """Base exception for all DPCL-related errors."""
+
     pass
 
 
 class NodeInstantiationError(DPCLError):
     """Raised when a node cannot be instantiated from its field type."""
-    
+
     def __init__(self, node_tag: str, reason: str):
         """
         Initialize the exception.
-        
+
         Params:
             node_tag: The tag of the node that failed to instantiate
             reason: The underlying reason for the failure
@@ -29,11 +30,11 @@ class NodeInstantiationError(DPCLError):
 
 class FieldTypeError(DPCLError):
     """Raised when a node has no field type or invalid field type."""
-    
+
     def __init__(self, node_tag: str, message: str = "has no field type"):
         """
         Initialize the exception.
-        
+
         Params:
             node_tag: The tag of the node with the field type issue
             message: Specific error message
@@ -44,11 +45,11 @@ class FieldTypeError(DPCLError):
 
 class PathValidationError(DPCLError):
     """Raised when path validation fails."""
-    
+
     def __init__(self, path: str, reason: str):
         """
         Initialize the exception.
-        
+
         Params:
             path: The invalid path
             reason: Why the path is invalid
@@ -60,11 +61,11 @@ class PathValidationError(DPCLError):
 
 class NodeTagValidationError(DPCLError):
     """Raised when node tag validation fails."""
-    
+
     def __init__(self, node_tag: str, reason: str):
         """
         Initialize the exception.
-        
+
         Params:
             node_tag: The invalid node tag
             reason: Why the node tag is invalid
@@ -76,11 +77,11 @@ class NodeTagValidationError(DPCLError):
 
 class RuntimeVariableError(DPCLError):
     """Raised when runtime variable resolution fails."""
-    
+
     def __init__(self, message: str):
         """
         Initialize the exception.
-        
+
         Params:
             message: Error message describing the variable resolution failure
         """
@@ -90,7 +91,13 @@ class RuntimeVariableError(DPCLError):
 class FieldValidationError(DPCLError):
     """Raised when command references non-existent fields in source structure."""
 
-    def __init__(self, field_path: str, container: str, message: str = "does not exist", command_context: str = None):
+    def __init__(
+        self,
+        field_path: str,
+        container: str,
+        message: str = "does not exist",
+        command_context: str = None,
+    ):
         """
         Initialize the exception.
 
@@ -116,11 +123,11 @@ class FieldValidationError(DPCLError):
 
 class VariableTargetValidationError(DPCLError):
     """Raised when variable target structure cannot be satisfied."""
-    
+
     def __init__(self, target_path: str, source_node: str, reason: str):
         """
         Initialize the exception.
-        
+
         Params:
             target_path: The variable target path that cannot be satisfied
             source_node: The node where this target was declared
@@ -133,11 +140,11 @@ class VariableTargetValidationError(DPCLError):
 
 class VariableSourceValidationError(DPCLError):
     """Raised when variable source field does not exist in referenced structure."""
-    
+
     def __init__(self, source_path: str, structure_type: str, command_context: str):
         """
         Initialize the exception.
-        
+
         Params:
             source_path: The source field path that does not exist
             structure_type: The structure type where field was expected
@@ -145,7 +152,9 @@ class VariableSourceValidationError(DPCLError):
         """
         self.source_path = source_path
         self.structure_type = structure_type
-        super().__init__(f"Source field '{source_path}' does not exist in {structure_type} (referenced by {command_context})")
+        super().__init__(
+            f"Source field '{source_path}' does not exist in {structure_type} (referenced by {command_context})"
+        )
 
 
 class TemplateVariableError(DPCLError):
@@ -163,16 +172,19 @@ class TemplateVariableError(DPCLError):
 
 class TemplateVariableSpacingError(TemplateVariableError):
     """Exception for template variable spacing violations."""
+
     pass
 
 
 class TemplateVariableConflictError(TemplateVariableError):
     """Exception for template variable conflicts with Assembly Variables."""
+
     pass
 
 
 class TemplateVariableNameError(TemplateVariableError):
     """Exception for unknown or invalid template variable names."""
+
     pass
 
 
@@ -189,5 +201,7 @@ class ComprehensiveStructuralValidationError(DPCLError):
         """
         self.issues = issues
         self.node_context = node_context
-        issue_summary = '; '.join(issues)
-        super().__init__(f"Multiple structural issues in {node_context}: {issue_summary}")
+        issue_summary = "; ".join(issues)
+        super().__init__(
+            f"Multiple structural issues in {node_context}: {issue_summary}"
+        )

@@ -1,14 +1,15 @@
 """
 Core structure classes for DPCL prompt tree building and management.
 
-This module contains the main classes for building and managing the 
+This module contains the main classes for building and managing the
 prompt tree structure, including node classes and the main RunStructure
 class that coordinates tree building and command processing.
 """
 
 from dataclasses import dataclass, field
+from typing import Any, Optional, get_args, get_origin
+
 from pydantic import BaseModel
-from typing import Any, Optional, Type, get_args, get_origin
 
 from langtree.commands.parser import (
     ExecutionCommand,
@@ -16,26 +17,37 @@ from langtree.commands.parser import (
     ParsedCommand,
     ResamplingCommand,
     VariableAssignmentCommand,
-    parse_command
+    parse_command,
 )
 from langtree.prompt.exceptions import FieldTypeError
-from langtree.prompt.registry import AssemblyVariableRegistry, PendingTargetRegistry, VariableRegistry, PendingTarget
+from langtree.prompt.registry import (
+    AssemblyVariableRegistry,
+    PendingTarget,
+    PendingTargetRegistry,
+    VariableRegistry,
+)
 from langtree.prompt.template_variables import process_template_variables
 from langtree.prompt.utils import extract_commands, get_root_tag
 
-
 # Type aliases
 PromptValue = str | int | float | bool | list | dict | None
-ParsedCommandUnion = VariableAssignmentCommand | ExecutionCommand | ResamplingCommand | NodeModifierCommand | ParsedCommand
+ParsedCommandUnion = (
+    VariableAssignmentCommand
+    | ExecutionCommand
+    | ResamplingCommand
+    | NodeModifierCommand
+    | ParsedCommand
+)
 
 
 class PromptTreeNode(BaseModel):
     """
     Base class for all prompt tree node types.
-    
+
     This class provides the foundation for creating structured prompt components
     that can be organized in a tree hierarchy for complex LLM interactions.
     """
+
     pass
 
 
@@ -45,25 +57,22 @@ ResolutionResult = PromptValue | PromptTreeNode
 @dataclass
 class StructureTreeNode:
     """Node in the structure tree representing a parsed prompt component."""
-    
+
     name: str
-    field_type: Optional[Type[PromptTreeNode]] = None
+    field_type: type[PromptTreeNode] | None = None
     parent: Optional["StructureTreeNode"] = None
     children: dict[str, "StructureTreeNode"] = field(default_factory=dict)
-    clean_docstring: Optional[str] = field(default=None)
+    clean_docstring: str | None = field(default=None)
     clean_field_descriptions: dict[str, str] = field(default_factory=dict)
     extracted_commands: list[ParsedCommandUnion] = field(default_factory=list)
 
 
-@dataclass  
+@dataclass
 class StructureTreeRoot(StructureTreeNode):
     """Root node for structure tree."""
-    
+
     def __init__(self, name: str):
         super().__init__(name=name, field_type=None, parent=None)
-
-
-
 
 
 class RunStructure:
@@ -75,7 +84,7 @@ class RunStructure:
 
     Responsibilities:
     - Build structural tree of `PromptTreeNode` subclasses for chain assembly
-    - Extract and parse DPCL commands from docstrings and field descriptions  
+    - Extract and parse DPCL commands from docstrings and field descriptions
     - Register variables and pending (forward‑referenced) target destinations
     - Provide execution plan scaffolding for chain composition
     - Generate validation reports for command compatibility
@@ -83,14 +92,14 @@ class RunStructure:
     This is a chain assembly framework - not a runtime execution system.
     The assembled chains will be LangChain Runnables that handle their own execution.
     """
-    
+
     def __init__(self):
         self._root_nodes = {}
         self._variable_registry = VariableRegistry()
         self._pending_target_registry = PendingTargetRegistry()
         self._assembly_variable_registry = AssemblyVariableRegistry()
 
-    def add(self, tree: Type[PromptTreeNode]) -> None:
+    def add(self, tree: type[PromptTreeNode]) -> None:
         """Add a root prompt tree node class to the structure.
 
         This performs a depth‑first traversal over the supplied `PromptTreeNode` subclass,
@@ -105,13 +114,15 @@ class RunStructure:
             ValueError: If a field lacks a type annotation or uses an unsupported type pattern.
         """
         tag = get_root_tag(tree)
-        designation = tag.split('.')[0]
+        designation = tag.split(".")[0]
         if designation not in self._root_nodes:
             root = StructureTreeRoot(name=designation)
             self._root_nodes[designation] = root
         self._process_subtask(tree, self._root_nodes[designation], tag)
 
-    def _process_subtask(self, subtree: Type[PromptTreeNode], parent: StructureTreeNode, tag: str) -> None:
+    def _process_subtask(
+        self, subtree: type[PromptTreeNode], parent: StructureTreeNode, tag: str
+    ) -> None:
         """Recursively materialize a subtree rooted at `subtree` into the structure.
 
         Side effects:
@@ -129,19 +140,19 @@ class RunStructure:
             ValueError: If a field annotation is missing or unsupported.
         """
         node = StructureTreeNode(name=tag, field_type=subtree, parent=parent)
-        field_name = tag.split('.')[-1]
+        field_name = tag.split(".")[-1]
         parent.children[field_name] = node
-        
+
         resolved_targets = self._pending_target_registry.resolve_pending(tag)
         for resolved_target in resolved_targets:
             self._complete_pending_command_processing(resolved_target)
-        
+
         if subtree.__doc__:
             commands, clean_content = extract_commands(subtree.__doc__)
-            
+
             processed_content = process_template_variables(clean_content, node)
             node.clean_docstring = processed_content
-            
+
             for command_str in commands:
                 parsed_command = parse_command(command_str)
                 node.extracted_commands.append(parsed_command)
@@ -150,27 +161,34 @@ class RunStructure:
                 self._validate_field_context_scoping(parsed_command, None, tag)
 
                 self._process_command(parsed_command, tag, None)
-        
+
         for field_name_inner, field_def in subtree.model_fields.items():
             if field_def.description:
                 commands, clean_content = extract_commands(field_def.description)
                 if clean_content:
                     processed_content = process_template_variables(clean_content, node)
                     node.clean_field_descriptions[field_name_inner] = processed_content
-                
+
                 for command_str in commands:
                     parsed_command = parse_command(command_str)
                     node.extracted_commands.append(parsed_command)
 
                     # Validate field context scoping for field-level commands
-                    self._validate_field_context_scoping(parsed_command, field_name_inner, tag)
+                    self._validate_field_context_scoping(
+                        parsed_command, field_name_inner, tag
+                    )
 
                     # Validate that iteration commands are only defined on iterable fields
-                    if hasattr(parsed_command, 'command_type') and parsed_command.command_type:
-                        self._validate_command_field_compatibility(parsed_command, field_name_inner, field_def, tag)
+                    if (
+                        hasattr(parsed_command, "command_type")
+                        and parsed_command.command_type
+                    ):
+                        self._validate_command_field_compatibility(
+                            parsed_command, field_name_inner, field_def, tag
+                        )
 
                     self._process_command(parsed_command, tag, field_name_inner)
-        
+
         for field_name_inner, field_def in subtree.model_fields.items():
             field_tag = f"{tag}.{field_name_inner}"
             annotation = field_def.annotation
@@ -188,8 +206,13 @@ class RunStructure:
                     commands, _ = extract_commands(field_def.description)
                     for command_str in commands:
                         parsed_command = parse_command(command_str)
-                        if hasattr(parsed_command, 'command_type') and parsed_command.command_type:
-                            self._validate_command_field_compatibility(parsed_command, field_name_inner, field_def, tag)
+                        if (
+                            hasattr(parsed_command, "command_type")
+                            and parsed_command.command_type
+                        ):
+                            self._validate_command_field_compatibility(
+                                parsed_command, field_name_inner, field_def, tag
+                            )
 
                 self._process_subtask(annotation, node, field_tag)
             elif origin is not None and args is not None:
@@ -197,9 +220,13 @@ class RunStructure:
                     if issubclass(type_candidate, PromptTreeNode):
                         self._process_subtask(type_candidate, node, field_tag)
             elif origin is None and args is None:
-                raise FieldTypeError(field_tag, f"has unsupported field type: {field_def.annotation}")
-    
-    def _process_command(self, command: ParsedCommandUnion, source_node_tag: str, field_name: str = None) -> None:
+                raise FieldTypeError(
+                    field_tag, f"has unsupported field type: {field_def.annotation}"
+                )
+
+    def _process_command(
+        self, command: ParsedCommandUnion, source_node_tag: str, field_name: str = None
+    ) -> None:
         """Register structural + variable metadata for a parsed command.
 
         Current behavior (Phase 1):
@@ -220,18 +247,24 @@ class RunStructure:
             self._process_dpcl_command(command, source_node_tag, field_name)
         elif isinstance(command, VariableAssignmentCommand):
             self._process_variable_assignment(command, source_node_tag)
-        elif isinstance(command, (ExecutionCommand, ResamplingCommand, NodeModifierCommand)):
+        elif isinstance(
+            command, (ExecutionCommand, ResamplingCommand, NodeModifierCommand)
+        ):
             pass
-    
-    def _process_dpcl_command(self, command: ParsedCommand, source_node_tag: str, field_name: str = None) -> None:
+
+    def _process_dpcl_command(
+        self, command: ParsedCommand, source_node_tag: str, field_name: str = None
+    ) -> None:
         """Process DPCL commands (@each, @all) with destinations and variable mappings."""
-        
+
         # Step 1: Validate inclusion field exists if this is an @each command
         if command.inclusion_path:
             self._validate_inclusion_field(command.inclusion_path, source_node_tag)
             # Step 1.2: Validate base field is iterable for @each commands
             if command.command_type.value == "@each":
-                self._validate_inclusion_base_field_iterable(command.inclusion_path, source_node_tag)
+                self._validate_inclusion_base_field_iterable(
+                    command.inclusion_path, source_node_tag
+                )
 
         # Step 1.5: Validate task target completeness
         self._validate_task_target_completeness(command, source_node_tag)
@@ -245,14 +278,18 @@ class RunStructure:
                 full_destination = destination_path
         else:
             full_destination = destination_path
-        
+
         target_node = self.get_node(full_destination)
         if target_node is None:
-            self._pending_target_registry.add_pending(full_destination, command, source_node_tag)
+            self._pending_target_registry.add_pending(
+                full_destination, command, source_node_tag
+            )
         else:
             # Target exists - validate cross-tree iteration count matching for @each commands
             if command.inclusion_path and command.command_type.value == "each":
-                self._validate_cross_tree_iteration_matching(command, source_node_tag, full_destination)
+                self._validate_cross_tree_iteration_matching(
+                    command, source_node_tag, full_destination
+                )
 
         # Step 3: Validate variable mappings and register them
         if command.variable_mappings:
@@ -261,7 +298,9 @@ class RunStructure:
 
             # Phase 3b: Validate variable source fields exist (VariableSourceValidationError)
             for variable_mapping in command.variable_mappings:
-                self._validate_variable_source_field(variable_mapping.source_path, source_node_tag, command)
+                self._validate_variable_source_field(
+                    variable_mapping.source_path, source_node_tag, command
+                )
 
             # Phase 3c: Validate loop nesting constraints between inclusion path and variable mappings
             self._validate_variable_mapping_nesting(command, source_node_tag)
@@ -270,37 +309,40 @@ class RunStructure:
             self._validate_subchain_matching(command, source_node_tag)
 
         for variable_mapping in command.variable_mappings:
-            
             if variable_mapping.resolved_target:
                 target_scope = variable_mapping.resolved_target.scope
                 variable_path = variable_mapping.resolved_target.path
                 source_path = variable_mapping.source_path
-                
+
                 # Validate variable target structure exists
-                self._validate_variable_target_structure(variable_path, target_scope, source_node_tag)
-                
+                self._validate_variable_target_structure(
+                    variable_path, target_scope, source_node_tag
+                )
+
                 # Register the variable target
                 self._variable_registry.register_variable(
                     variable_path=variable_path,
                     scope=target_scope,
                     source_node_tag=source_node_tag,
                     command_type=command.command_type.value,  # Convert enum to string
-                    has_multiplicity=command.has_multiplicity
+                    has_multiplicity=command.has_multiplicity,
                 )
-                
+
                 # Add satisfaction source
                 self._variable_registry.add_satisfaction_source(
                     variable_path=variable_path,
                     scope=target_scope,
-                    source_path=source_path
+                    source_path=source_path,
                 )
-        
+
         # NOTE: Context resolution is deferred until after tree building is complete
         # This prevents failures when trying to resolve forward references or non-existent fields
         # during tree construction. Context resolution will happen in validate_tree() or
         # when preparing execution chains.
-    
-    def _process_variable_assignment(self, command: VariableAssignmentCommand, source_node_tag: str) -> None:
+
+    def _process_variable_assignment(
+        self, command: VariableAssignmentCommand, source_node_tag: str
+    ) -> None:
         """Process Assembly Variable assignment commands (! var=value).
 
         Stores Assembly Variables in the registry with conflict detection per LANGUAGE_SPECIFICATION.md.
@@ -314,12 +356,16 @@ class RunStructure:
             AssemblyVariableConflictError: If variable already exists with different value
             DPCLError: If variable name conflicts with reserved template variables or field names
         """
-        from langtree.prompt.registry import AssemblyVariableConflictError
         from langtree.prompt.exceptions import DPCLError
-        from langtree.prompt.template_variables import validate_template_variable_conflicts
+        from langtree.prompt.registry import AssemblyVariableConflictError
+        from langtree.prompt.template_variables import (
+            validate_template_variable_conflicts,
+        )
 
         # Check for reserved template variable conflicts first
-        template_conflicts = validate_template_variable_conflicts("", {command.variable_name})
+        template_conflicts = validate_template_variable_conflicts(
+            "", {command.variable_name}
+        )
         if template_conflicts:
             raise ValueError(f"Reserved variable name: {template_conflicts[0]}")
 
@@ -332,144 +378,181 @@ class RunStructure:
                     f"Assembly Variable '{command.variable_name}' conflicts with field name "
                     f"in {source_node_tag}. Variable names cannot conflict with field names in same subtree."
                 )
-        
+
         try:
             self._assembly_variable_registry.store_variable(
                 name=command.variable_name,
                 value=command.value,
                 source_node_tag=source_node_tag,
-                defined_at_line=0  # TODO: Add line number tracking if needed
+                defined_at_line=0,  # TODO: Add line number tracking if needed
             )
         except AssemblyVariableConflictError:
             # Re-raise with context for better error reporting
             raise
 
-    def _complete_pending_command_processing(self, pending_target: PendingTarget) -> None:
+    def _complete_pending_command_processing(
+        self, pending_target: PendingTarget
+    ) -> None:
         """Complete processing of a command that was waiting for its target to be resolved.
-        
+
         This method performs the comprehensive resolution and validation workflow for commands
         that were deferred due to forward references. It integrates with context resolution,
         variable mapping validation, and variable registry updates.
-        
+
         Params:
             pending_target: The pending target with command and source information
         """
         # Now that the target exists, we can complete the deferred processing
         command = pending_target.command
         source_node_tag = pending_target.source_node_tag
-        
+
         # Add the command to the source node's extracted_commands if not already there
         source_node = self.get_node(source_node_tag)
         if source_node and command not in source_node.extracted_commands:
             source_node.extracted_commands.append(command)
-        
+
         try:
             # Step 1: Invoke inclusion context resolution if applicable
             if command.inclusion_path and command.resolved_inclusion:
                 self._resolve_inclusion_context(command, source_node_tag)
-            
+
             # Step 2: Invoke destination context resolution now that target node exists
             target_node = self.get_node(pending_target.target_path)
             if target_node:
-                self._resolve_destination_context(command, target_node, pending_target.target_path)
+                self._resolve_destination_context(
+                    command, target_node, pending_target.target_path
+                )
 
             # Step 2.5: Validate cross-tree iteration count matching for @each commands
-            if target_node and command.inclusion_path and command.command_type.value == "each":
-                self._validate_cross_tree_iteration_matching(command, source_node_tag, pending_target.target_path)
+            if (
+                target_node
+                and command.inclusion_path
+                and command.command_type.value == "each"
+            ):
+                self._validate_cross_tree_iteration_matching(
+                    command, source_node_tag, pending_target.target_path
+                )
 
             # Step 3: Resolve each variable mapping (source + target) semantically
             for variable_mapping in command.variable_mappings:
-                self._resolve_variable_mapping_context(variable_mapping, command, source_node_tag, pending_target.target_path)
-            
+                self._resolve_variable_mapping_context(
+                    variable_mapping,
+                    command,
+                    source_node_tag,
+                    pending_target.target_path,
+                )
+
             # Step 4: Update variable registry entries from syntactic to semantic satisfaction
             self._update_variable_registry_satisfaction(command, source_node_tag)
-            
+
         except Exception as e:
             # Let validation errors bubble up - these are intended to fail the operation
             from langtree.prompt.exceptions import FieldValidationError
+
             if isinstance(e, FieldValidationError):
                 raise
 
             # For other exceptions, continue swallowing for now
             # TODO: Implement command.resolution_errors tracking
             pass
-    
-    def _resolve_inclusion_context(self, command: ParsedCommand, source_node_tag: str) -> None:
+
+    def _resolve_inclusion_context(
+        self, command: ParsedCommand, source_node_tag: str
+    ) -> None:
         """
         Resolve inclusion context for @each commands with inclusion paths.
-        
+
         Validates that the inclusion path points to an iterable field and performs
         semantic validation to ensure the command can execute successfully.
-        
+
         Params:
             command: The parsed command with inclusion path information
             source_node_tag: Tag of the source node for context resolution
-            
+
         Raises:
             ValueError: When inclusion path is invalid or not iterable
         """
         # Basic validation - check if inclusion path exists and is accessible
         # TODO: Implement actual iterable validation logic
         pass
-    
-    def _resolve_destination_context(self, command: ParsedCommand, target_node: StructureTreeNode, target_path: str) -> None:
+
+    def _resolve_destination_context(
+        self, command: ParsedCommand, target_node: StructureTreeNode, target_path: str
+    ) -> None:
         """
         Resolve destination context now that target node exists.
-        
+
         Validates that destination path exists, is accessible, and type-compatible
         with the variable mappings that will target it.
-        
+
         Params:
             command: The parsed command with destination information
             target_node: The target structure tree node that was just added
             target_path: Full path to the target node
-            
+
         Raises:
             ValueError: When destination is incompatible with variable mappings
         """
         # Validate that target node has a field_type (required for variable mapping)
         if not target_node.field_type:
-            raise ValueError(f"Target node '{target_path}' has no field_type defined - cannot map variables")
-        
+            raise ValueError(
+                f"Target node '{target_path}' has no field_type defined - cannot map variables"
+            )
+
         # For each variable mapping, check if the target field exists
         for variable_mapping in command.variable_mappings:
-            if variable_mapping.resolved_target and variable_mapping.resolved_target.scope:
+            if (
+                variable_mapping.resolved_target
+                and variable_mapping.resolved_target.scope
+            ):
                 scope_name = variable_mapping.resolved_target.scope.get_name()
                 field_path = variable_mapping.resolved_target.path
-                
+
                 # For 'value' scope, check if the field exists in the target node's field_type
                 if scope_name == "value":
                     try:
                         # Check if field exists in the target node's model
-                        if hasattr(target_node.field_type, 'model_fields'):
+                        if hasattr(target_node.field_type, "model_fields"):
                             if field_path not in target_node.field_type.model_fields:
-                                raise ValueError(f"Target field '{field_path}' not found in {target_path}")
+                                raise ValueError(
+                                    f"Target field '{field_path}' not found in {target_path}"
+                                )
                     except Exception as e:
-                        raise ValueError(f"Cannot validate target field '{field_path}' in {target_path}: {e}")
-                
+                        raise ValueError(
+                            f"Cannot validate target field '{field_path}' in {target_path}: {e}"
+                        )
+
                 # TODO: Add validation for other scopes (outputs, prompt, task)
-    
-    def _resolve_variable_mapping_context(self, variable_mapping, command: ParsedCommand, source_node_tag: str, target_path: str) -> None:
+
+    def _resolve_variable_mapping_context(
+        self,
+        variable_mapping,
+        command: ParsedCommand,
+        source_node_tag: str,
+        target_path: str,
+    ) -> None:
         """
         Resolve a single variable mapping semantically.
-        
+
         Validates that source paths exist and are reachable from source node context.
         Validates that target variables exist in destination and are type-compatible.
-        
+
         Params:
             variable_mapping: The variable mapping to resolve
             command: The parent command containing this mapping
             source_node_tag: Tag of the source node for context resolution
             target_path: Full path to the target node
-            
+
         Raises:
             ValueError: When variable mapping is invalid or incompatible
         """
         # Validate source path exists and is accessible
         source_node = self.get_node(source_node_tag)
         if not source_node or not source_node.field_type:
-            raise ValueError(f"Source node '{source_node_tag}' not found or has no field_type")
-        
+            raise ValueError(
+                f"Source node '{source_node_tag}' not found or has no field_type"
+            )
+
         # Check source field accessibility
         if variable_mapping.resolved_source and variable_mapping.resolved_source.scope:
             scope_name = variable_mapping.resolved_source.scope.get_name()
@@ -477,9 +560,11 @@ class RunStructure:
 
             # For 'prompt' scope, check if the field exists in the source node
             if scope_name == "prompt":
-                if hasattr(source_node.field_type, 'model_fields'):
+                if hasattr(source_node.field_type, "model_fields"):
                     if field_path not in source_node.field_type.model_fields:
-                        raise ValueError(f"Source field '{field_path}' not found in {source_node_tag}")
+                        raise ValueError(
+                            f"Source field '{field_path}' not found in {source_node_tag}"
+                        )
 
             # TODO: Add validation for other source scopes (value, outputs, task)
 
@@ -491,24 +576,29 @@ class RunStructure:
                 target_node = self.get_node(target_path)
                 if target_node:
                     from langtree.prompt.resolution import _track_outputs_collection
+
                     _track_outputs_collection(
                         self,
                         variable_mapping.resolved_target.path,
-                        variable_mapping.resolved_source.path if variable_mapping.resolved_source else "*",
+                        variable_mapping.resolved_source.path
+                        if variable_mapping.resolved_source
+                        else "*",
                         source_node_tag,
-                        target_node
+                        target_node,
                     )
-        
+
         # Target validation is handled by _resolve_destination_context
         # TODO: Add type compatibility checking between source and target
-    
-    def _update_variable_registry_satisfaction(self, command: ParsedCommand, source_node_tag: str) -> None:
+
+    def _update_variable_registry_satisfaction(
+        self, command: ParsedCommand, source_node_tag: str
+    ) -> None:
         """
         Update variable registry entries from syntactic to semantic satisfaction.
-        
+
         Marks variables as semantically satisfied with resolved source paths.
         Updates relationship types (1:1, 1:n, n:n) based on command analysis.
-        
+
         Params:
             command: The resolved command with variable mappings
             source_node_tag: Tag of the source node for registry updates
@@ -518,42 +608,41 @@ class RunStructure:
 
     def get_assembly_variable_registry(self) -> AssemblyVariableRegistry:
         """Get the Assembly Variable Registry for cross-module variable access.
-        
+
         Returns:
             The AssemblyVariableRegistry instance containing all Assembly Variables
         """
         return self._assembly_variable_registry
 
     def resolve_runtime_variable(
-        self, 
-        variable_path: str, 
-        current_node: StructureTreeNode
+        self, variable_path: str, current_node: StructureTreeNode
     ) -> str:
         """
         Resolve runtime variables {{variable}} for content processing.
-        
+
         This method provides the core runtime variable resolution capability required by
         the LANGUAGE_SPECIFICATION.md. It resolves variables from execution context only.
-        
+
         Args:
             variable_path: The variable path to resolve (e.g., "field", "task.field")
             current_node: Current node context for variable resolution
-            
+
         Returns:
             Resolved variable value as string
-            
+
         Raises:
             RuntimeVariableError: When variable resolution fails
         """
         try:
             # Import resolution functions from resolution module
             from langtree.prompt.resolution import _resolve_regular_variable
-            
+
             # Regular runtime variable ({{variable}}) - execution context only
             return _resolve_regular_variable(self, variable_path, current_node)
-                
+
         except Exception as e:
             from langtree.prompt.exceptions import RuntimeVariableError
+
             raise RuntimeVariableError(
                 f"Failed to resolve runtime variable '{{{{{variable_path}}}}}': {str(e)}"
             )
@@ -567,14 +656,14 @@ class RunStructure:
         Returns:
             The `StructureTreeNode` if present; otherwise `None`.
         """
-        path = tag.split('.')
+        path = tag.split(".")
         node = self._root_nodes.get(path[0])
         for name in path[1:]:
             if node is None:
                 break
             node = node.children.get(name)
         return node
-    
+
     def get_prompt_sequence(self, name: str) -> list[str]:
         """Construct ordered prompt content segments leading to a descendant field.
 
@@ -593,18 +682,20 @@ class RunStructure:
             See: tests/langtree/prompt/test_todos.py::test_cleaned_prompt_content_integration
         """
         from itertools import pairwise
-        
-        path = name.split('.')
+
+        path = name.split(".")
         node = self._root_nodes[path[0]]
         prompts = []
         for tag, tag_next in pairwise(path[1:]):
             node = node.children.get(tag)
             type_mro = node.field_type.__mro__
-            for parent in type_mro[:type_mro.index(PromptTreeNode)]:
+            for parent in type_mro[: type_mro.index(PromptTreeNode)]:
                 parent_descr = parent.__doc__ or ""  # TODO: process prompt
                 # See: tests/langtree/prompt/test_todos.py::test_prompt_template_processing
                 prompts.append(parent_descr)
-            field_descr = node.field_type.model_fields[tag_next].description  # TODO: process prompt  
+            field_descr = node.field_type.model_fields[
+                tag_next
+            ].description  # TODO: process prompt
             # See: tests/langtree/prompt/test_todos.py::test_field_description_processing
             prompts.append(field_descr)
         return prompts
@@ -621,17 +712,43 @@ class RunStructure:
             - relationship_types: counts by 1:1 / 1:n / n:n / unknown
         """
         return {
-            'total_variables': len(self._variable_registry.variables),
-            'satisfied_variables': len([v for v in self._variable_registry.variables.values() if v.is_satisfied()]),
-            'unsatisfied_variables': len(self._variable_registry.get_unsatisfied_variables()),
-            'pending_targets': len(self._pending_target_registry.pending_targets),
-            'relationship_types': {
-                '1:1': len([v for v in self._variable_registry.variables.values() if v.get_relationship_type() == "1:1"]),
-                '1:n': len([v for v in self._variable_registry.variables.values() if v.get_relationship_type() == "1:n"]),
-                'n:n': len([v for v in self._variable_registry.variables.values() if v.get_relationship_type() == "n:n"])
-            }
+            "total_variables": len(self._variable_registry.variables),
+            "satisfied_variables": len(
+                [
+                    v
+                    for v in self._variable_registry.variables.values()
+                    if v.is_satisfied()
+                ]
+            ),
+            "unsatisfied_variables": len(
+                self._variable_registry.get_unsatisfied_variables()
+            ),
+            "pending_targets": len(self._pending_target_registry.pending_targets),
+            "relationship_types": {
+                "1:1": len(
+                    [
+                        v
+                        for v in self._variable_registry.variables.values()
+                        if v.get_relationship_type() == "1:1"
+                    ]
+                ),
+                "1:n": len(
+                    [
+                        v
+                        for v in self._variable_registry.variables.values()
+                        if v.get_relationship_type() == "1:n"
+                    ]
+                ),
+                "n:n": len(
+                    [
+                        v
+                        for v in self._variable_registry.variables.values()
+                        if v.get_relationship_type() == "n:n"
+                    ]
+                ),
+            },
         }
-    
+
     def get_execution_plan(self) -> dict:
         """Produce a preliminary (heuristic) execution plan description.
 
@@ -648,66 +765,85 @@ class RunStructure:
             This does not yet perform full topological ordering or multiplicity expansion; future work will refine.
         """
         plan = {
-            'chain_steps': [],
-            'external_inputs': [],
-            'variable_flows': [],
-            'unresolved_issues': []
+            "chain_steps": [],
+            "external_inputs": [],
+            "variable_flows": [],
+            "unresolved_issues": [],
         }
-        
+
         # Identify external inputs (unsatisfied variables)
         unsatisfied_vars = self._variable_registry.get_truly_unsatisfied_variables(self)
         for var_info in unsatisfied_vars:
             scope_name = var_info.get_scope_name()
-            full_name = f"{scope_name}.{var_info.variable_path}" if scope_name else var_info.variable_path
-            plan['external_inputs'].append({
-                'variable': full_name,
-                'source_node': var_info.source_node_tag,
-                'scope': scope_name,
-                'path': var_info.variable_path,
-                'required_type': var_info.get_relationship_type()
-            })
-        
+            full_name = (
+                f"{scope_name}.{var_info.variable_path}"
+                if scope_name
+                else var_info.variable_path
+            )
+            plan["external_inputs"].append(
+                {
+                    "variable": full_name,
+                    "source_node": var_info.source_node_tag,
+                    "scope": scope_name,
+                    "path": var_info.variable_path,
+                    "required_type": var_info.get_relationship_type(),
+                }
+            )
+
         # Identify unresolved targets as blocking issues
-        for target_path, pending_list in self._pending_target_registry.pending_targets.items():
-            plan['unresolved_issues'].append({
-                'type': 'unresolved_target',
-                'target': target_path,
-                'referenced_by': [pending.source_node_tag for pending in pending_list],
-                'command_count': len(pending_list)
-            })
-        
+        for (
+            target_path,
+            pending_list,
+        ) in self._pending_target_registry.pending_targets.items():
+            plan["unresolved_issues"].append(
+                {
+                    "type": "unresolved_target",
+                    "target": target_path,
+                    "referenced_by": [
+                        pending.source_node_tag for pending in pending_list
+                    ],
+                    "command_count": len(pending_list),
+                }
+            )
+
         # Analyze variable flows and satisfaction relationships
         for var_name, var_info in self._variable_registry.variables.items():
             if var_info.is_satisfied():
                 for source in var_info.satisfaction_sources:
-                    plan['variable_flows'].append({
-                        'from': source,
-                        'to': var_name,
-                        'target_node': var_info.source_node_tag,
-                        'relationship_type': var_info.get_relationship_type(),
-                        'scope': var_info.get_scope_name()
-                    })
-        
+                    plan["variable_flows"].append(
+                        {
+                            "from": source,
+                            "to": var_name,
+                            "target_node": var_info.source_node_tag,
+                            "relationship_type": var_info.get_relationship_type(),
+                            "scope": var_info.get_scope_name(),
+                        }
+                    )
+
         # Organize nodes into potential execution steps
         # This is a simplified version - could be enhanced with dependency analysis
         processed_nodes = set()
-        
+
         # First, collect all nodes that are referenced as targets
         referenced_nodes = set()
         for node_name, node in self._root_nodes.items():
             self._collect_referenced_nodes(node, referenced_nodes)
-        
+
         # Add all nodes to execution plan - both nodes with commands and referenced target nodes
         for node_name, node in self._root_nodes.items():
-            self._add_node_to_execution_plan(node, plan, processed_nodes, referenced_nodes)
-        
+            self._add_node_to_execution_plan(
+                node, plan, processed_nodes, referenced_nodes
+            )
+
         return plan
-    
-    def _collect_referenced_nodes(self, node: StructureTreeNode, referenced_nodes: set) -> None:
+
+    def _collect_referenced_nodes(
+        self, node: StructureTreeNode, referenced_nodes: set
+    ) -> None:
         """Helper method to collect all nodes that are referenced as command targets."""
-        if hasattr(node, 'extracted_commands') and node.extracted_commands:
+        if hasattr(node, "extracted_commands") and node.extracted_commands:
             for command in node.extracted_commands:
-                if hasattr(command, 'destination_path') and command.destination_path:
+                if hasattr(command, "destination_path") and command.destination_path:
                     # Try to find the actual target node
                     target_node = self.get_node(command.destination_path)
                     if target_node:
@@ -715,58 +851,68 @@ class RunStructure:
                     else:
                         # Try alternative paths for the destination
                         from langtree.prompt.utils import underscore
+
                         try:
                             underscore_name = underscore(command.destination_path)
-                            if '_' in underscore_name:
-                                parts = underscore_name.split('_', 1)
+                            if "_" in underscore_name:
+                                parts = underscore_name.split("_", 1)
                                 if len(parts) == 2:
-                                    alt_path = f'{parts[0]}.{parts[1]}'
+                                    alt_path = f"{parts[0]}.{parts[1]}"
                                     target_node = self.get_node(alt_path)
                                     if target_node:
                                         referenced_nodes.add(target_node.name)
                         except Exception:
                             pass
-        
+
         # Recursively check children
         for child in node.children.values():
             self._collect_referenced_nodes(child, referenced_nodes)
-    
-    def _add_node_to_execution_plan(self, node: StructureTreeNode, plan: dict, processed_nodes: set, referenced_nodes: set) -> None:
+
+    def _add_node_to_execution_plan(
+        self,
+        node: StructureTreeNode,
+        plan: dict,
+        processed_nodes: set,
+        referenced_nodes: set,
+    ) -> None:
         """Helper method to add a node and its children to the execution plan."""
         if node.name in processed_nodes:
             return
-        
+
         processed_nodes.add(node.name)
-        
+
         # Add this node as an execution step if it has commands OR if it's referenced by other commands
-        has_commands = hasattr(node, 'extracted_commands') and node.extracted_commands
+        has_commands = hasattr(node, "extracted_commands") and node.extracted_commands
         is_referenced = node.name in referenced_nodes
-        
+
         if has_commands or is_referenced:
             step = {
-                'node_tag': node.name,
-                'commands': len(getattr(node, 'extracted_commands', [])),
-                'clean_prompt': getattr(node, 'clean_docstring', None),
-                'field_descriptions': getattr(node, 'clean_field_descriptions', {}),
-                'dependencies': [],  # Could be enhanced with actual dependency analysis
-                'is_terminal': not has_commands and is_referenced  # Mark terminal nodes
+                "node_tag": node.name,
+                "commands": len(getattr(node, "extracted_commands", [])),
+                "clean_prompt": getattr(node, "clean_docstring", None),
+                "field_descriptions": getattr(node, "clean_field_descriptions", {}),
+                "dependencies": [],  # Could be enhanced with actual dependency analysis
+                "is_terminal": not has_commands
+                and is_referenced,  # Mark terminal nodes
             }
-            plan['chain_steps'].append(step)
-        
+            plan["chain_steps"].append(step)
+
         # Recursively process children
         for child in node.children.values():
-            self._add_node_to_execution_plan(child, plan, processed_nodes, referenced_nodes)
-    
+            self._add_node_to_execution_plan(
+                child, plan, processed_nodes, referenced_nodes
+            )
+
     # Validation methods (delegated to validation module)
     def validate_tree(self) -> dict[str, list[str]]:
         """
         Run basic structural validation on the prompt tree.
-        
-        Performs fundamental validation checks including unresolved targets, 
-        unsatisfied variables, and multiply satisfied variables. This is a 
-        lightweight validation pass that focuses on structural integrity 
+
+        Performs fundamental validation checks including unresolved targets,
+        unsatisfied variables, and multiply satisfied variables. This is a
+        lightweight validation pass that focuses on structural integrity
         rather than semantic correctness.
-        
+
         Returns:
             Dictionary with validation results containing keys:
             - 'unresolved_targets': List of target paths that couldn't be resolved
@@ -774,17 +920,18 @@ class RunStructure:
             - 'multiply_satisfied_variables': List of variables with multiple sources
         """
         from langtree.prompt.validation import validate_tree
+
         return validate_tree(self)
-    
+
     def validate_comprehensive(self) -> dict:
         """
         Perform comprehensive semantic validation of the prompt tree.
-        
-        Executes a full suite of validation checks beyond basic structural 
-        validation, including semantic analysis, dependency validation, and 
-        error categorization. This provides the complete validation picture 
+
+        Executes a full suite of validation checks beyond basic structural
+        validation, including semantic analysis, dependency validation, and
+        error categorization. This provides the complete validation picture
         required for execution planning and error reporting.
-        
+
         Returns:
             Dictionary with comprehensive validation results containing:
             - 'circular_dependencies': List of detected circular references
@@ -797,93 +944,103 @@ class RunStructure:
             - 'error_summary': Synthesized summary of all validation issues
         """
         from langtree.prompt.validation import validate_comprehensive
+
         return validate_comprehensive(self)
-    
+
     # Resolution methods (delegated to resolution module)
     def resolve_deferred_contexts(self) -> dict:
         """
         Attempt Phase 2 context resolution for all deferred commands.
-        
-        Executes context resolution for commands that were deferred during tree 
-        construction due to forward references or missing targets. This is a 
-        best-effort operation that attempts to resolve as many contexts as 
+
+        Executes context resolution for commands that were deferred during tree
+        construction due to forward references or missing targets. This is a
+        best-effort operation that attempts to resolve as many contexts as
         possible without failing on unresolvable references.
-        
+
         Returns:
             Dictionary containing resolution results and status information
-            
+
         Raises:
             ResolutionError: When critical resolution failures prevent execution
         """
         from langtree.prompt.resolution import resolve_deferred_contexts
+
         return resolve_deferred_contexts(self)
-    
+
     def _resolve_in_current_node_context(self, path: str, node_tag: str):
         """
         Resolve a path within the current node's context.
-        
-        Attempts to resolve a given path by looking within the specified node's 
-        available fields and attributes. This is used for resolving references 
+
+        Attempts to resolve a given path by looking within the specified node's
+        available fields and attributes. This is used for resolving references
         that should be satisfied by the current node's content or metadata.
-        
+
         Params:
             path: The field path to resolve within the node context
             node_tag: Identifier of the node to search within
-            
+
         Returns:
             Resolved value if path exists, None otherwise
         """
         from langtree.prompt.resolution import _resolve_in_current_node_context
+
         return _resolve_in_current_node_context(self, path, node_tag)
-    
+
     def _resolve_scope_segment_context(self, path: str, node_tag: str):
         """
         Resolve a scoped path segment with explicit scope prefix.
-        
-        Handles resolution of paths that include scope prefixes (e.g., 'prompt.', 
-        'outputs.', 'value.'). Routes the resolution to the appropriate scope 
+
+        Handles resolution of paths that include scope prefixes (e.g., 'prompt.',
+        'outputs.', 'value.'). Routes the resolution to the appropriate scope
         resolver based on the prefix and validates scope accessibility.
-        
+
         Params:
             path: The scoped path to resolve (includes scope prefix)
             node_tag: Identifier of the node providing the resolution context
-            
+
         Returns:
             Resolved value if scope and path are valid, None otherwise
-            
+
         Raises:
             ScopeError: When scope prefix is invalid or inaccessible
         """
         from langtree.prompt.resolution import _resolve_scope_segment_context
+
         return _resolve_scope_segment_context(self, path, node_tag)
-    
+
     def _resolve_in_value_context(self, path: str, node_tag: str):
         """Resolve a path within the value context."""
         from langtree.prompt.resolution import _resolve_in_value_context
+
         return _resolve_in_value_context(self, path, node_tag)
-    
+
     def _resolve_in_outputs_context(self, path: str, node_tag: str):
         """Resolve a path within the outputs context."""
         from langtree.prompt.resolution import _resolve_in_outputs_context
+
         return _resolve_in_outputs_context(self, path, node_tag)
-    
+
     def _resolve_in_global_tree_context(self, path: str):
         """Resolve a path within the global tree context."""
         from langtree.prompt.resolution import _resolve_in_global_tree_context
+
         return _resolve_in_global_tree_context(self, path)
-    
+
     def _resolve_in_target_node_context(self, path: str, target_node):
         """Resolve a path within a target node context."""
         from langtree.prompt.resolution import _resolve_in_target_node_context
+
         return _resolve_in_target_node_context(self, path, target_node)
-    
+
     def _resolve_in_current_prompt_context(self, path: str, node_tag: str):
         """Resolve a path within the current prompt context."""
         from langtree.prompt.resolution import _resolve_in_current_prompt_context
+
         return _resolve_in_current_prompt_context(self, path, node_tag)
-    
-    
-    def _validate_variable_source_field(self, source_path: str, source_node_tag: str, command: Any = None) -> None:
+
+    def _validate_variable_source_field(
+        self, source_path: str, source_node_tag: str, command: Any = None
+    ) -> None:
         """
         Validate that variable source field exists in referenced structure.
 
@@ -903,20 +1060,35 @@ class RunStructure:
             return
 
         # Handle @each vs @all commands differently per LANGUAGE_SPECIFICATION.md
-        if command and hasattr(command, 'command_type'):
-            if command.command_type.value == "each" and hasattr(command, 'inclusion_path') and command.inclusion_path:
+        if command and hasattr(command, "command_type"):
+            if (
+                command.command_type.value == "each"
+                and hasattr(command, "inclusion_path")
+                and command.inclusion_path
+            ):
                 # @each commands: validate iteration variable field existence
-                inclusion_parts = command.inclusion_path.split('.')
-                iteration_collection = inclusion_parts[-1]  # e.g., "sections" from "document.sections"
+                inclusion_parts = command.inclusion_path.split(".")
+                iteration_collection = inclusion_parts[
+                    -1
+                ]  # e.g., "sections" from "document.sections"
 
-                path_components = source_path.split('.')
+                path_components = source_path.split(".")
                 if path_components[0] == iteration_collection:
                     # This is an iteration variable access (e.g., "sections.title" for @each[sections])
                     # Validate that the dotted field exists on the iteration item type
-                    remaining_components = path_components[1:]  # Skip iteration variable name itself
+                    remaining_components = path_components[
+                        1:
+                    ]  # Skip iteration variable name itself
                     if remaining_components:
-                        iteration_item_type = self._get_iteration_item_type(source_node_tag, iteration_collection)
-                        self._validate_field_path_exists(remaining_components, iteration_item_type, source_path, source_node_tag)
+                        iteration_item_type = self._get_iteration_item_type(
+                            source_node_tag, iteration_collection
+                        )
+                        self._validate_field_path_exists(
+                            remaining_components,
+                            iteration_item_type,
+                            source_path,
+                            source_node_tag,
+                        )
                     return
             elif command.command_type.value == "all":
                 # @all commands: already handled by _validate_all_command_rhs_scoping()
@@ -927,63 +1099,76 @@ class RunStructure:
         if not source_node or not source_node.field_type:
             return  # Skip validation if source node not found
 
-        path_components = source_path.split('.')
+        path_components = source_path.split(".")
 
         # Handle scoped variables (e.g., prompt.data, value.field, outputs.result)
-        known_scopes = ['prompt', 'value', 'outputs', 'task']
+        known_scopes = ["prompt", "value", "outputs", "task"]
         if len(path_components) >= 2 and path_components[0] in known_scopes:
             scope_prefix = path_components[0]
-            remaining_path = '.'.join(path_components[1:])
+            remaining_path = ".".join(path_components[1:])
 
-            if scope_prefix == 'prompt':
+            if scope_prefix == "prompt":
                 # For prompt scope, validate that the remaining path exists in the current node
                 remaining_components = path_components[1:]
-                if hasattr(source_node.field_type, 'model_fields'):
-                    self._validate_field_path_exists(remaining_components, source_node.field_type, remaining_path, source_node_tag)
+                if hasattr(source_node.field_type, "model_fields"):
+                    self._validate_field_path_exists(
+                        remaining_components,
+                        source_node.field_type,
+                        remaining_path,
+                        source_node_tag,
+                    )
                 return
-            elif scope_prefix in ['value', 'outputs', 'task']:
+            elif scope_prefix in ["value", "outputs", "task"]:
                 # For other scopes, we defer validation to runtime resolution
                 # as these depend on execution context
                 return
 
         # Validate the complete path using same logic as inclusion field validation
-        if hasattr(source_node.field_type, 'model_fields'):
-            self._validate_field_path_exists(path_components, source_node.field_type, source_path, source_node_tag)
-    
-    def _validate_variable_target_structure(self, variable_path: str, target_scope, source_node_tag: str) -> None:
+        if hasattr(source_node.field_type, "model_fields"):
+            self._validate_field_path_exists(
+                path_components, source_node.field_type, source_path, source_node_tag
+            )
+
+    def _validate_variable_target_structure(
+        self, variable_path: str, target_scope, source_node_tag: str
+    ) -> None:
         """
         Validate that variable target structure can be satisfied.
-        
+
         Validates that target variable paths (e.g., "main_analysis.title") can be
         created by checking if the target structure exists in the appropriate scope.
-        
+
         Params:
             variable_path: Path to the target variable (e.g., "main_analysis.title")
             target_scope: Scope object for the target variable
             source_node_tag: Tag of the node where this target is declared
-            
+
         Raises:
             VariableTargetValidationError: If target structure cannot be satisfied
         """
         from langtree.prompt.exceptions import VariableTargetValidationError
-        
+
         # For value scope, check if the path can be created in the current node structure
         if target_scope.get_name() == "value":
-            path_components = variable_path.split('.')
+            path_components = variable_path.split(".")
             if len(path_components) > 1:
                 # Check if the parent structure exists (e.g., "main_analysis" in "main_analysis.title")
                 source_node = self.get_node(source_node_tag)
                 if source_node and source_node.field_type:
                     first_component = path_components[0]
-                    if (hasattr(source_node.field_type, 'model_fields') and 
-                        first_component not in source_node.field_type.model_fields):
+                    if (
+                        hasattr(source_node.field_type, "model_fields")
+                        and first_component not in source_node.field_type.model_fields
+                    ):
                         raise VariableTargetValidationError(
                             target_path=variable_path,
                             source_node=source_node_tag,
-                            reason=f"target structure '{first_component}' does not exist"
+                            reason=f"target structure '{first_component}' does not exist",
                         )
-    
-    def _validate_inclusion_field(self, inclusion_path: str, source_node_tag: str) -> None:
+
+    def _validate_inclusion_field(
+        self, inclusion_path: str, source_node_tag: str
+    ) -> None:
         """
         Validate that inclusion field exists in the source structure.
 
@@ -997,29 +1182,30 @@ class RunStructure:
         Raises:
             FieldValidationError: If inclusion field does not exist
         """
+        from typing import get_args, get_origin
+
         from langtree.prompt.exceptions import FieldValidationError
-        from typing import get_origin, get_args
 
         source_node = self.get_node(source_node_tag)
         if not source_node or not source_node.field_type:
             return  # Skip validation if source node not found or has no type
 
-        path_components = inclusion_path.split('.')
+        path_components = inclusion_path.split(".")
         current_type = source_node.field_type
 
         # Validate each component of the path step by step
         for i, component in enumerate(path_components):
             # Check if this component exists as a field in current type
-            if not hasattr(current_type, 'model_fields'):
+            if not hasattr(current_type, "model_fields"):
                 # Can't validate further if not a PromptTreeNode
                 break
 
             if component not in current_type.model_fields:
-                partial_path = '.'.join(path_components[:i+1])
+                partial_path = ".".join(path_components[: i + 1])
                 raise FieldValidationError(
                     field_path=partial_path,
                     container=current_type.__name__,
-                    message=f"inclusion field '{component}' does not exist"
+                    message=f"inclusion field '{component}' does not exist",
                 )
 
             # Move to the next type in the path
@@ -1031,17 +1217,19 @@ class RunStructure:
                 # Handle list types by extracting the element type
                 if get_origin(field_type) is list:
                     args = get_args(field_type)
-                    if args and hasattr(args[0], 'model_fields'):
+                    if args and hasattr(args[0], "model_fields"):
                         current_type = args[0]
                     else:
                         break  # Can't validate further if not a PromptTreeNode
-                elif hasattr(field_type, 'model_fields'):
+                elif hasattr(field_type, "model_fields"):
                     current_type = field_type
                 else:
                     # The field exists but we can't validate nested paths within it
                     break
 
-    def _validate_inclusion_base_field_iterable(self, inclusion_path: str, source_node_tag: str) -> None:
+    def _validate_inclusion_base_field_iterable(
+        self, inclusion_path: str, source_node_tag: str
+    ) -> None:
         """
         Validate that the base field in inclusion path is iterable for @each commands.
 
@@ -1056,18 +1244,19 @@ class RunStructure:
         Raises:
             FieldValidationError: If base field is not iterable
         """
-        from langtree.prompt.exceptions import FieldValidationError
         from typing import get_origin
+
+        from langtree.prompt.exceptions import FieldValidationError
 
         source_node = self.get_node(source_node_tag)
         if not source_node or not source_node.field_type:
             return  # Skip validation if source node not found or has no type
 
-        path_components = inclusion_path.split('.')
+        path_components = inclusion_path.split(".")
         base_field = path_components[0]
 
         # Check if base field exists
-        if not hasattr(source_node.field_type, 'model_fields'):
+        if not hasattr(source_node.field_type, "model_fields"):
             return  # Can't validate if not a PromptTreeNode
 
         if base_field not in source_node.field_type.model_fields:
@@ -1084,11 +1273,13 @@ class RunStructure:
                 field_path=base_field,
                 container=source_node_tag,
                 message=f"base field '{base_field}' must be iterable (list type) for @each command. "
-                       f"Found {field_type}. Use @all for single objects or make field a list.",
-                command_context=f"@each[{inclusion_path}] requires base field to be list type"
+                f"Found {field_type}. Use @all for single objects or make field a list.",
+                command_context=f"@each[{inclusion_path}] requires base field to be list type",
             )
 
-    def _validate_command_field_compatibility(self, command: 'ParsedCommand', field_name: str, field_def, source_node_tag: str) -> None:
+    def _validate_command_field_compatibility(
+        self, command: "ParsedCommand", field_name: str, field_def, source_node_tag: str
+    ) -> None:
         """
         Validate that command types are compatible with the field they're defined on.
 
@@ -1104,11 +1295,12 @@ class RunStructure:
         Raises:
             FieldValidationError: If command type incompatible with field type
         """
-        from langtree.prompt.exceptions import FieldValidationError
         from typing import get_origin
 
+        from langtree.prompt.exceptions import FieldValidationError
+
         # Only validate iteration commands
-        if not hasattr(command, 'command_type') or command.command_type.value != "each":
+        if not hasattr(command, "command_type") or command.command_type.value != "each":
             return
 
         field_type = field_def.annotation
@@ -1116,7 +1308,7 @@ class RunStructure:
 
         # Check if this is a cross-tree reference (destination goes to different registered structure)
         is_cross_tree = False
-        if hasattr(command, 'destination_path') and command.destination_path:
+        if hasattr(command, "destination_path") and command.destination_path:
             dest_path = command.destination_path
             # Cross-tree means the destination is a different registered structure node
             if source_node_tag != dest_path:
@@ -1126,18 +1318,26 @@ class RunStructure:
         # For @each commands on same-tree references, the field must be iterable (list type)
         # For cross-tree references, the field doesn't need to be iterable since results go elsewhere
         if origin is not list and not is_cross_tree:
-            command_context = f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}*"
+            command_context = (
+                f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}*"
+            )
 
             raise FieldValidationError(
                 field_path=field_name,
                 container=source_node_tag,
                 message=f"iteration command @each cannot be defined on non-iterable field of type {field_type}. "
-                       f"@each creates multiple iterations which require an iterable field (list type). "
-                       f"Use @all for single objects or change field to list type.",
-                command_context=command_context
+                f"@each creates multiple iterations which require an iterable field (list type). "
+                f"Use @all for single objects or change field to list type.",
+                command_context=command_context,
             )
 
-    def _validate_field_path_exists(self, path_components: list[str], field_type: type, source_path: str, source_node_tag: str) -> None:
+    def _validate_field_path_exists(
+        self,
+        path_components: list[str],
+        field_type: type,
+        source_path: str,
+        source_node_tag: str,
+    ) -> None:
         """
         Helper method to validate that a field path exists in the given type structure.
 
@@ -1157,21 +1357,21 @@ class RunStructure:
         current_type = field_type
 
         for i, component in enumerate(path_components):
-            if not hasattr(current_type, 'model_fields'):
+            if not hasattr(current_type, "model_fields"):
                 # Can't validate further - not a Pydantic model
                 # If there are remaining components to check, this is an error
-                remaining_path = '.'.join(path_components[i:])
+                remaining_path = ".".join(path_components[i:])
                 raise VariableSourceValidationError(
                     source_path=source_path,
                     structure_type=f"{current_type.__name__ if hasattr(current_type, '__name__') else str(current_type)}",
-                    command_context=f"Cannot access '{remaining_path}' on {current_type.__name__ if hasattr(current_type, '__name__') else str(current_type)} type"
+                    command_context=f"Cannot access '{remaining_path}' on {current_type.__name__ if hasattr(current_type, '__name__') else str(current_type)} type",
                 )
 
             if component not in current_type.model_fields:
                 raise VariableSourceValidationError(
                     source_path=source_path,
                     structure_type=current_type.__name__,
-                    command_context=source_node_tag
+                    command_context=source_node_tag,
                 )
 
             # Get the field type for next iteration
@@ -1179,8 +1379,10 @@ class RunStructure:
             field_annotation = field_def.annotation
 
             # Handle list/sequence types: list[ItemType] -> ItemType
-            if hasattr(field_annotation, '__origin__'):
-                if field_annotation.__origin__ is list and hasattr(field_annotation, '__args__'):
+            if hasattr(field_annotation, "__origin__"):
+                if field_annotation.__origin__ is list and hasattr(
+                    field_annotation, "__args__"
+                ):
                     if field_annotation.__args__:
                         current_type = field_annotation.__args__[0]
                         continue
@@ -1188,7 +1390,9 @@ class RunStructure:
             # Direct type assignment
             current_type = field_annotation
 
-    def _validate_variable_mapping_nesting(self, command: 'ParsedCommand', source_node_tag: str) -> None:
+    def _validate_variable_mapping_nesting(
+        self, command: "ParsedCommand", source_node_tag: str
+    ) -> None:
         """
         Validate loop nesting constraints between inclusion path and variable mappings.
 
@@ -1206,8 +1410,10 @@ class RunStructure:
 
         if command.inclusion_path:
             # Count actual iterable levels in inclusion path, not just path components
-            path_components = command.inclusion_path.split('.')
-            iteration_levels = self._count_iterable_levels_in_path(path_components, source_node_tag)
+            path_components = command.inclusion_path.split(".")
+            iteration_levels = self._count_iterable_levels_in_path(
+                path_components, source_node_tag
+            )
             iteration_root = path_components[0]
 
         # Track nesting levels for all LHS mappings
@@ -1215,9 +1421,12 @@ class RunStructure:
 
         for variable_mapping in command.variable_mappings:
             # Calculate LHS nesting level from variable path like "value.results.items"
-            if variable_mapping.resolved_target and variable_mapping.resolved_target.path:
+            if (
+                variable_mapping.resolved_target
+                and variable_mapping.resolved_target.path
+            ):
                 lhs_path = variable_mapping.resolved_target.path
-                lhs_components = lhs_path.split('.')
+                lhs_components = lhs_path.split(".")
 
                 # For value scope, we can't validate against source node types since
                 # target fields are in destination node. Skip detailed LHS validation
@@ -1228,14 +1437,21 @@ class RunStructure:
                 # Check if the field actually exists in the source node
                 source_node = self.get_node(source_node_tag)
                 field_exists = False
-                if (source_node and source_node.field_type and
-                    hasattr(source_node.field_type, 'model_fields')):
-                    first_component = lhs_components[0] if lhs_components else ''
-                    field_exists = first_component in source_node.field_type.model_fields
+                if (
+                    source_node
+                    and source_node.field_type
+                    and hasattr(source_node.field_type, "model_fields")
+                ):
+                    first_component = lhs_components[0] if lhs_components else ""
+                    field_exists = (
+                        first_component in source_node.field_type.model_fields
+                    )
 
                 if field_exists:
                     # Field exists in source - validate its nesting level (applies to ALL scopes)
-                    lhs_nesting = self._count_iterable_levels(lhs_components, source_node_tag)
+                    lhs_nesting = self._count_iterable_levels(
+                        lhs_components, source_node_tag
+                    )
                     lhs_nesting_levels.append(lhs_nesting)
 
                     # Validate: no LHS can exceed iteration level
@@ -1243,7 +1459,7 @@ class RunStructure:
                         raise FieldValidationError(
                             field_path=lhs_path,
                             container=source_node_tag,
-                            message=f"has {lhs_nesting} nesting levels which exceeds iteration level {iteration_levels} from inclusion path '{command.inclusion_path}'"
+                            message=f"has {lhs_nesting} nesting levels which exceeds iteration level {iteration_levels} from inclusion path '{command.inclusion_path}'",
                         )
                 # else: Field doesn't exist - it's a destination field, skip LHS-RHS nesting validation
                 # This will be validated during assembly when destination structure is known (for ALL scopes)
@@ -1253,7 +1469,12 @@ class RunStructure:
                 rhs_path = variable_mapping.source_path
 
                 # Skip scope-modified paths (handled by different validation)
-                if '.' in rhs_path and rhs_path.split('.')[0] in ('prompt', 'value', 'outputs', 'task'):
+                if "." in rhs_path and rhs_path.split(".")[0] in (
+                    "prompt",
+                    "value",
+                    "outputs",
+                    "task",
+                ):
                     continue
 
                 # Allow if path starts with iteration root (subchain)
@@ -1262,9 +1483,11 @@ class RunStructure:
 
                 # Allow if path starts with iteration variable
                 # For @each[document.sections], allow "sections.title" (sections is the iteration variable)
-                inclusion_parts = command.inclusion_path.split('.')
-                iteration_collection = inclusion_parts[-1]  # e.g., "sections" from "document.sections"
-                if rhs_path.split('.')[0] == iteration_collection:
+                inclusion_parts = command.inclusion_path.split(".")
+                iteration_collection = inclusion_parts[
+                    -1
+                ]  # e.g., "sections" from "document.sections"
+                if rhs_path.split(".")[0] == iteration_collection:
                     continue
 
                 # TODO: This exception needs specification clarification
@@ -1277,12 +1500,18 @@ class RunStructure:
                         current_mapping_scope = mapping.resolved_target.scope
                         break
 
-                if current_mapping_scope and current_mapping_scope.get_name() == 'value':
+                if (
+                    current_mapping_scope
+                    and current_mapping_scope.get_name() == "value"
+                ):
                     # Check if it's a valid field in the same context
                     source_node = self.get_node(source_node_tag)
-                    if (source_node and source_node.field_type and
-                        hasattr(source_node.field_type, 'model_fields') and
-                        rhs_path in source_node.field_type.model_fields):
+                    if (
+                        source_node
+                        and source_node.field_type
+                        and hasattr(source_node.field_type, "model_fields")
+                        and rhs_path in source_node.field_type.model_fields
+                    ):
                         continue
 
                 # If none of the above, fail
@@ -1290,7 +1519,7 @@ class RunStructure:
                     field_path=rhs_path,
                     container=source_node_tag,
                     message=f"must start from iteration root '{iteration_root}' when using @each[{command.inclusion_path}] "
-                            f"or be a field in the same context"
+                    f"or be a field in the same context",
                 )
 
         # Check for cross-tree references before applying local nesting validation
@@ -1301,8 +1530,12 @@ class RunStructure:
                 variable_path = variable_mapping.resolved_target.path
 
                 # Cross-tree references in value scope with nested paths skip local nesting validation
-                if (target_scope and target_scope.get_name() == 'value' and
-                    '.' in variable_path and not variable_path.startswith(command.inclusion_path or '')):
+                if (
+                    target_scope
+                    and target_scope.get_name() == "value"
+                    and "." in variable_path
+                    and not variable_path.startswith(command.inclusion_path or "")
+                ):
                     has_cross_tree_reference = True
                     break
 
@@ -1316,10 +1549,12 @@ class RunStructure:
                 raise FieldValidationError(
                     field_path=command.inclusion_path,
                     container=source_node_tag,
-                    message=f"requires at least one variable mapping to match iteration level {iteration_levels}, but found nesting levels: {lhs_nesting_levels}"
+                    message=f"requires at least one variable mapping to match iteration level {iteration_levels}, but found nesting levels: {lhs_nesting_levels}",
                 )
 
-    def _validate_field_inheritance(self, field_tag: str, annotation: type, origin: type, args: tuple) -> None:
+    def _validate_field_inheritance(
+        self, field_tag: str, annotation: type, origin: type, args: tuple
+    ) -> None:
         """
         Validate that field types use proper inheritance (PromptTreeNode, not raw BaseModel).
 
@@ -1339,7 +1574,9 @@ class RunStructure:
         """
 
         # Validate against bare collection types (list, dict, set without type parameters)
-        self._validate_against_bare_collection_types(field_tag, annotation, origin, args)
+        self._validate_against_bare_collection_types(
+            field_tag, annotation, origin, args
+        )
 
         # TODO: Add list[list[...]] antipattern validation
 
@@ -1351,7 +1588,9 @@ class RunStructure:
             for type_candidate in args:
                 self._check_single_type_inheritance(field_tag, type_candidate)
 
-    def _check_single_type_inheritance(self, field_tag: str, type_to_check: type) -> None:
+    def _check_single_type_inheritance(
+        self, field_tag: str, type_to_check: type
+    ) -> None:
         """
         Check a single type for proper inheritance.
 
@@ -1365,22 +1604,29 @@ class RunStructure:
         from pydantic import BaseModel
 
         # Skip built-in types and primitives
-        if not hasattr(type_to_check, '__module__') or type_to_check.__module__ in ('builtins', 'typing'):
+        if not hasattr(type_to_check, "__module__") or type_to_check.__module__ in (
+            "builtins",
+            "typing",
+        ):
             return
 
         # If it's a class that inherits from BaseModel
         try:
-            if issubclass(type_to_check, BaseModel) and not issubclass(type_to_check, PromptTreeNode):
+            if issubclass(type_to_check, BaseModel) and not issubclass(
+                type_to_check, PromptTreeNode
+            ):
                 raise FieldTypeError(
                     field_tag,
                     f"uses BaseModel inheritance ({type_to_check.__name__}) which is not allowed. "
-                    f"All model classes must inherit from PromptTreeNode, not raw BaseModel."
+                    f"All model classes must inherit from PromptTreeNode, not raw BaseModel.",
                 )
         except TypeError:
             # issubclass can raise TypeError for some types like generics
             pass
 
-    def _get_iteration_item_type(self, source_node_tag: str, iteration_collection: str) -> type:
+    def _get_iteration_item_type(
+        self, source_node_tag: str, iteration_collection: str
+    ) -> type:
         """
         Extract the item type from a list field for iteration validation.
 
@@ -1400,11 +1646,11 @@ class RunStructure:
         from langtree.prompt.exceptions import VariableSourceValidationError
 
         source_node = self.get_node(source_node_tag)
-        if not source_node or not hasattr(source_node.field_type, 'model_fields'):
+        if not source_node or not hasattr(source_node.field_type, "model_fields"):
             raise VariableSourceValidationError(
                 source_path=iteration_collection,
                 structure_type="unknown",
-                command_context=f"Cannot validate iteration on node {source_node_tag}"
+                command_context=f"Cannot validate iteration on node {source_node_tag}",
             )
 
         field_def = source_node.field_type.model_fields.get(iteration_collection)
@@ -1412,22 +1658,27 @@ class RunStructure:
             raise VariableSourceValidationError(
                 source_path=iteration_collection,
                 structure_type=source_node.field_type.__name__,
-                command_context=f"Iteration field '{iteration_collection}' not found"
+                command_context=f"Iteration field '{iteration_collection}' not found",
             )
 
         # Extract item type from list[ItemType]
         field_annotation = field_def.annotation
-        if hasattr(field_annotation, '__origin__') and field_annotation.__origin__ is list:
-            if hasattr(field_annotation, '__args__') and field_annotation.__args__:
+        if (
+            hasattr(field_annotation, "__origin__")
+            and field_annotation.__origin__ is list
+        ):
+            if hasattr(field_annotation, "__args__") and field_annotation.__args__:
                 return field_annotation.__args__[0]
 
         raise VariableSourceValidationError(
             source_path=iteration_collection,
             structure_type=source_node.field_type.__name__,
-            command_context=f"Field '{iteration_collection}' is not a list type for iteration"
+            command_context=f"Field '{iteration_collection}' is not a list type for iteration",
         )
 
-    def _validate_against_bare_collection_types(self, field_tag: str, annotation: type, origin: type, args: tuple) -> None:
+    def _validate_against_bare_collection_types(
+        self, field_tag: str, annotation: type, origin: type, args: tuple
+    ) -> None:
         """
         Validate that collection types have proper type parameters.
 
@@ -1454,7 +1705,7 @@ class RunStructure:
                 field_path=field_tag,
                 container="field type validation",
                 message=f"Bare collection type '{collection_name}' is underspecified. "
-                       f"Use proper type parameters like '{collection_name}[str]' or '{collection_name}[str, int]' instead."
+                f"Use proper type parameters like '{collection_name}[str]' or '{collection_name}[str, int]' instead.",
             )
 
         # Check if origin is a bare collection type (this handles typing.List, typing.Dict, etc.)
@@ -1464,10 +1715,12 @@ class RunStructure:
                 field_path=field_tag,
                 container="field type validation",
                 message=f"Bare collection type '{collection_name}' is underspecified. "
-                       f"Use proper type parameters like '{collection_name}[str]' or '{collection_name}[str, int]' instead."
+                f"Use proper type parameters like '{collection_name}[str]' or '{collection_name}[str, int]' instead.",
             )
 
-    def _count_iterable_levels(self, path_components: list[str], source_node_tag: str) -> int:
+    def _count_iterable_levels(
+        self, path_components: list[str], source_node_tag: str
+    ) -> int:
         """
         Count the actual iterable levels in a field path by examining types.
 
@@ -1480,7 +1733,7 @@ class RunStructure:
         This uses Pydantic type introspection to check actual field types.
         """
         # Skip 'value' if present - it's not part of the field structure
-        if path_components and path_components[0] == 'value':
+        if path_components and path_components[0] == "value":
             field_components = path_components[1:]
         else:
             field_components = path_components
@@ -1496,17 +1749,20 @@ class RunStructure:
 
         # Walk through the path components to find the target field type
         for component in field_components:
-            if not hasattr(current_type, 'model_fields'):
+            if not hasattr(current_type, "model_fields"):
                 # Cannot continue traversal - this should not happen for source fields
-                raise ValueError(f"Cannot count iterable levels: '{current_type}' has no model_fields while processing '{'.'.join(field_components)}'")
+                raise ValueError(
+                    f"Cannot count iterable levels: '{current_type}' has no model_fields while processing '{'.'.join(field_components)}'"
+                )
 
             if component not in current_type.model_fields:
                 # Field doesn't exist - this should not happen for source fields after field existence check
                 from langtree.prompt.exceptions import FieldValidationError
+
                 raise FieldValidationError(
-                    field_path='.'.join(field_components),
+                    field_path=".".join(field_components),
                     container=source_node_tag,
-                    message=f"field '{component}' does not exist in {current_type.__name__ if hasattr(current_type, '__name__') else str(current_type)} during nesting level counting"
+                    message=f"field '{component}' does not exist in {current_type.__name__ if hasattr(current_type, '__name__') else str(current_type)} during nesting level counting",
                 )
 
             field_def = current_type.model_fields[component]
@@ -1528,7 +1784,7 @@ class RunStructure:
         - list[SomeNode] where SomeNode.items: list[str] = 2 levels (can traverse as field.items)
         - list[list[str]] = invalid pattern (should fail - no traversable field names)
         """
-        from typing import get_origin, get_args
+        from typing import get_args, get_origin
 
         # Check if this is a list type
         origin = get_origin(field_type)
@@ -1546,11 +1802,13 @@ class RunStructure:
                 return 1 + self._count_nested_iterations(inner_type)
 
             # If inner type is a PromptTreeNode, count its maximum iterable depth
-            if hasattr(inner_type, 'model_fields'):
+            if hasattr(inner_type, "model_fields"):
                 max_inner_depth = 0
                 for field_name, field_def in inner_type.model_fields.items():
                     try:
-                        inner_depth = self._count_nested_iterations(field_def.annotation)
+                        inner_depth = self._count_nested_iterations(
+                            field_def.annotation
+                        )
                         max_inner_depth = max(max_inner_depth, inner_depth)
                     except Exception:
                         continue
@@ -1560,7 +1818,7 @@ class RunStructure:
                 return 1
         else:
             # Not a list - check if it's a PromptTreeNode with iterable fields
-            if hasattr(field_type, 'model_fields'):
+            if hasattr(field_type, "model_fields"):
                 max_depth = 0
                 for field_name, field_def in field_type.model_fields.items():
                     try:
@@ -1572,7 +1830,9 @@ class RunStructure:
             else:
                 return 0
 
-    def _count_iterable_levels_in_path(self, path_components: list[str], source_node_tag: str) -> int:
+    def _count_iterable_levels_in_path(
+        self, path_components: list[str], source_node_tag: str
+    ) -> int:
         """
         Count actual iterable levels in an inclusion path by examining field types.
 
@@ -1597,7 +1857,7 @@ class RunStructure:
 
         # Walk through path components and count iterable levels
         for component in path_components:
-            if not hasattr(current_type, 'model_fields'):
+            if not hasattr(current_type, "model_fields"):
                 break
 
             if component not in current_type.model_fields:
@@ -1607,10 +1867,13 @@ class RunStructure:
             field_annotation = field_def.annotation
 
             # Check if this field is iterable (list type)
-            if hasattr(field_annotation, '__origin__') and field_annotation.__origin__ is list:
+            if (
+                hasattr(field_annotation, "__origin__")
+                and field_annotation.__origin__ is list
+            ):
                 iterable_count += 1
                 # Get the inner type for next iteration
-                if hasattr(field_annotation, '__args__') and field_annotation.__args__:
+                if hasattr(field_annotation, "__args__") and field_annotation.__args__:
                     current_type = field_annotation.__args__[0]
                 else:
                     break
@@ -1619,12 +1882,14 @@ class RunStructure:
                 current_type = field_annotation
 
             # Stop if we can't introspect further
-            if not hasattr(current_type, 'model_fields'):
+            if not hasattr(current_type, "model_fields"):
                 break
 
         return iterable_count
 
-    def _validate_task_target_completeness(self, command: 'ParsedCommand', source_node_tag: str) -> None:
+    def _validate_task_target_completeness(
+        self, command: "ParsedCommand", source_node_tag: str
+    ) -> None:
         """
         Validate that task targets are complete (not just 'task').
 
@@ -1640,17 +1905,23 @@ class RunStructure:
         if destination_path == "task":
             # Build command context for error chaining
             command_type = "@each" if command.inclusion_path else "@all"
-            inclusion_part = f"[{command.inclusion_path}]" if command.inclusion_path else ""
-            command_context = f"{command_type}{inclusion_part}->{command.destination_path}@{{...}}"
+            inclusion_part = (
+                f"[{command.inclusion_path}]" if command.inclusion_path else ""
+            )
+            command_context = (
+                f"{command_type}{inclusion_part}->{command.destination_path}@{{...}}"
+            )
 
             raise FieldValidationError(
                 field_path=destination_path,
                 container=source_node_tag,
                 message="is an incomplete task target. Use specific task names like 'task.analyzer' instead of just 'task'",
-                command_context=command_context
+                command_context=command_context,
             )
 
-    def _validate_field_context_scoping(self, command, field_name: str, source_node_tag: str) -> None:
+    def _validate_field_context_scoping(
+        self, command, field_name: str, source_node_tag: str
+    ) -> None:
         """
         Validate field context scoping for @each commands.
 
@@ -1660,7 +1931,7 @@ class RunStructure:
         from langtree.prompt.exceptions import FieldValidationError
 
         # Only validate ParsedCommand types with inclusion_path (@each commands)
-        if not hasattr(command, 'inclusion_path') or not command.inclusion_path:
+        if not hasattr(command, "inclusion_path") or not command.inclusion_path:
             return
 
         inclusion_path = command.inclusion_path
@@ -1671,8 +1942,8 @@ class RunStructure:
                 field_path=inclusion_path,
                 container=source_node_tag,
                 message="@each commands are not allowed in class docstrings. "
-                        "@each commands must be defined in field descriptions where they can reference the field context.",
-                command_context=f"@each[{command.inclusion_path}] in docstring of {source_node_tag}"
+                "@each commands must be defined in field descriptions where they can reference the field context.",
+                command_context=f"@each[{command.inclusion_path}] in docstring of {source_node_tag}",
             )
 
         # DPCL scoping rule: inclusion_path must ALWAYS start with field_name
@@ -1684,11 +1955,13 @@ class RunStructure:
                 field_path=inclusion_path,
                 container=source_node_tag,
                 message=f"inclusion_path '{inclusion_path}' must start with field '{field_name}' where command is defined. "
-                        f"Commands can only reference the field they are defined in (DPCL scoping rule)",
-                command_context=command_context
+                f"Commands can only reference the field they are defined in (DPCL scoping rule)",
+                command_context=command_context,
             )
 
-    def _validate_subchain_matching(self, command: 'ParsedCommand', source_node_tag: str) -> None:
+    def _validate_subchain_matching(
+        self, command: "ParsedCommand", source_node_tag: str
+    ) -> None:
         """
         Validate RHS paths using last-matching-iterable algorithm.
 
@@ -1725,9 +1998,14 @@ class RunStructure:
             source_path = variable_mapping.source_path
 
             # Skip wildcard and scope-modified paths - these have different validation rules
-            if source_path == '*':
+            if source_path == "*":
                 continue
-            if '.' in source_path and source_path.split('.')[0] in ('prompt', 'value', 'outputs', 'task'):
+            if "." in source_path and source_path.split(".")[0] in (
+                "prompt",
+                "value",
+                "outputs",
+                "task",
+            ):
                 continue  # Skip scoped paths from structural validation
 
             # COMMENTED OUT: Skip iteration variable paths from structural validation
@@ -1740,7 +2018,9 @@ class RunStructure:
             # Skip same-node field references in value scope
             if variable_mapping.resolved_target:
                 target_scope = variable_mapping.resolved_target.scope.get_name()
-                if target_scope == "value" and self._is_same_node_field(source_path, source_node_tag):
+                if target_scope == "value" and self._is_same_node_field(
+                    source_path, source_node_tag
+                ):
                     continue
                 if target_scope in ("prompt", "outputs"):
                     continue  # These scopes have broader validation rules
@@ -1749,12 +2029,12 @@ class RunStructure:
             # Sibling fields that diverge from inclusion path should be caught and rejected
 
             # Add to structural validation
-            rhs_paths.append(source_path.split('.'))
+            rhs_paths.append(source_path.split("."))
 
         # Apply last-matching-iterable validation if we have paths to validate
         if rhs_paths:
             parser = CommandParser()
-            inclusion_path_components = command.inclusion_path.split('.')
+            inclusion_path_components = command.inclusion_path.split(".")
 
             try:
                 result = parser.validate_last_matching_iterable(
@@ -1762,19 +2042,23 @@ class RunStructure:
                 )
                 if not result["valid"]:
                     from langtree.prompt.exceptions import FieldValidationError
+
                     command_context = f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}* in field '{command.inclusion_path.split('.')[0]}'"
 
                     # Extract detailed error message from parser
-                    error_detail = result.get('error', result.get('reason', 'validation failed'))
+                    error_detail = result.get(
+                        "error", result.get("reason", "validation failed")
+                    )
                     raise FieldValidationError(
                         field_path=command.inclusion_path,
                         container=source_node_tag,
                         message=error_detail,
-                        command_context=command_context
+                        command_context=command_context,
                     )
             except Exception as e:
                 # Convert parser errors to field validation errors, preserving detailed messages
                 from langtree.prompt.exceptions import FieldValidationError
+
                 command_context = f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}* in field '{command.inclusion_path.split('.')[0]}'"
 
                 # Preserve the original error message which contains the keywords expected by tests
@@ -1782,7 +2066,7 @@ class RunStructure:
                     field_path=command.inclusion_path,
                     container=source_node_tag,
                     message=str(e),
-                    command_context=command_context
+                    command_context=command_context,
                 )
 
     def _is_same_node_field(self, source_path: str, source_node_tag: str) -> bool:
@@ -1807,15 +2091,19 @@ class RunStructure:
                 return False
 
             # Check if the source_path is a valid field in this node
-            path_components = source_path.split('.')
-            self._validate_field_path_exists(path_components, field_type, source_path, source_node_tag)
+            path_components = source_path.split(".")
+            self._validate_field_path_exists(
+                path_components, field_type, source_path, source_node_tag
+            )
             return True
 
         except Exception:
             # If validation fails, it's not a valid same-node field
             return False
 
-    def _is_sibling_field_reference(self, source_path: str, inclusion_path: str) -> bool:
+    def _is_sibling_field_reference(
+        self, source_path: str, inclusion_path: str
+    ) -> bool:
         """
         Check if source_path and inclusion_path are sibling fields in the same structure.
 
@@ -1828,22 +2116,26 @@ class RunStructure:
         Returns:
             True if they are sibling fields in the same parent structure
         """
-        source_parts = source_path.split('.')
-        inclusion_parts = inclusion_path.split('.')
+        source_parts = source_path.split(".")
+        inclusion_parts = inclusion_path.split(".")
 
         # Must have at least 2 parts each to have a parent and field
         if len(source_parts) < 2 or len(inclusion_parts) < 2:
             return False
 
         # Check if they share the same parent path
-        source_parent = '.'.join(source_parts[:-1])
-        inclusion_parent = '.'.join(inclusion_parts[:-1])
+        source_parent = ".".join(source_parts[:-1])
+        inclusion_parent = ".".join(inclusion_parts[:-1])
 
         # Sibling fields have the same parent path but different final fields
-        return (source_parent == inclusion_parent and
-                source_parts[-1] != inclusion_parts[-1])
+        return (
+            source_parent == inclusion_parent
+            and source_parts[-1] != inclusion_parts[-1]
+        )
 
-    def _validate_cross_tree_iteration_matching(self, command: 'ParsedCommand', source_node_tag: str, target_path: str) -> None:
+    def _validate_cross_tree_iteration_matching(
+        self, command: "ParsedCommand", source_node_tag: str, target_path: str
+    ) -> None:
         """
         Validate that cross-tree iteration counts match between source and target structures.
 
@@ -1866,8 +2158,10 @@ class RunStructure:
             return
 
         # Extract inclusion path components for source iteration count
-        inclusion_components = command.inclusion_path.split('.')
-        source_iteration_count = self._count_iterable_levels_in_path(inclusion_components, source_node_tag)
+        inclusion_components = command.inclusion_path.split(".")
+        source_iteration_count = self._count_iterable_levels_in_path(
+            inclusion_components, source_node_tag
+        )
 
         # Count iterations in target structure by finding maximum iteration depth
         target_node = self.get_node(target_path)
@@ -1879,32 +2173,41 @@ class RunStructure:
         for field_name, _ in target_node.field_type.model_fields.items():
             try:
                 # Try to find the deepest iterable path starting from this field
-                max_depth = self._find_max_iteration_depth(field_name, target_node.field_type, target_path)
+                max_depth = self._find_max_iteration_depth(
+                    field_name, target_node.field_type, target_path
+                )
                 target_iteration_count = max(target_iteration_count, max_depth)
             except Exception:
                 continue
 
-
         # For @each commands with multiplicity, the target receives individual items
         # so iteration count mismatch is expected and valid (expansion pattern)
-        is_each_with_multiplicity = (hasattr(command, 'command_type') and
-                                   command.command_type.value == "each" and
-                                   hasattr(command, 'has_multiplicity') and command.has_multiplicity)
+        is_each_with_multiplicity = (
+            hasattr(command, "command_type")
+            and command.command_type.value == "each"
+            and hasattr(command, "has_multiplicity")
+            and command.has_multiplicity
+        )
 
         # Validate iteration counts match (except for @each expansion patterns)
-        if source_iteration_count != target_iteration_count and not is_each_with_multiplicity:
+        if (
+            source_iteration_count != target_iteration_count
+            and not is_each_with_multiplicity
+        ):
             command_context = f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}* in field '{command.inclusion_path.split('.')[0]}'"
 
             raise FieldValidationError(
                 field_path=command.inclusion_path,
                 container=source_node_tag,
                 message=f"Cross-tree iteration count mismatch: source has {source_iteration_count} iteration levels "
-                        f"but target structure '{target_path}' has {target_iteration_count} iteration levels. "
-                        f"Cross-tree references require matching iteration counts for execution compatibility.",
-                command_context=command_context
+                f"but target structure '{target_path}' has {target_iteration_count} iteration levels. "
+                f"Cross-tree references require matching iteration counts for execution compatibility.",
+                command_context=command_context,
             )
 
-    def _find_max_iteration_depth(self, field_name: str, parent_type: type, context_tag: str) -> int:
+    def _find_max_iteration_depth(
+        self, field_name: str, parent_type: type, context_tag: str
+    ) -> int:
         """
         Find the maximum iteration depth starting from a field by traversing nested PromptTreeNode types.
 
@@ -1922,18 +2225,21 @@ class RunStructure:
 
         # Check if this field itself is iterable
         field_type = field_def.annotation
-        from typing import get_origin, get_args
+        from typing import get_args, get_origin
+
         origin = get_origin(field_type)
 
         if origin is list:
             # This field is iterable - count 1 and recurse into its element type
             args = get_args(field_type)
-            if args and hasattr(args[0], 'model_fields'):
+            if args and hasattr(args[0], "model_fields"):
                 # Element type is a PromptTreeNode - find max depth in its fields
                 element_type = args[0]
                 max_nested_depth = 0
                 for nested_field_name, _ in element_type.model_fields.items():
-                    nested_depth = self._find_max_iteration_depth(nested_field_name, element_type, context_tag)
+                    nested_depth = self._find_max_iteration_depth(
+                        nested_field_name, element_type, context_tag
+                    )
                     max_nested_depth = max(max_nested_depth, nested_depth)
                 return 1 + max_nested_depth
             else:
@@ -1941,17 +2247,24 @@ class RunStructure:
                 return 1
         else:
             # Field is not iterable itself - check if it's a PromptTreeNode we can recurse into
-            if hasattr(field_type, 'model_fields'):
+            if hasattr(field_type, "model_fields"):
                 max_nested_depth = 0
                 for nested_field_name, _ in field_type.model_fields.items():
-                    nested_depth = self._find_max_iteration_depth(nested_field_name, field_type, context_tag)
+                    nested_depth = self._find_max_iteration_depth(
+                        nested_field_name, field_type, context_tag
+                    )
                     max_nested_depth = max(max_nested_depth, nested_depth)
                 return max_nested_depth
             else:
                 # Non-iterable primitive field
                 return 0
 
-    def _validate_all_command_rhs_scoping(self, command: 'ParsedCommand', field_name: str = None, source_node_tag: str = None) -> None:
+    def _validate_all_command_rhs_scoping(
+        self,
+        command: "ParsedCommand",
+        field_name: str = None,
+        source_node_tag: str = None,
+    ) -> None:
         """
         Validate @all command RHS scoping rules per LANGUAGE_SPECIFICATION.md.
 
@@ -2000,14 +2313,14 @@ class RunStructure:
                 raise FieldValidationError(
                     field_path=field_name,
                     container=source_node_tag,
-                    message=f"@all command references '{source_path}' but @all commands can only reference the exact field containing the command ('{field_name}') or wildcard (*). RHS must be containing field only."
+                    message=f"@all command references '{source_path}' but @all commands can only reference the exact field containing the command ('{field_name}') or wildcard (*). RHS must be containing field only.",
                 )
             else:
                 # Docstring-level command: only wildcard allowed
                 raise FieldValidationError(
                     field_path="<docstring>",
                     container=source_node_tag,
-                    message=f"@all command in docstring references '{source_path}' but docstring @all commands can only use wildcard (*) for data locality."
+                    message=f"@all command in docstring references '{source_path}' but docstring @all commands can only use wildcard (*) for data locality.",
                 )
 
     def list_runtime_variables(self) -> list[str]:
@@ -2020,6 +2333,7 @@ class RunStructure:
         Uses existing runtime variable resolution system instead of regex scanning.
         """
         import re
+
         from langtree.prompt.resolution import resolve_runtime_variables
 
         runtime_vars = []
@@ -2030,11 +2344,14 @@ class RunStructure:
             content_sources = []
 
             # Add clean docstring if available
-            if hasattr(node, 'clean_docstring') and node.clean_docstring:
+            if hasattr(node, "clean_docstring") and node.clean_docstring:
                 content_sources.append(node.clean_docstring)
 
             # Add clean field descriptions if available
-            if hasattr(node, 'clean_field_descriptions') and node.clean_field_descriptions:
+            if (
+                hasattr(node, "clean_field_descriptions")
+                and node.clean_field_descriptions
+            ):
                 content_sources.extend(node.clean_field_descriptions.values())
 
             # Process each content source using existing resolution system
@@ -2043,10 +2360,12 @@ class RunStructure:
                     try:
                         # Use existing resolve_runtime_variables to get expanded content
                         # Use deferred validation for variable listing (don't error on undefined vars)
-                        expanded_content = resolve_runtime_variables(content, self, node, validate=False)
+                        expanded_content = resolve_runtime_variables(
+                            content, self, node, validate=False
+                        )
 
                         # Extract expanded variable patterns from resolved content
-                        expanded_var_pattern = re.compile(r'\{(prompt__[^}]+)\}')
+                        expanded_var_pattern = re.compile(r"\{(prompt__[^}]+)\}")
                         found_vars = expanded_var_pattern.findall(expanded_content)
                         runtime_vars.extend(found_vars)
 

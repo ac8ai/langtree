@@ -15,21 +15,22 @@ Design notes:
     - Sampling utilities wrap an existing chain instead of duplicating logic.
 """
 
-import random
-from langchain_core.prompts import (
-        ChatPromptTemplate,
-        SystemMessagePromptTemplate,
-        HumanMessagePromptTemplate,
-)
+from uuid import uuid4
+
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    SystemMessagePromptTemplate,
+)
 from langchain_core.runnables import Runnable, RunnableLambda
 from pydantic import BaseModel
-from uuid import uuid4
 
 from langtree.dynamic import describe_model
 from langtree.models import LLMProvider
 
 _llm_provider = LLMProvider()
+
 
 def prepare_chain(
     llm_name: str,
@@ -55,8 +56,8 @@ def prepare_chain(
       2. Human message containing: Context, Task, Output spec, (optional model schema), Input, (optional Samples)
 
     When `structured_output` is provided, uses LangChain's modern
-    `.with_structured_output()` API for Pydantic model binding. If 
-    `parse_as_string` is True, a `StrOutputParser` is appended (mutually 
+    `.with_structured_output()` API for Pydantic model binding. If
+    `parse_as_string` is True, a `StrOutputParser` is appended (mutually
     exclusive with structured output binding).
 
     Params:
@@ -80,18 +81,26 @@ def prepare_chain(
     llm = _llm_provider.get_llm(llm_name)
     if structured_output is not None:
         llm = llm.with_structured_output(structured_output)
-    human_message = ''.join((
-        f'# Context\n\n{prompt_context.strip()}\n' if prompt_context is not None else "",
-        f'\n# Task\n\n{prompt_task.strip()}\n',
-        f'\n# Output\n\n{prompt_output.strip()}\n' if prompt_output is not None else "",
-        describe_model(structured_output(), describe_fields=True) if structured_output is not None else "",
-        f'\n# Input\n\n{prompt_input}\n' if prompt_input else "",
-        f"\n## Samples\n\n{samples_template}\n" if samples_template else "",
-        "\n<ignore>{signature}</ignore>\n" if for_sampling else ""
-    ))
+    human_message = "".join(
+        (
+            f"# Context\n\n{prompt_context.strip()}\n"
+            if prompt_context is not None
+            else "",
+            f"\n# Task\n\n{prompt_task.strip()}\n",
+            f"\n# Output\n\n{prompt_output.strip()}\n"
+            if prompt_output is not None
+            else "",
+            describe_model(structured_output(), describe_fields=True)
+            if structured_output is not None
+            else "",
+            f"\n# Input\n\n{prompt_input}\n" if prompt_input else "",
+            f"\n## Samples\n\n{samples_template}\n" if samples_template else "",
+            "\n<ignore>{signature}</ignore>\n" if for_sampling else "",
+        )
+    )
     messages = [
         SystemMessagePromptTemplate.from_template(prompt_system),
-        HumanMessagePromptTemplate.from_template(human_message)
+        HumanMessagePromptTemplate.from_template(human_message),
     ]
     prompt_template = ChatPromptTemplate.from_messages(messages=messages)
     chain = prompt_template | llm
@@ -100,6 +109,7 @@ def prepare_chain(
             raise ValueError("Structured output is not allowed in this chain.")
         chain = chain | StrOutputParser()
     return chain
+
 
 def sample_mapper(input_data: dict[str, str]) -> dict[str, str]:
     """Inject a unique signature marker into input mapping for sampling runs.
@@ -115,9 +125,9 @@ def sample_mapper(input_data: dict[str, str]) -> dict[str, str]:
         is a UUID wrapped in an `<ignore>` tag.
     """
     output_data = input_data.copy()
-    output_data['signature'] = f'<ignore>{str(uuid4())}</ignore>'
+    output_data["signature"] = f"<ignore>{str(uuid4())}</ignore>"
     return output_data
-    
+
 
 def sample_chain(
     chain: Runnable,
@@ -145,22 +155,18 @@ def sample_chain(
         Runnable producing aggregated re‑prompt output (string or model-bound response).
     """
     if skip_context_prompt:
-        prompts['prompt_context'] = None
-    prompts['prompt_task'] = prompts['prompt_task'].format(original_task=original_task)
+        prompts["prompt_context"] = None
+    prompts["prompt_task"] = prompts["prompt_task"].format(original_task=original_task)
     samples_template = "\n\n".join(
-        "<sample>\n{sample_" + str(i + 1) + "}\n</sample>"
-        for i in range(n_samples)
+        "<sample>\n{sample_" + str(i + 1) + "}\n</sample>" for i in range(n_samples)
     )
     sampling_chain = prepare_chain(
-        llm_name='summarization',
+        llm_name="summarization",
         **prompts,
         samples_template=samples_template,
     )
     signed_chain = RunnableLambda(sample_mapper) | chain
-    samples = {
-        f'sample_{i + 1}': signed_chain
-        for i in range(n_samples)
-    }
+    samples = {f"sample_{i + 1}": signed_chain for i in range(n_samples)}
     resample = samples | sampling_chain
     if output_as_string:
         resample = resample | StrOutputParser()

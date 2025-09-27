@@ -7,14 +7,15 @@ processing prompts, and handling naming conventions.
 
 import re
 from textwrap import dedent
-from typing import Type, TYPE_CHECKING
+from typing import TYPE_CHECKING
+
 from inflection import underscore
 
 if TYPE_CHECKING:
     from langtree.prompt.structure import PromptTreeNode
 
 # Text processing utilities - matches commands that may span multiple lines within brackets/braces
-COMMAND_PATTERN = re.compile(r'^\s*!\s*[^!\n]*(?:\n(?!\s*!)[^\n]*)*', re.MULTILINE)
+COMMAND_PATTERN = re.compile(r"^\s*!\s*[^!\n]*(?:\n(?!\s*!)[^\n]*)*", re.MULTILINE)
 
 
 def extract_commands(content: str | None) -> tuple[list[str], str]:
@@ -34,7 +35,7 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
     if not content:
         return [], ""
 
-    lines = content.split('\n')
+    lines = content.split("\n")
     commands = []
     command_indices = set()
     current_command = None
@@ -50,7 +51,7 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
             continue
 
         # Check if this line starts a new command
-        if stripped.startswith('!'):
+        if stripped.startswith("!"):
             # Finish previous command if any
             if current_command is not None:
                 commands.append(current_command.strip())
@@ -60,14 +61,28 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
             command_indices.add(i)
 
             # Check if this command has multiline contexts
-            in_multiline_context = any(char in line for char in ['[', '{', '('])
-            bracket_depth = line.count('[') + line.count('{') + line.count('(') - line.count(']') - line.count('}') - line.count(')')
+            in_multiline_context = any(char in line for char in ["[", "{", "("])
+            bracket_depth = (
+                line.count("[")
+                + line.count("{")
+                + line.count("(")
+                - line.count("]")
+                - line.count("}")
+                - line.count(")")
+            )
 
         elif current_command is not None and in_multiline_context and bracket_depth > 0:
             # Continue multiline command if we're in a bracket/brace context
-            current_command += '\n' + line
+            current_command += "\n" + line
             command_indices.add(i)
-            bracket_depth += line.count('[') + line.count('{') + line.count('(') - line.count(']') - line.count('}') - line.count(')')
+            bracket_depth += (
+                line.count("[")
+                + line.count("{")
+                + line.count("(")
+                - line.count("]")
+                - line.count("}")
+                - line.count(")")
+            )
 
             if bracket_depth <= 0:
                 in_multiline_context = False
@@ -91,7 +106,7 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
 
     # Remove command lines from content
     clean_lines = [line for i, line in enumerate(lines) if i not in command_indices]
-    clean_content = '\n'.join(clean_lines)
+    clean_content = "\n".join(clean_lines)
 
     # Clean up the content - remove empty lines and dedent
     clean_content = dedent(clean_content).strip()
@@ -99,7 +114,7 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
     return commands, clean_content
 
 
-def get_root_tag(subtree: Type['PromptTreeNode'], kind: str = 'task') -> str:
+def get_root_tag(subtree: type["PromptTreeNode"], kind: str = "task") -> str:
     """
     Generate a root tag for a PromptTreeNode type based on naming conventions.
 
@@ -118,40 +133,50 @@ def get_root_tag(subtree: Type['PromptTreeNode'], kind: str = 'task') -> str:
     Raises:
         ValueError: If the class name doesn't follow naming conventions or expected kind
     """
-    class_name = subtree.__name__.split('.')[-1]
+    class_name = subtree.__name__.split(".")[-1]
 
     # Validate CamelCase format
     if not _is_valid_camelcase(class_name):
-        raise ValueError(f"Class name '{class_name}' must be in CamelCase format (no underscores, starts with capital letter)")
+        raise ValueError(
+            f"Class name '{class_name}' must be in CamelCase format (no underscores, starts with capital letter)"
+        )
 
     # For task classes, validate and process Task prefix
-    if kind == 'task':
-        is_valid, matched_prefix = _is_valid_prefix(class_name, ['Task'])
+    if kind == "task":
+        is_valid, matched_prefix = _is_valid_prefix(class_name, ["Task"])
         if not is_valid:
-            raise ValueError(f"Task class name '{class_name}' has invalid prefix - must start with 'Task' followed by a capital letter (e.g., TaskEarly, TaskA)")
+            raise ValueError(
+                f"Task class name '{class_name}' has invalid prefix - must start with 'Task' followed by a capital letter (e.g., TaskEarly, TaskA)"
+            )
 
         # Extract the part after matched prefix and convert to underscore
-        task_suffix = class_name[len(matched_prefix):]  # Remove prefix
+        task_suffix = class_name[len(matched_prefix) :]  # Remove prefix
         if task_suffix:
             name = underscore(task_suffix)
         else:
-            raise ValueError(f"Task class name '{class_name}' must have content after '{matched_prefix}' prefix")
+            raise ValueError(
+                f"Task class name '{class_name}' must have content after '{matched_prefix}' prefix"
+            )
 
-        root_tag = f'task.{name}'
+        root_tag = f"task.{name}"
         return root_tag
 
     # For non-task classes, use the original logic
     name_underscore = underscore(class_name)
-    parts = name_underscore.split('_', 1)
+    parts = name_underscore.split("_", 1)
 
     if len(parts) != 2:
-        raise ValueError(f"Class name '{class_name}' does not follow expected '{kind.title()}Name' pattern")
+        raise ValueError(
+            f"Class name '{class_name}' does not follow expected '{kind.title()}Name' pattern"
+        )
 
     designation, name = parts
     if designation != kind:
-        raise ValueError(f"Expected a {kind} class, got: {class_name} of a kind {designation}.")
+        raise ValueError(
+            f"Expected a {kind} class, got: {class_name} of a kind {designation}."
+        )
 
-    root_tag = f'{designation}.{name}'
+    root_tag = f"{designation}.{name}"
     return root_tag
 
 
@@ -170,7 +195,7 @@ def _is_valid_camelcase(name: str) -> bool:
         return False
 
     # No underscores allowed
-    if '_' in name:
+    if "_" in name:
         return False
 
     return True
@@ -191,7 +216,7 @@ def _is_valid_prefix(name: str, allowed_prefixes: list[str] = None) -> tuple[boo
         Tuple of (is_valid, matched_prefix)
     """
     if allowed_prefixes is None:
-        allowed_prefixes = ['Task']
+        allowed_prefixes = ["Task"]
 
     for prefix in allowed_prefixes:
         if name.startswith(prefix):

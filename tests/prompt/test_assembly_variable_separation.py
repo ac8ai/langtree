@@ -12,9 +12,10 @@ Expected Behavior:
 """
 
 import pytest
+
 from langtree.prompt import PromptTreeNode, RunStructure
-from langtree.prompt.resolution import resolve_runtime_variables
 from langtree.prompt.exceptions import RuntimeVariableError
+from langtree.prompt.resolution import resolve_runtime_variables
 
 
 class TestAssemblyVariableSeparation:
@@ -29,11 +30,12 @@ class TestAssemblyVariableSeparation:
 
             Template with assembly variables: {count} items above {threshold}
             """
+
             field_var: str = "default"
 
         structure = RunStructure()
         structure.add(TaskWithAssemblyVar)
-        node = structure.get_node('task.with_assembly_var')
+        node = structure.get_node("task.with_assembly_var")
 
         # Assembly variable 'count' in runtime template should fail
         with pytest.raises(RuntimeVariableError) as exc_info:
@@ -41,7 +43,10 @@ class TestAssemblyVariableSeparation:
 
         error_msg = str(exc_info.value)
         assert "assembly variable" in error_msg.lower()
-        assert "cannot be used in runtime contexts" in error_msg or "only valid in command arguments" in error_msg
+        assert (
+            "cannot be used in runtime contexts" in error_msg
+            or "only valid in command arguments" in error_msg
+        )
 
     def test_assembly_variable_in_runtime_template_should_fail_threshold(self):
         """Second assembly variable should also fail in runtime template."""
@@ -52,11 +57,12 @@ class TestAssemblyVariableSeparation:
 
             Template with assembly variables: {count} items above {threshold}
             """
+
             field_var: str = "default"
 
         structure = RunStructure()
         structure.add(TaskWithAssemblyVar)
-        node = structure.get_node('task.with_assembly_var')
+        node = structure.get_node("task.with_assembly_var")
 
         # Assembly variable 'threshold' in runtime template should fail
         with pytest.raises(RuntimeVariableError) as exc_info:
@@ -64,7 +70,10 @@ class TestAssemblyVariableSeparation:
 
         error_msg = str(exc_info.value)
         assert "assembly variable" in error_msg.lower()
-        assert "cannot be used in runtime contexts" in error_msg or "only valid in command arguments" in error_msg
+        assert (
+            "cannot be used in runtime contexts" in error_msg
+            or "only valid in command arguments" in error_msg
+        )
 
     def test_multiple_assembly_variables_in_runtime_template_should_fail(self):
         """Multiple assembly variables in single template should fail."""
@@ -76,15 +85,18 @@ class TestAssemblyVariableSeparation:
 
             Template: Run {iterations} times with {model_name} in {debug_mode}
             """
+
             field_var: str = "default"
 
         structure = RunStructure()
         structure.add(TaskWithAssemblyVars)
-        node = structure.get_node('task.with_assembly_vars')
+        node = structure.get_node("task.with_assembly_vars")
 
         # All assembly variables should fail - test first one encountered
         with pytest.raises(RuntimeVariableError) as exc_info:
-            resolve_runtime_variables("Run {iterations} times with {model_name}", structure, node)
+            resolve_runtime_variables(
+                "Run {iterations} times with {model_name}", structure, node
+            )
 
         error_msg = str(exc_info.value)
         assert "assembly variable" in error_msg.lower()
@@ -97,11 +109,12 @@ class TestAssemblyVariableSeparation:
 
             Template with field variable: {field_var}
             """
+
             field_var: str = "default"
 
         structure = RunStructure()
         structure.add(TaskWithMixedVars)
-        node = structure.get_node('task.with_mixed_vars')
+        node = structure.get_node("task.with_mixed_vars")
 
         # Field variable should expand normally
         expanded = resolve_runtime_variables("Field: {field_var}", structure, node)
@@ -115,11 +128,12 @@ class TestAssemblyVariableSeparation:
 
             Template: Configuration: {config_value}
             """
+
             pass
 
         structure = RunStructure()
         structure.add(TaskWithAssemblyVar)
-        node = structure.get_node('task.with_assembly_var')
+        node = structure.get_node("task.with_assembly_var")
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables("{config_value}", structure, node)
@@ -128,8 +142,9 @@ class TestAssemblyVariableSeparation:
         # Error should mention the specific variable name
         assert "config_value" in error_msg
         # Error should explain assembly variables are for commands only
-        assert ("assembly variable" in error_msg.lower() and
-                ("command" in error_msg.lower() or "!" in error_msg))
+        assert "assembly variable" in error_msg.lower() and (
+            "command" in error_msg.lower() or "!" in error_msg
+        )
 
     def test_assembly_variables_in_commands_should_still_work(self):
         """Assembly variables should continue to work in command contexts."""
@@ -140,13 +155,14 @@ class TestAssemblyVariableSeparation:
 
             This is the template content.
             """
+
             result: str = "default"
 
         structure = RunStructure()
         # This should not raise any errors - assembly variables in commands are valid
         structure.add(TaskWithCommandUsage)
 
-        node = structure.get_node('task.with_command_usage')
+        node = structure.get_node("task.with_command_usage")
         assert node is not None
 
         # But using assembly variable in template should still fail
@@ -158,11 +174,12 @@ class TestAssemblyVariableSeparation:
 
         class TaskWithoutVariables(PromptTreeNode):
             """Simple template."""
+
             field_var: str = "default"
 
         structure = RunStructure()
         structure.add(TaskWithoutVariables)
-        node = structure.get_node('task.without_variables')
+        node = structure.get_node("task.without_variables")
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables("Unknown: {unknown_var}", structure, node)
@@ -186,13 +203,14 @@ class TestAssemblyVariableValidUsage:
 
             Process items in batches.
             """
+
             items: list[str] = ["item1", "item2"]
 
         structure = RunStructure()
         # Should not raise errors - assembly variables used in commands
         structure.add(TaskWithAssemblyVars)
 
-        node = structure.get_node('task.with_assembly_vars')
+        node = structure.get_node("task.with_assembly_vars")
         assert node is not None
 
     def test_assembly_variable_registry_integration(self):
@@ -203,14 +221,17 @@ class TestAssemblyVariableValidUsage:
 
             Template content.
             """
+
             pass
 
         structure = RunStructure()
         structure.add(TaskWithAssemblyVar)
 
         # Assembly variable should be in registry
-        node_name = 'task.with_assembly_var'
-        if hasattr(structure, '_assembly_variable_registry'):
-            assembly_vars = structure._assembly_variable_registry.get_variables_for_node(node_name)
+        node_name = "task.with_assembly_var"
+        if hasattr(structure, "_assembly_variable_registry"):
+            assembly_vars = (
+                structure._assembly_variable_registry.get_variables_for_node(node_name)
+            )
             assembly_var_names = [var.name for var in assembly_vars]
-            assert 'setting' in assembly_var_names
+            assert "setting" in assembly_var_names
