@@ -551,7 +551,7 @@ class TestScopeSegmentContextResolution:
                 "task.nonexistent", "task.source"
             )
             # Accept either real resolution or placeholder
-            assert isinstance(result, (str, type(None)))
+            assert isinstance(result, str | type(None))
         except KeyError:
             # Missing target is acceptable error
             pass
@@ -732,7 +732,7 @@ class TestTargetNodeContextResolution:
         assert not isinstance(result, str) or not result.startswith("target_node[")
         # TODO: Expect structured object e.g. { 'path': 'title', 'exists': True, 'type': str }
         # For now, accept current boolean implementation
-        assert isinstance(result, (bool, dict, str))
+        assert isinstance(result, bool | dict | str)
 
     def test_validate_nonexistent_structure_path(self):
         """Test validating a path that doesn't exist in target structure."""
@@ -778,7 +778,7 @@ class TestValueContextResolution:
             result = self.run_structure._resolve_in_value_context(
                 "input_data", "task.value"
             )  # Use existing field
-            assert isinstance(result, (str, int, list, dict, type(None)))
+            assert isinstance(result, str | int | list | dict | type(None))
         except KeyError:
             # KeyError is acceptable for missing fields
             pass
@@ -1457,8 +1457,8 @@ class TestSpecificationContractEnforcement:
         # Test that different case is allowed (case-sensitive)
         class TaskCaseSensitive(PromptTreeNode):
             """
-            Task testing case sensitivity.
             ! Field="assembly_value"  # Different case from field
+            Task testing case sensitivity.
             """
 
             field: str = "field_value"  # Lowercase
