@@ -75,7 +75,7 @@ class TaskInsightGenerator(TaskCustomerAnalysis):
             """)
 
         insights: list[Insight] = Field(description="""
-            ! @each[insights]->task.order_processor@{{orders.feedback=insights.recommendation}}
+            ! @each[insights]->task.order_processor@{{orders.feedback=insights.recommendation}}* # Generate insights
             
             Insights for this category
         """)
@@ -182,7 +182,7 @@ class TaskInsightGenerator(TaskCustomerAnalysis):
             """)
 
         insights: list[Insight] = Field(description="""
-            ! @each[insights]->task.order_processor@{{orders.feedback=insights.recommendation}}
+            ! @each[insights]->task.order_processor@{{orders.feedback=insights.recommendation}}* # Generate insights
 
             Insights for this category
         """)

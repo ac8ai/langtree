@@ -6,9 +6,13 @@ replacing the current placeholder implementations that return debug strings.
 The tests should drive the implementation of actual data access and validation.
 """
 
+# Group 1: External direct imports (alphabetical)
 import pytest
+
+# Group 2: External from imports (alphabetical by source module)
 from pydantic import Field
 
+# Group 4: Internal from imports (alphabetical by source module)
 from langtree.prompt import PromptTreeNode, RunStructure, StructureTreeNode
 from langtree.prompt.exceptions import (
     NodeTagValidationError,
@@ -54,7 +58,8 @@ class TestIntegrationWorkflow:
         # Check that the target was found and not added to pending registry
         assert len(self.run_structure._pending_target_registry.pending_targets) == 0
 
-        # TODO: The following should be tested but variable registration is incomplete
+        # TODO: Fix variable registration - DPCL variable targets should be tracked
+        # See: tests/prompt/test_resolution.py::TestIntegrationWorkflow::test_command_processing_calls_resolution
         pytest.skip(
             "TODO: Fix variable registration - DPCL variable targets should be tracked per LANGUAGE_SPECIFICATION.md"
         )
@@ -1047,9 +1052,9 @@ class TestSpecificationViolationDetection:
 
         run_structure = RunStructure()
 
-        # Invalid: @each without required multiplicity - currently falls through to general parse error
+        # Invalid: @each without required multiplicity - now gives specific error
         with pytest.raises(
-            CommandParseError, match=r"Invalid command syntax|malformed"
+            CommandParseError, match=r"@each commands require.*multiplicity indicator"
         ):
 
             class TaskInvalidEach(PromptTreeNode):
@@ -1059,9 +1064,9 @@ class TestSpecificationViolationDetection:
 
             run_structure.add(TaskInvalidEach)
 
-        # Invalid: @all with inclusion brackets - currently falls through to general parse error
+        # Invalid: @all with inclusion brackets - now gives specific error
         with pytest.raises(
-            CommandParseError, match=r"Invalid command syntax|malformed"
+            CommandParseError, match=r"@all commands cannot have inclusion brackets"
         ):
 
             class TaskInvalidAll(PromptTreeNode):
@@ -1142,9 +1147,9 @@ class TestSpecificationViolationDetection:
 
             run_structure.add(TaskEmptyPath)
 
-        # Invalid: Empty variable name in mapping
+        # Invalid: Empty variable name in mapping - now gives specific path validation error
         with pytest.raises(
-            CommandParseError, match=r"Invalid command syntax|malformed"
+            CommandParseError, match=r"Invalid.*path.*cannot.*end with dots"
         ):
 
             class TaskEmptyVariable(PromptTreeNode):
@@ -1182,9 +1187,14 @@ class TestSpecificationViolationDetection:
         # Should NOT raise error - deep nesting is valid
         run_structure.add(TaskDeepNesting)
 
-    @pytest.mark.skip(reason="TODO: Implement scope validation edge cases")
+    @pytest.mark.skip("TODO: Implement scope validation edge cases")
     def test_scope_validation_edge_cases(self):
         """Test scope validation edge cases per COMPREHENSIVE_GUIDE.md."""
+        # TODO: Implement scope validation edge cases
+        # See: tests/prompt/test_resolution.py::TestSpecificationViolationDetection::test_scope_validation_edge_cases
+        pytest.skip(
+            "TODO: Implement scope validation edge cases - see langtree/prompt/scopes.py"
+        )
         run_structure = RunStructure()
 
         # Invalid: Using 'outputs' scope in @each (iteration context)
@@ -2327,53 +2337,51 @@ class TestRuntimeVariableResolution:
         expected_content = "Task: {prompt__with_scoped_vars__name} with priority {prompt__with_scoped_vars__priority}\nTimestamp: {prompt__with_scoped_vars__timestamp}"
         assert resolved_content == expected_content
 
-    @pytest.mark.skip("TODO: Implement assembly variable priority resolution")
-    def test_assembly_variable_priority_resolution(self):
-        """Test {{<variable>}} resolution with Assembly Variable priority."""
+    def test_runtime_variable_field_resolution(self):
+        """Test {variable} resolution to field values with proper scope separation."""
 
-        class TaskWithPriorityVar(PromptTreeNode):
+        class TaskWithFields(PromptTreeNode):
             """
-            Task with assembly variable override.
-            ! model="claude-3"
-            ! temperature=0.8
+            Task demonstrating runtime variable resolution.
+            ! model="claude-3"  # Assembly variable for chain configuration
+            ! temperature=0.8   # Assembly variable for chain configuration
 
-            Using model {{<model>}} with temperature {{<temperature>}}.
-            Fallback model from field: {{<model_name>}}
+            Using model {model_name} with temperature {temperature_setting}.
+            Process data: {input_data}
             """
 
-            model_name: str = "gpt-4"  # Should be overridden by assembly variable
+            model_name: str = "gpt-4"
+            temperature_setting: float = 0.7
+            input_data: str = "sample data"
             result: str = "default"
 
-        self.run_structure.add(TaskWithPriorityVar)
+        self.run_structure.add(TaskWithFields)
+        source_node = self.run_structure.get_node("task.taskwithfields")
 
-        # TODO: Test resolution priority: Assembly Variables first
-        # TODO: Verify {{<model>}} resolves to "claude-3" (assembly variable)
-        # TODO: Verify {{<temperature>}} resolves to 0.8 (assembly variable)
-        # TODO: Verify {{<model_name>}} resolves to "gpt-4" (field fallback)
-        # TODO: Implement runtime variable resolution with priority handling
+        # Test basic field resolution - should expand to external scope format
+        content = "Using model {model_name} with temperature {temperature_setting}."
+        expanded = resolve_runtime_variables(content, self.run_structure, source_node)
 
-    @pytest.mark.skip("TODO: Implement execution context resolution")
-    def test_execution_context_variable_resolution(self):
-        """Test runtime variable resolution from execution context."""
+        # Verify field variables are expanded to external scope (prompt__variable)
+        assert (
+            expanded
+            == "Using model {prompt__model_name} with temperature {prompt__temperature_setting}."
+        )
 
-        class TaskWithContextVar(PromptTreeNode):
-            """
-            Task using execution context variables.
+        # Test assembly variable separation - assembly variables don't interfere with runtime variables
+        content_with_assembly_ref = "Using assembly model {model}"
+        assembly_result = resolve_runtime_variables(
+            content_with_assembly_ref, self.run_structure, source_node
+        )
+        # Assembly variable {model} becomes external scope {prompt__model}, demonstrating separation
+        assert assembly_result == "Using assembly model {prompt__model}"
 
-            Processing document: {{document.title}}
-            Current step: {{execution.step}}
-            Previous results: {{previous.summary}}
-            """
-
-            result: str = "default"
-
-        self.run_structure.add(TaskWithContextVar)
-
-        # TODO: Test execution context variable resolution
-        # TODO: Verify {{document.title}} resolves from execution context
-        # TODO: Verify {{execution.step}} resolves from current execution state
-        # TODO: Verify {{previous.summary}} resolves from previous step outputs
-        # TODO: Implement execution context variable resolution
+        # Test field variable resolution
+        valid_field_content = "Data: {input_data}"
+        expanded_field = resolve_runtime_variables(
+            valid_field_content, self.run_structure, source_node
+        )
+        assert expanded_field == "Data: {prompt__input_data}"
 
     def test_scope_aware_runtime_variable_resolution(self):
         """Test runtime variable resolution with scope awareness."""
@@ -2541,29 +2549,27 @@ class TestRuntimeVariableIntegrationWithDPCL:
         """Set up test fixtures."""
         self.run_structure = RunStructure()
 
-    @pytest.mark.skip("TODO: Implement runtime variables in DPCL commands")
-    def test_runtime_variables_in_dpcl_command_arguments(self):
-        """Test runtime variables in DPCL command arguments."""
+    @pytest.mark.skip("TODO: Implement assembly variables in DPCL commands")
+    def test_assembly_variables_in_dpcl_command_arguments(self):
+        """Test assembly variables in DPCL command arguments."""
 
-        class TaskWithRuntimeInCommand(PromptTreeNode):
+        class TaskWithAssemblyInCommand(PromptTreeNode):
             """
-            Task using runtime variables in DPCL commands.
-            ! iterations={{<iteration_count>}}
-            ! model_key="{{<selected_model>}}"
-            ! resample({{<iterations>}})
-            ! llm("{{<model_key>}}", override={{<override_flag>}})
+            Task using assembly variables in DPCL commands.
+            ! iteration_count=5
+            ! selected_model="gpt-4"
+            ! override_flag=true
+            ! resample(iteration_count)
+            ! llm(selected_model, override=override_flag)
             """
 
-            iteration_count: int = 5
-            selected_model: str = "gpt-4"
-            override_flag: bool = True
             result: str = "default"
 
-        self.run_structure.add(TaskWithRuntimeInCommand)
+        self.run_structure.add(TaskWithAssemblyInCommand)
 
-        # TODO: Test runtime variable resolution in command arguments
-        # TODO: Verify {{<iteration_count>}} resolves in resample() command
-        # TODO: Verify {{<selected_model>}} resolves in llm() command
+        # TODO: Test assembly variable resolution in command arguments
+        # TODO: Verify iteration_count variable resolves in resample() command
+        # TODO: Verify selected_model variable resolves in llm() command
         # TODO: Test type coercion for different argument types
         # TODO: Implement runtime variable resolution in DPCL commands
 

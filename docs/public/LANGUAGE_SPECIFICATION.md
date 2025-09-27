@@ -77,7 +77,7 @@ Prompt Chaining Language (PCL) is a domain-specific language for controlling dat
 ```ebnf
 command ::= "!" WS* command_body
 
-command_body ::= each_command | all_command | node_modifier | variable_assignment | execution_command | resampling_command
+command_body ::= each_command | all_command | node_modifier | variable_assignment | execution_command | resampling_command | comment_command
 
 (* Strict spacing - no whitespace around operators *)
 each_command ::= "@each" inclusion? "->" destination "@{{" mappings "}}" "*"
@@ -103,6 +103,8 @@ execution_command ::= identifier "(" (arguments | multiline_arguments) ")" comme
 multiline_arguments ::= WS* value (WS* "," WS* value)* WS* ","? WS*
 
 resampling_command ::= "@resampled" "[" identifier "]" "->" aggregation_function comment?
+
+comment_command ::= "#" [^\n]*
 
 (* Core elements *)
 destination ::= path
@@ -526,19 +528,49 @@ class QuickNode(PromptTreeNode):
 
 ### Comment Support
 
-**Purpose**: Add human-readable annotations to command lines.
+**Purpose**: Add human-readable annotations to command lines and provide standalone documentation.
 
 **Syntax**:
 ```
-! command # This is a comment
-! variable=value # Another comment
+! # This is a standalone comment
+!# Another standalone comment
+! command # This is an inline comment
+! variable=value # Another inline comment
+```
+
+**Comment Types**:
+
+#### Standalone Comments
+- **Syntax**: `! # comment` or `!# comment`
+- **Purpose**: Pure documentation lines that don't execute commands
+- **Examples**: `! # Initialize analysis phase`, `!# TODO: optimize performance`
+
+#### Inline Comments
+- **Syntax**: `command # comment`
+- **Purpose**: Annotate existing commands with explanations
+- **Support**: All command types (variable assignment, execution, @each, @all, etc.)
+- **Examples**:
+  - `! model="gpt-4" # Use high-quality model`
+  - `! @each[items]->task@{{value.data=items}}* # Process each item`
+
+#### Multiline Comments
+- **Context**: Within variable mappings `@{{...}}` blocks
+- **Processing**: Quote-aware parsing (comments inside strings are preserved)
+- **Example**:
+```
+! @each[items]->task@{{
+    # This is a comment within the mapping
+    value.data=items, # Another comment
+    value.title="Item with # symbol" # Hash in string preserved
+}}*
 ```
 
 **Rules**:
 - Comments start with `#` character
-- Everything after `#` is ignored during parsing
+- Everything after `#` is ignored during parsing (except inside quoted strings)
 - Whitespace before `#` is trimmed
 - Comments are for human readability only
+- Quote-aware: `#` symbols inside quoted strings are not treated as comments
 
 ## Variable System
 

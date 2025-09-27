@@ -63,6 +63,7 @@ class TaskAdvancedAnalyzer(PromptTreeNode):
     """
     ! llm("gpt-4")
     ! repeat(2)
+    !# Initialize advanced analysis
 
     Advanced document analysis with multi-pass processing.
     Generate comprehensive insights from document collections.
@@ -71,7 +72,7 @@ class TaskAdvancedAnalyzer(PromptTreeNode):
     """
 
     documents: list[Document] = Field(description="""
-        ! @each[documents]->task.processor@{{value.content=documents.content}}
+        ! @each[documents]->task.processor@{{value.content=documents.content}}* # Process each document
 
         Documents to analyze in detail
     """)
@@ -116,7 +117,7 @@ class TaskInsightGenerator(PromptTreeNode):
     """Generate insights from processed data."""
 
     insights: list[str] = Field(description="""
-        ! @each[insights]->task.data_processor@{{value.insights=insights}}
+        ! @each[insights]->task.data_processor@{{value.insights=insights}}*
 
         Generated insights from processed data
     """)

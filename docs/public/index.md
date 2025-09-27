@@ -21,7 +21,7 @@ class TaskCustomerAnalysis(PromptTreeNode):
         feedback: str = Field(description="Raw customer feedback")
 
     orders: list[Order] = Field(description="""
-        ! @each[orders]->task.analyzer@{{value.insights=orders.feedback}}
+        ! @each[orders]->task.analyzer@{{value.insights=orders.feedback}}*
 
         Customer orders to process
     """)

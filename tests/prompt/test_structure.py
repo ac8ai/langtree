@@ -8,14 +8,9 @@ This module tests the core structure components:
 - RunStructure: Complete tree orchestration
 """
 
-# Group 1: External direct imports (alphabetical)
-
 import pytest
-
-# Group 2: External from imports (alphabetical by source module)
 from pydantic import Field
 
-# Group 4: Internal from imports (alphabetical by source module)
 from langtree.prompt import PromptTreeNode, RunStructure, StructureTreeNode
 from langtree.prompt.exceptions import (
     TemplateVariableError,
@@ -235,7 +230,9 @@ class TestTemplateVariableSystem:
             field: str = Field(description="Test field")
 
         # Valid node should process correctly
-        self.structure.add(TaskValidSpacing)  # TODO: Implement spacing validation
+        # TODO: Implement spacing validation
+        # See: tests/prompt/test_structure.py::TestTemplateVariableSystem::test_template_variable_spacing_validation
+        self.structure.add(TaskValidSpacing)
         # Invalid node should raise error or auto-correct
         # with pytest.raises(TemplateVariableError):
         #     self.structure.add(InvalidNode)
@@ -433,35 +430,104 @@ class TestTemplateVariableSystem:
         # Leaf: ### (level 3)
         # Field descriptions: #### (level 4)
 
-    @pytest.mark.skip("TODO: Implement template variable system")
     def test_template_variable_assembly_integration(self):
-        """Test integration between template variables and prompt assembly."""
+        """Test integration between template variables and full prompt assembly process."""
 
-        class TaskIntegrationTest(PromptTreeNode):
-            """Integration test.
+        class TaskComplexIntegration(PromptTreeNode):
+            """Complex integration test for template variables.
 
-            ! count=3
-            ! model="gpt-4"
+            ! data_source="input.csv"
+            ! output_format="json"
 
-            # Context Section
+            ## Context Information
+
+            This task processes data from multiple sources.
+
             {COLLECTED_CONTEXT}
 
-            # Main Content
+            ## Processing Steps
+
+            Follow these detailed processing steps:
+
             {PROMPT_SUBTREE}
 
-            Process with model: {{<model>}} for {{<count>}} iterations.
+            ## Configuration
+
+            - Data source: Uses assembly variable data_source
+            - Output format: Uses assembly variable output_format
+            - Processing mode: Standard analysis
             """
 
-            step1: str = Field(description="First processing step")
-            step2: str = Field(description="Second processing step")
+            data_extraction: str = Field(description="Extract data from source files")
+            data_validation: str = Field(description="Validate extracted data quality")
+            data_transformation: str = Field(
+                description="Transform data to target format"
+            )
+            result_generation: str = Field(description="Generate final results")
 
-        self.structure.add(TaskIntegrationTest)
+        # Add to structure and verify template variables work with assembly
+        self.structure.add(TaskComplexIntegration)
 
-        # Should integrate:
-        # 1. Assembly variables (count, model)
-        # 2. Template variables ({COLLECTED_CONTEXT}, {PROMPT_SUBTREE})
-        # 3. Runtime variable references ({{<model>}}, {{<count>}})
-        # 4. Proper heading levels and spacing
+        # Get the node from structure
+        node = self.structure.get_node("task.complex_integration")
+        assert node is not None, "Node should be added to structure"
+
+        # Verify template variables are properly processed
+        from langtree.prompt.template_variables import (
+            process_template_variables,
+            resolve_template_variables_in_content,
+        )
+
+        # Test 1: Template variable processing should work without errors
+        clean_content = node.clean_docstring or ""
+        processed_content = process_template_variables(clean_content, node)
+        assert isinstance(processed_content, str), "Should process without errors"
+
+        # Test 2: Template variables should be resolved in content
+        resolved_content = resolve_template_variables_in_content(clean_content, node)
+
+        # Template variables should be resolved to actual field content
+        assert "{PROMPT_SUBTREE}" not in resolved_content, (
+            "PROMPT_SUBTREE should be resolved"
+        )
+        assert "{COLLECTED_CONTEXT}" not in resolved_content, (
+            "COLLECTED_CONTEXT should be resolved"
+        )
+
+        # Test 3: Field content should be properly included in PROMPT_SUBTREE resolution
+        assert "Data Extraction" in resolved_content, "Should include field titles"
+        assert "Extract data from source files" in resolved_content, (
+            "Should include field descriptions"
+        )
+        assert "Data Validation" in resolved_content, "Should include all fields"
+        assert "Result Generation" in resolved_content, "Should include all fields"
+
+        # Test 4: Original structure and spacing should be preserved
+        assert "## Context Information" in resolved_content, (
+            "Should preserve original headings"
+        )
+        assert "## Processing Steps" in resolved_content, "Should preserve structure"
+        assert "## Configuration" in resolved_content, "Should preserve all content"
+
+        # Test 5: Assembly variables should coexist with template variables
+        # (Assembly variables are handled separately, shouldn't interfere)
+        assert "data_source" in clean_content, (
+            "Assembly variables should be preserved in original"
+        )
+        assert "output_format" in clean_content, (
+            "Assembly variables should be preserved"
+        )
+
+        # Test 6: Verify proper heading levels in PROMPT_SUBTREE resolution
+        from langtree.prompt.template_variables import resolve_prompt_subtree
+
+        prompt_result = resolve_prompt_subtree(node, base_heading_level=3)
+        assert "### Data Extraction" in prompt_result, (
+            "Should use correct heading level"
+        )
+        assert "### Data Validation" in prompt_result, (
+            "Should use consistent heading levels"
+        )
 
 
 class TestTemplateVariableValidation:
@@ -562,33 +628,126 @@ class TestTemplateVariableIntegration:
         # 2. Template variables are processed in docstrings (implemented)
         # 3. Context flow and template processing work together (basic level)
 
-    @pytest.mark.skip("TODO: Implement template variable runtime integration")
     def test_template_variables_with_runtime_variables(self):
-        """Test template variables combined with runtime variable resolution."""
+        """Test that template variables don't interfere with runtime variable syntax."""
 
-        class CombinedNode(PromptTreeNode):
-            """Combined template and runtime variables.
+        class TaskCombinedVariables(PromptTreeNode):
+            """Test separation of template variables from runtime variables.
 
-            ! model="gpt-4"
-            ! iterations=5
+            ! data_source="input.csv"
+            ! model_name="gpt-4"
 
-            # Context
+            ## Context Section
+
+            The following context will be dynamically provided:
+
             {COLLECTED_CONTEXT}
 
-            # Instructions
-            Use model {{<model>}} for {{<iterations>}} rounds.
+            ## Processing Instructions
+
+            Execute the following steps with runtime configuration:
 
             {PROMPT_SUBTREE}
+
+            ## Runtime Configuration
+
+            This task will use runtime variables for dynamic behavior:
+            - Model: {model_name} (runtime field reference)
+            - Data source: {data_source} (runtime field reference)
+            - Processing mode: {processing_mode} (runtime field reference)
+            - Dynamic count: {iteration_count} (runtime field reference)
             """
 
-            analysis: str = Field(description="Analysis with {{<model>}}")
-            summary: str = Field(description="Summary after {{<iterations>}} rounds")
+            model_name: str = Field(
+                default="gpt-4", description="Model name for processing"
+            )
+            data_source: str = Field(
+                default="input.csv", description="Source of input data"
+            )
+            processing_mode: str = Field(
+                default="analysis", description="Processing mode configuration"
+            )
+            iteration_count: int = Field(
+                default=3, description="Number of processing iterations"
+            )
+            analysis_step: str = Field(description="Primary analysis processing")
+            validation_step: str = Field(description="Data validation processing")
 
-        self.structure.add(CombinedNode)
+        self.structure.add(TaskCombinedVariables)
+        node = self.structure.get_node("task.combined_variables")
+        assert node is not None
 
-        # Should handle both:
-        # 1. Template variables ({COLLECTED_CONTEXT}, {PROMPT_SUBTREE})
-        # 2. Runtime variables ({{<model>}}, {{<iterations>}}) in descriptions
+        # Test template variable processing doesn't break runtime variables
+        from langtree.prompt.template_variables import (
+            process_template_variables,
+            resolve_template_variables_in_content,
+        )
+
+        clean_content = node.clean_docstring or ""
+
+        # Test 1: Template variables are properly resolved
+        resolved_content = resolve_template_variables_in_content(clean_content, node)
+        assert "{PROMPT_SUBTREE}" not in resolved_content, (
+            "Template variables should be resolved"
+        )
+        assert "{COLLECTED_CONTEXT}" not in resolved_content, (
+            "Template variables should be resolved"
+        )
+
+        # Test 2: Runtime variable syntax is preserved (not template variables)
+        assert "{model_name}" in resolved_content, (
+            "Runtime field references should be preserved"
+        )
+        assert "{data_source}" in resolved_content, (
+            "Runtime field references should be preserved"
+        )
+        assert "{processing_mode}" in resolved_content, (
+            "Runtime field references should be preserved"
+        )
+        assert "{iteration_count}" in resolved_content, (
+            "Runtime field references should be preserved"
+        )
+
+        # Test 3: Template variable resolution includes field content
+        assert "Analysis Step" in resolved_content, (
+            "PROMPT_SUBTREE should include field titles"
+        )
+        assert "Primary analysis processing" in resolved_content, (
+            "Should include field descriptions"
+        )
+        assert "Validation Step" in resolved_content, "Should include all field titles"
+        assert "Data validation processing" in resolved_content, (
+            "Should include all field descriptions"
+        )
+
+        # Test 4: Original document structure is preserved
+        assert "## Context Section" in resolved_content, (
+            "Should preserve document headings"
+        )
+        assert "## Processing Instructions" in resolved_content, (
+            "Should preserve structure"
+        )
+        assert "## Runtime Configuration" in resolved_content, (
+            "Should preserve all content"
+        )
+
+        # Test 5: Template variable processing works without errors
+        processed_content = process_template_variables(clean_content, node)
+        assert isinstance(processed_content, str), "Should process without errors"
+
+        # Test 6: Assembly variables in original docstring are preserved
+        assert "data_source" in clean_content, (
+            "Assembly variables should be in original content"
+        )
+        assert "model_name" in clean_content, "Assembly variables should be preserved"
+
+        # The key test: Template variables and runtime variables coexist peacefully
+        # Template variables ({PROMPT_SUBTREE}, {COLLECTED_CONTEXT}) are resolved at assembly time
+        # Runtime variables ({field_name}) are preserved for runtime resolution
+        assert (
+            "{PROMPT_SUBTREE}" not in resolved_content
+            and "{model_name}" in resolved_content
+        ), "Different variable types handled separately"
 
 
 class TestPendingTargetResolutionCore:
@@ -639,6 +798,11 @@ class TestPendingTargetResolutionCore:
     @pytest.mark.skip("TODO: Implement context resolution integration")
     def test_inclusion_context_resolution_integration(self):
         """Test that pending resolution triggers inclusion context validation."""
+        # TODO: Implement context resolution integration
+        # See: tests/prompt/test_structure.py::TestContextResolutionIntegration::test_inclusion_context_resolution_integration
+        pytest.skip(
+            "TODO: Implement context resolution integration - see langtree/prompt/resolution.py"
+        )
 
         # Create command with inclusion path referencing future target
         class TaskEarly(PromptTreeNode):

@@ -325,6 +325,17 @@ class ResamplingCommand:
 
 
 @dataclass
+class CommentCommand:
+    """Represents a standalone comment command (! # comment)."""
+
+    comment: str
+
+    def __str__(self) -> str:
+        """Return a string representation of the comment."""
+        return f"# {self.comment}"
+
+
+@dataclass
 class ParsedCommand:
     command_type: CommandType
     destination_path: str
@@ -332,6 +343,7 @@ class ParsedCommand:
     inclusion_path: str | None = None  # For @each commands
     has_multiplicity: bool = False  # True if command ends with *
     is_wildcard_assignment: bool = False  # True if uses * assignment
+    comment: str | None = None  # Optional comment
 
     # Scope resolution for all path components
     resolved_destination: ResolvedPath | None = None
@@ -416,8 +428,8 @@ class CommandParser:
         r"(?:\[(?P<inclusion>[^\]]*)\])?\s*"
         r"->\s*(?P<destination>\S+)"  # No space allowed after destination
         r"@\{\{\s*(?P<mappings>[^}]*)\s*\}\}\s*"
-        r"(?P<multiplicity>\*)?$",
-        re.VERBOSE,
+        r"(?P<multiplicity>\*)?"
+        r"(?:\s*#(?P<comment>.*))?$"  # Optional comment support
     )
 
     # New patterns for extended syntax - handle quoted strings properly
@@ -440,6 +452,9 @@ class CommandParser:
     NODE_MODIFIER_PATTERN = re.compile(
         r"^!\s*(?P<modifier>@sequential|@parallel|together)(?:\s*#(?P<comment>.*))?$"
     )
+
+    # Standalone comment pattern: ! # comment or !# comment
+    COMMENT_PATTERN = re.compile(r"^!\s*#(?P<comment>.*)$")
 
     VARIABLE_MAPPING_PATTERN = re.compile(
         r"(?P<target>[^=,:\s]+)\s*=\s*(?P<source>[^=,:\s]*)",  # Added colon to forbidden chars
@@ -873,7 +888,7 @@ class CommandParser:
 
     def parse(
         self, command: str
-    ) -> "VariableAssignmentCommand | ExecutionCommand | ResamplingCommand | NodeModifierCommand | ParsedCommand":
+    ) -> "VariableAssignmentCommand | ExecutionCommand | ResamplingCommand | NodeModifierCommand | CommentCommand | ParsedCommand":
         """
         Parse a command string into the appropriate command object.
 
@@ -911,6 +926,11 @@ class CommandParser:
         exec_match = self.EXECUTION_PATTERN.match(command)
         if exec_match:
             return self._parse_execution_command(exec_match)
+
+        # Try to parse as standalone comment (early to avoid conflicts)
+        comment_match = self.COMMENT_PATTERN.match(command)
+        if comment_match:
+            return self._parse_comment_command(comment_match)
 
         # Try to parse as variable assignment
         var_match = self.VARIABLE_ASSIGNMENT_PATTERN.match(command)
@@ -1061,6 +1081,11 @@ class CommandParser:
             modifier, comment.strip() if comment else None
         )
 
+    def _parse_comment_command(self, match) -> CommentCommand:
+        """Parse standalone comment command."""
+        comment = match.group("comment")
+        return CommentCommand(comment=comment.strip() if comment else "")
+
     def _parse_traditional_command(self, match) -> ParsedCommand:
         """Parse traditional @each/@all command."""
         groups = match.groupdict()
@@ -1142,6 +1167,9 @@ class CommandParser:
 
                 # Multiple wildcard mappings are allowed (e.g., value.item=*, value.result=*)
 
+        # Parse comment
+        comment = groups.get("comment")
+
         return ParsedCommand(
             command_type=command_type,
             destination_path=destination_path,
@@ -1149,6 +1177,7 @@ class CommandParser:
             inclusion_path=inclusion_path,
             has_multiplicity=has_multiplicity,
             is_wildcard_assignment=is_wildcard_assignment,
+            comment=comment.strip() if comment else None,
         )
 
     def _parse_value(self, value_str: str) -> str | int | float | bool:
@@ -1361,8 +1390,35 @@ class CommandParser:
 
         mappings = []
 
-        # Split by comma, but be careful about nested structures
-        mapping_parts = [part.strip() for part in mappings_str.split(",")]
+        # Handle multiline mappings with comments
+        # First, process line by line to strip comments and filter comment-only lines
+        lines = mappings_str.split("\n")
+        cleaned_parts = []
+
+        for line in lines:
+            # Strip comments from the line
+            if "#" in line:
+                # Find the first # that's not inside quotes
+                in_quote = False
+                quote_char = None
+                for i, char in enumerate(line):
+                    if not in_quote and char in ('"', "'"):
+                        in_quote = True
+                        quote_char = char
+                    elif in_quote and char == quote_char:
+                        in_quote = False
+                        quote_char = None
+                    elif not in_quote and char == "#":
+                        line = line[:i]
+                        break
+
+            line = line.strip()
+            if line:  # Skip empty lines and comment-only lines
+                cleaned_parts.append(line)
+
+        # Join the cleaned lines and split by comma
+        cleaned_mappings_str = " ".join(cleaned_parts)
+        mapping_parts = [part.strip() for part in cleaned_mappings_str.split(",")]
 
         for part in mapping_parts:
             if not part:
@@ -1873,7 +1929,7 @@ class CommandParser:
 
 def parse_command(
     command: str,
-) -> "VariableAssignmentCommand | ExecutionCommand | ResamplingCommand | NodeModifierCommand | ParsedCommand":
+) -> "VariableAssignmentCommand | ExecutionCommand | ResamplingCommand | NodeModifierCommand | CommentCommand | ParsedCommand":
     """
     Convenience function to parse a command string.
 
