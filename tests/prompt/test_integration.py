@@ -2611,7 +2611,18 @@ class TestLangTreeChainIntrospection:
 
         # Test chain step building with this content
         try:
-            step_chain = builder._build_step_chain(processor_node, "reasoning")
+            # Create step dictionary in the expected format
+            step = {
+                "node_tag": processor_node.name,
+                "commands": len(getattr(processor_node, "extracted_commands", [])),
+                "clean_prompt": getattr(processor_node, "clean_docstring", None),
+                "field_descriptions": getattr(
+                    processor_node, "clean_field_descriptions", {}
+                ),
+                "dependencies": [],
+                "is_terminal": False,
+            }
+            step_chain = builder._build_step_chain(step, "reasoning")
             assert step_chain is not None, "Chain step should build successfully"
 
             # Verify chain step is properly wrapped with context propagation
