@@ -94,10 +94,9 @@ class TaskInsightGenerator(TaskCustomerAnalysis):
 
 **Advanced Capabilities:**
 - **Deep Navigation**: Multi-level path traversal with validation
-- **Cross-Tree References**: TaskA → TaskB with iteration count matching
-- **Subchain Validation**: RHS paths must be subchains of inclusion paths
+- **Cross-Tree References**: Data flow between different tree structures
 - **Mixed Hierarchies**: Iterable and non-iterable nodes in same structure
-- **Semantic Validation**: 529 passing tests ensure correctness
+- **Semantic Validation**: Comprehensive validation ensures correctness
 
 The framework validates tree structures, parses DPCL commands, and generates deterministic execution pipelines.
 
@@ -117,7 +116,91 @@ The framework validates tree structures, parses DPCL commands, and generates det
 
 ## Vision
 
-Enable developers to define complex multi-step LLM workflows declaratively, with automatic parallelization, deterministic execution order, and native LangChain integration.
+### Tomorrow
+Enable parallel execution and chaining of structured generation workflows, allowing complex multi-step LLM processes to run efficiently with automatic dependency resolution and deterministic execution order.
+
+### Advanced Tree Orchestration
+```python
+class TaskCustomerAnalysis(PromptTreeNode):
+    """
+    You are analyzing customer data to improve business operations.
+    Focus on extracting actionable insights from customer interactions.
+    """
+
+class TaskOrderProcessor(TaskCustomerAnalysis):
+    """
+    ! llm("opus4.1")
+
+    ## Order Processing Phase
+
+    Now process customer orders to extract feedback patterns.
+    Look for common themes and sentiment indicators in order feedback.
+
+    {PROMPT_SUBTREE}
+    """
+
+    class Order(PromptTreeNode):
+        """
+        For each order, analyze the customer feedback thoroughly.
+        Extract sentiment, key issues, and satisfaction indicators.
+        """
+        feedback: str = Field(description="Raw customer feedback from order")
+
+    orders: list[Order] = Field(description="Customer orders to process")
+
+class TaskInsightGenerator(TaskCustomerAnalysis):
+    """
+    ! repeat(3)
+
+    ## Insight Generation Phase
+
+    Transform processed feedback into business recommendations.
+    Create specific, measurable improvement suggestions.
+
+    {PROMPT_SUBTREE}
+
+    # Generated so far
+
+    {COLLECTED_CONTEXT}
+    """
+
+    class Category(PromptTreeNode):
+        """
+        Group related insights into logical business categories.
+        Each category should address a specific operational area.
+        """
+
+        class Insight(PromptTreeNode):
+            """
+            Generate one specific, actionable business recommendation.
+            Include implementation steps and expected outcomes.
+            """
+            recommendation: str = Field(description="""
+                ! repeat(3)
+
+                Detailed business recommendation
+            """)
+
+        insights: list[Insight] = Field(description="""
+            ! @each[insights]->task.order_processor@{{orders.feedback=insights.recommendation}}
+
+            Insights for this category
+        """)
+
+    categories: list[Category] = Field(description="""
+        ! llm('gpt5')
+
+        Business insight categories
+    """)
+    final_report: str = Field(description="""
+        ! @all->task.order_processor@{{prompt.final_report=final_report}}*
+
+        Executive summary of all insights
+    """)
+```
+
+### Future
+Evolve into a comprehensive agent orchestration platform where JSON definitions dynamically generate LangTree nodes, enabling agents to coordinate and collaborate through the same powerful validation and execution framework that drives structured generation today.
 
 ## Installation
 
