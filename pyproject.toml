@@ -51,6 +51,9 @@ include = ["src/langtree"]
 addopts = "--cov=langtree --cov-branch --cov-report=term-missing -rA"
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "performance: marks tests as performance tests (may be slow)"
+]
 
 [tool.ruff]
 line-length = 88

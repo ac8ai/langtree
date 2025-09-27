@@ -471,9 +471,6 @@ class TestTemplateVariableValidation:
         """Create structure fixture for validation tests."""
         self.structure = RunStructure()
 
-    @pytest.mark.xfail(
-        reason="Template variable validation not yet implemented - invalid names should be rejected"
-    )
     def test_invalid_template_variable_names(self):
         """Test that invalid template variable names are rejected."""
         invalid_cases = [
@@ -484,10 +481,14 @@ class TestTemplateVariableValidation:
         ]
 
         for invalid_template in invalid_cases:
+            # Create a class with the invalid template in its docstring
+            docstring = f"Test with invalid template: {invalid_template}"
 
             class TaskInvalidTemplate(PromptTreeNode):
-                f"""Test with invalid template: {invalid_template}"""
                 field: str = Field(description="Test field")
+
+            # Set the docstring dynamically
+            TaskInvalidTemplate.__doc__ = docstring
 
             # This should raise an error when validation is implemented
             with pytest.raises((ValueError, TemplateVariableError)):

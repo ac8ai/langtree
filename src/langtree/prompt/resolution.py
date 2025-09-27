@@ -198,14 +198,14 @@ def _resolve_inclusion_context(
         item_type = "unknown"
 
         # Safe length check for sized collections
-        if isinstance(inclusion_value, (list, dict, tuple, set)):
+        if isinstance(inclusion_value, list | dict | tuple | set):
             try:
                 iterable_length = len(inclusion_value)
             except (TypeError, AttributeError):
                 iterable_length = None
 
         # Safe item type detection for indexable collections
-        if isinstance(inclusion_value, (list, tuple)) and inclusion_value:
+        if isinstance(inclusion_value, list | tuple) and inclusion_value:
             try:
                 item_type = type(inclusion_value[0]).__name__
             except (IndexError, TypeError, AttributeError):
@@ -576,7 +576,7 @@ def _is_missing_field_acceptable(path: str, node_instance: object) -> bool:
         if hasattr(node_instance, first_component):
             value = getattr(node_instance, first_component)
             # If it's None or an empty collection, missing sub-paths are acceptable
-            if value is None or (isinstance(value, (list, dict)) and len(value) == 0):
+            if value is None or (isinstance(value, list | dict) and len(value) == 0):
                 return True
 
         # Check if it's defined in model fields but not set
@@ -1175,7 +1175,9 @@ def resolve_runtime_variables(
         variable_path = match.group(1).strip()
 
         # Skip reserved template variables
-        if variable_path in ("PROMPT_SUBTREE", "COLLECTED_CONTEXT"):
+        from langtree.prompt.template_variables import VALID_TEMPLATE_VARIABLES
+
+        if variable_path in VALID_TEMPLATE_VARIABLES:
             return match.group(0)  # Return the original {TEMPLATE_VAR} unchanged
 
         try:

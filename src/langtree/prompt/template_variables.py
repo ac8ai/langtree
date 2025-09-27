@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from langtree.prompt.structure import RunStructure, StructureTreeNode
 
 
+# Valid template variable names
+VALID_TEMPLATE_VARIABLES = ("PROMPT_SUBTREE", "COLLECTED_CONTEXT")
+
 # Template variable patterns
 # These patterns specifically match single-brace syntax and exclude double-brace runtime variables
 PROMPT_SUBTREE_PATTERN = re.compile(r"(?<!\{)\{PROMPT_SUBTREE\}(?!\})")
@@ -98,30 +101,45 @@ def validate_template_variable_names(content: str) -> list[str]:
             f"Malformed template variable syntax with nested braces '{match.group()}' at line {line_number}. Template variables cannot be nested."
         )
 
-    # Pattern to find any single-brace template variable-like structures
-    unknown_template_pattern = re.compile(r"(?<!\{)\{([A-Z_][A-Z0-9_]*)\}(?!\})")
+    # Pattern to find any single-brace variable-like structures
+    all_variable_pattern = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")
 
-    # Pattern to find runtime variables (single-brace, alphanumeric + underscore)
-    runtime_var_pattern = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")
-
-    # Find all potential template variables
-    matches = unknown_template_pattern.finditer(content)
+    # Find all potential template/runtime variables
+    matches = all_variable_pattern.finditer(content)
 
     for match in matches:
         var_name = match.group(1)
-        # Check if it's not one of the known template variables
-        if var_name not in ("PROMPT_SUBTREE", "COLLECTED_CONTEXT"):
+
+        # Check if it looks like a template variable (more precise pattern matching)
+        is_template_like = (
+            var_name.isupper()  # All uppercase like INVALID_TEMPLATE
+            or
+            # Mixed case that looks like misspelled template variables
+            (
+                any(c.isupper() for c in var_name)
+                and (
+                    "subtree" in var_name.lower()
+                    or "prompt" in var_name.lower()
+                    or "collected" in var_name.lower()
+                )
+            )
+            or
+            # Exact misspellings of known template variables
+            var_name.lower() in ("prompt_subtree", "collected_context")
+        )
+
+        if is_template_like and var_name not in VALID_TEMPLATE_VARIABLES:
             line_number = content[: match.start()].count("\n") + 1
             errors.append(
-                f"Unknown template variable '{{{var_name}}}' at line {line_number}. Only PROMPT_SUBTREE and COLLECTED_CONTEXT are supported."
+                f"Unknown template variable '{{{var_name}}}' at line {line_number}. Only {' and '.join(VALID_TEMPLATE_VARIABLES)} are supported."
             )
 
     # Check runtime variables for double underscore usage (reserved for system)
-    runtime_matches = runtime_var_pattern.finditer(content)
+    runtime_matches = all_variable_pattern.finditer(content)
     for match in runtime_matches:
         var_name = match.group(1)
         # Skip template variables
-        if var_name in ("PROMPT_SUBTREE", "COLLECTED_CONTEXT"):
+        if var_name in VALID_TEMPLATE_VARIABLES:
             continue
         # Check for double underscore (reserved for system)
         if "__" in var_name:
@@ -293,7 +311,7 @@ def validate_template_variable_conflicts(
     errors = []
 
     # Check if any Assembly Variables use template variable names
-    template_var_names = {"PROMPT_SUBTREE", "COLLECTED_CONTEXT"}
+    template_var_names = set(VALID_TEMPLATE_VARIABLES)
 
     for var_name in assembly_variables:
         if var_name in template_var_names:
