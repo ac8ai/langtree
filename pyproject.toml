@@ -37,6 +37,7 @@ dev = [
 
 docs = [
     "mkdocs-material>=9.6.20",
+    "mkdocstrings[python]>=0.24.0",
 ]
 
 [build-system]
@@ -49,4 +50,16 @@ include = ["src/langtree"]
 [tool.pytest.ini_options]
 addopts = "--cov=langtree --cov-branch --cov-report=term-missing -rA"
 testpaths = ["tests"]
-pythonpath = ["src"] 
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501"]  # Line too long (handled by formatter)
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space" 

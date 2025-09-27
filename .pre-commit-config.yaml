@@ -4,12 +4,12 @@ repos:
   hooks:
   - id: nbdev_clean
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.13.2
+  rev: v0.11.9
   hooks:
   - id: ruff
     name: ruff-check
+    args: [--fix]
     exclude: ^notebooks/
-  - id: ruff
+  - id: ruff-format
     name: ruff-format
-    entry: ruff check --fix
     exclude: ^notebooks/
