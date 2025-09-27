@@ -1,0 +1,80 @@
+site_name: LangTree Documentation
+site_url: https://ac8.ai/langtree
+repo_url: https://github.com/ac8ai/langtree
+repo_name: ac8ai/langtree
+edit_uri: edit/main/docs/public/
+docs_dir: docs/public
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - DPCL Reference: LANGUAGE_SPECIFICATION.md
+  #- Examples: examples.md
+  #- API Reference: api.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ac8ai/langtree
+  version:
+    provider: mike

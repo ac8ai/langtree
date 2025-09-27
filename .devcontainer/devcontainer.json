@@ -1,0 +1,41 @@
+{
+    "name": "LangTree Dev",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "langtree",
+	"workspaceFolder": "/workspaces/langtree",
+	"privileged": false,
+    "postCreateCommand": "if [ -d \".venv\" ]; then rm -rf .venv; fi && uv sync --group dev --group docs",
+	"forwardPorts": [8000],
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+				"python.terminal.activateEnvironment": true,
+				"terminal.integrated.profiles.linux": {
+					"AgentVenv": {
+					"path": "/bin/bash",
+					"args": [
+						"-c",
+						"[[ \"$VIRTUAL_ENV\" == '${workspaceFolder}/.venv' ]] || source '${workspaceFolder}/.venv/bin/activate'; exec bash -i"
+					]
+					}
+				},
+				"terminal.integrated.defaultProfile.linux": "bash",
+				"terminal.integrated.automationProfile.linux": "AgentVenv"
+			},
+			"extensions": [
+				"ms-azuretools.vscode-containers",
+                "ms-python.python",
+				"ms-toolsai.jupyter",
+				"ms-toolsai.vscode-jupyter-powertoys",
+				"GitHub.vscode-github-actions",
+				"charliermarsh.ruff",
+				"mechatroner.rainbow-csv",
+				"ms-python.debugpy",
+				"anthropic.claude-code",
+				"Upstash.context7-mcp",
+				"openai.chatgpt"
+			]
+		}
+	}
+}

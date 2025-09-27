@@ -1,0 +1,15 @@
+repos:
+- repo: https://github.com/fastai/nbdev
+  rev: 2.4.5
+  hooks:
+  - id: nbdev_clean
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.13.2
+  hooks:
+  - id: ruff
+    name: ruff-check
+    exclude: ^notebooks/
+  - id: ruff
+    name: ruff-format
+    entry: ruff check --fix
+    exclude: ^notebooks/
