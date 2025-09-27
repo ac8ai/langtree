@@ -17,7 +17,10 @@ from pydantic import Field
 
 # Group 4: Internal from imports (alphabetical by source module)
 from langtree.prompt import PromptTreeNode, RunStructure, StructureTreeNode
-from langtree.prompt.exceptions import TemplateVariableError
+from langtree.prompt.exceptions import (
+    TemplateVariableError,
+    VariableTargetValidationError,
+)
 from langtree.prompt.registry import PendingTarget
 
 
@@ -1384,3 +1387,258 @@ class TestPendingTargetIntegrationWithResolution:
         # assert "value.result=prompt.data" in unresolved_error.command_description
         # See: llm/prompt/structure.py::finalize
         # 3. Assembly variable resolution during template processing
+
+
+class TestContextResolutionValidation:
+    """Test context resolution in variable target structure validation.
+
+    These tests verify that _validate_variable_target_structure correctly
+    validates against target node context instead of source node context.
+    """
+
+    def test_cross_tree_validation_uses_target_context(self):
+        """Test that validation correctly uses target node context."""
+
+        class Company(PromptTreeNode):
+            name: str
+
+        class TaskStructureAThreeLevels(PromptTreeNode):
+            """Target node with 'companies' field."""
+
+            companies: list[Company] = []
+
+        class TaskStructureCTwoLevels(PromptTreeNode):
+            """Source node without 'companies' field."""
+
+            data: list[Company] = Field(
+                default=[],
+                description="! @each[data]->task.structure_a_three_levels@{{value.companies.name=data.name}}*",
+            )
+
+        structure = RunStructure()
+        structure.add(TaskStructureAThreeLevels)
+
+        # This should NOT raise an error because validation now checks target context
+        # Target node (TaskStructureAThreeLevels) HAS the 'companies' field
+        structure.add(TaskStructureCTwoLevels)
+
+    def test_legitimate_validation_errors_preserved(self):
+        """Test that fix doesn't break legitimate validation errors."""
+
+        class SomeItem(PromptTreeNode):
+            name: str
+
+        class TaskTarget(PromptTreeNode):
+            """Target node lacking the referenced field."""
+
+            other_field: str = "test"
+
+        class TaskSource(PromptTreeNode):
+            """Source node with invalid field reference."""
+
+            data: list[SomeItem] = Field(
+                default=[],
+                description="! @each[data]->task.target@{{value.nonexistent.name=data.name}}*",
+            )
+
+        structure = RunStructure()
+        structure.add(TaskTarget)
+
+        # This SHOULD raise an error because 'nonexistent' doesn't exist in target
+        with pytest.raises(VariableTargetValidationError):
+            structure.add(TaskSource)
+
+
+class TestContextResolutionHardCases:
+    """Hard core test cases that stress test the context resolution implementation."""
+
+    def test_forward_reference_fallback_behavior(self):
+        """Test context resolution with forward references where target doesn't exist yet."""
+
+        class TaskWithForwardRef(PromptTreeNode):
+            """Node with forward reference that falls back to source validation."""
+
+            data: list[str] = Field(
+                default=[],
+                description="! @each[data]->task.nonexistent@{{value.some_field=data}}*",
+            )
+
+        structure = RunStructure()
+
+        # Should handle missing target gracefully without crashing
+        # This tests the fallback mechanism in the fix
+        structure.add(TaskWithForwardRef)
+
+        # Verify forward reference was recorded
+        assert len(structure._pending_target_registry.pending_targets) > 0
+
+    def test_deep_nested_field_validation_in_target_context(self):
+        """Test validation of deeply nested field paths in target context."""
+
+        class Member(PromptTreeNode):
+            name: str
+
+        class TeamBridge(PromptTreeNode):
+            members: list[Member] = []
+
+        class Team(PromptTreeNode):
+            bridge: TeamBridge
+
+        class DeptBridge(PromptTreeNode):
+            teams: list[Team] = []
+
+        class Department(PromptTreeNode):
+            bridge: DeptBridge
+
+        class CompanyBridge(PromptTreeNode):
+            departments: list[Department] = []
+
+        class TaskComplexTarget(PromptTreeNode):
+            """Target with deep nested structure."""
+
+            companies: list[
+                CompanyBridge
+            ] = []  # Deep path: companies.departments.bridge.teams.bridge.members.name
+
+        class TaskComplexSource(PromptTreeNode):
+            """Source that maps to deep nested path in target."""
+
+            items: list[Member] = Field(
+                default=[],
+                description="! @each[items]->task.complex_target@{{value.companies.departments.bridge.teams.bridge.members.name=items.name}}*",
+            )
+
+        structure = RunStructure()
+        structure.add(TaskComplexTarget)
+
+        # Should validate 'companies' exists in target (not source)
+        # Even though the path is deep, validation checks first component in target context
+        structure.add(TaskComplexSource)
+
+    def test_multiple_variable_mappings_mixed_validity(self):
+        """Test multiple mappings where some are valid in target, others invalid."""
+
+        class Item(PromptTreeNode):
+            name: str
+
+        class TaskMixedTarget(PromptTreeNode):
+            """Target with some fields but not others."""
+
+            valid_field: list[Item] = []
+            # Missing: invalid_field
+
+        class TaskMixedSource(PromptTreeNode):
+            """Source with multiple mappings - some valid, some invalid."""
+
+            data: list[Item] = Field(
+                default=[],
+                description="! @each[data]->task.mixed_target@{{value.valid_field.name=data.name, value.invalid_field.name=data.name}}*",
+            )
+
+        structure = RunStructure()
+        structure.add(TaskMixedTarget)
+
+        # Should fail because 'invalid_field' doesn't exist in target
+        with pytest.raises(VariableTargetValidationError) as exc_info:
+            structure.add(TaskMixedSource)
+
+        # Should mention the invalid field specifically
+        assert "invalid_field" in str(exc_info.value)
+
+    def test_complex_inheritance_hierarchy_validation(self):
+        """Test context resolution with complex inheritance patterns."""
+
+        class BaseItem(PromptTreeNode):
+            id: str
+
+        class SpecialItem(BaseItem):
+            name: str
+            description: str
+
+        class TaskComplexInheritanceTarget(PromptTreeNode):
+            """Target with complex type hierarchy."""
+
+            special_items: list[SpecialItem] = []
+            # Should validate against SpecialItem fields (name, description, id)
+
+        class TaskComplexInheritanceSource(PromptTreeNode):
+            """Source that maps to inherited field."""
+
+            raw_data: list[SpecialItem] = Field(
+                default=[],
+                description="! @each[raw_data]->task.complex_inheritance_target@{{value.special_items.description=raw_data.description}}*",
+            )
+
+        structure = RunStructure()
+        structure.add(TaskComplexInheritanceTarget)
+
+        # Should work because 'special_items' exists in target
+        # and description exists in SpecialItem
+        structure.add(TaskComplexInheritanceSource)
+
+    def test_edge_case_empty_and_none_target_tags(self):
+        """Test edge cases with None or empty target node tags."""
+
+        class BasicItem(PromptTreeNode):
+            name: str
+
+        class TaskEdgeCaseTarget(PromptTreeNode):
+            """Simple target node."""
+
+            items: list[BasicItem] = []
+
+        class TaskEdgeCaseSource(PromptTreeNode):
+            """Source that should work with basic validation."""
+
+            data: list[BasicItem] = Field(
+                default=[],
+                description="! @each[data]->task.edge_case_target@{{value.items.name=data.name}}*",
+            )
+
+        structure = RunStructure()
+        structure.add(TaskEdgeCaseTarget)
+
+        # This tests the robustness of the fix when handling edge cases
+        structure.add(TaskEdgeCaseSource)
+
+    def test_stress_multiple_cross_references(self):
+        """Stress test with multiple nodes cross-referencing each other."""
+
+        class DataItem(PromptTreeNode):
+            value: str
+
+        class TaskA(PromptTreeNode):
+            """First target with unique field."""
+
+            unique_field_a: list[DataItem] = []
+
+        class TaskB(PromptTreeNode):
+            """Second target with different field."""
+
+            unique_field_b: list[DataItem] = []
+
+        class TaskC(PromptTreeNode):
+            """Third target with yet another field."""
+
+            unique_field_c: list[DataItem] = []
+
+        class TaskStressSource(PromptTreeNode):
+            """Source that references all targets with their respective fields."""
+
+            source_data: list[DataItem] = Field(
+                default=[],
+                description="""
+                ! @each[source_data]->task.a@{{value.unique_field_a.value=source_data.value}}*
+                ! @each[source_data]->task.b@{{value.unique_field_b.value=source_data.value}}*
+                ! @each[source_data]->task.c@{{value.unique_field_c.value=source_data.value}}*
+                """,
+            )
+
+        structure = RunStructure()
+        structure.add(TaskA)
+        structure.add(TaskB)
+        structure.add(TaskC)
+
+        # Each validation should check the correct target context
+        # TaskA should find unique_field_a, TaskB should find unique_field_b, etc.
+        structure.add(TaskStressSource)

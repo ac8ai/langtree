@@ -19,7 +19,7 @@ class TestNamingConventionValidation:
         """Non-CamelCase class names should be rejected."""
 
         # Snake case should fail
-        class task_early(PromptTreeNode):
+        class task_early(PromptTreeNode):  # noqa: N801
             """Task with snake_case name - should be rejected."""
 
             pass
@@ -37,7 +37,7 @@ class TestNamingConventionValidation:
     def test_camelcase_without_capital_first_letter_should_fail(self):
         """camelCase (lowercase first letter) should be rejected."""
 
-        class taskEarly(PromptTreeNode):
+        class taskEarly(PromptTreeNode):  # noqa: N801
             """Task with camelCase name - should be rejected."""
 
             pass
@@ -55,7 +55,7 @@ class TestNamingConventionValidation:
     def test_mixed_case_with_underscores_should_fail(self):
         """Mixed case with underscores should be rejected."""
 
-        class Task_early(PromptTreeNode):
+        class Task_early(PromptTreeNode):  # noqa: N801
             """Task with mixed case - should be rejected."""
 
             pass
@@ -103,7 +103,7 @@ class TestNamingConventionValidation:
     def test_lowercase_task_should_fail(self):
         """All lowercase 'task' should be rejected."""
 
-        class task(PromptTreeNode):
+        class task(PromptTreeNode):  # noqa: N801
             """All lowercase task - should be rejected."""
 
             pass

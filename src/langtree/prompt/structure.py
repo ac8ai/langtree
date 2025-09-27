@@ -248,7 +248,7 @@ class RunStructure:
         elif isinstance(command, VariableAssignmentCommand):
             self._process_variable_assignment(command, source_node_tag)
         elif isinstance(
-            command, (ExecutionCommand, ResamplingCommand, NodeModifierCommand)
+            command, ExecutionCommand | ResamplingCommand | NodeModifierCommand
         ):
             pass
 
@@ -316,7 +316,7 @@ class RunStructure:
 
                 # Validate variable target structure exists
                 self._validate_variable_target_structure(
-                    variable_path, target_scope, source_node_tag
+                    variable_path, target_scope, source_node_tag, full_destination
                 )
 
                 # Register the variable target
@@ -1130,7 +1130,11 @@ class RunStructure:
             )
 
     def _validate_variable_target_structure(
-        self, variable_path: str, target_scope, source_node_tag: str
+        self,
+        variable_path: str,
+        target_scope,
+        source_node_tag: str,
+        target_node_tag: str = None,
     ) -> None:
         """
         Validate that variable target structure can be satisfied.
@@ -1142,6 +1146,7 @@ class RunStructure:
             variable_path: Path to the target variable (e.g., "main_analysis.title")
             target_scope: Scope object for the target variable
             source_node_tag: Tag of the node where this target is declared
+            target_node_tag: Tag of the target node where this variable will be resolved
 
         Raises:
             VariableTargetValidationError: If target structure cannot be satisfied
@@ -1153,12 +1158,25 @@ class RunStructure:
             path_components = variable_path.split(".")
             if len(path_components) > 1:
                 # Check if the parent structure exists (e.g., "main_analysis" in "main_analysis.title")
-                source_node = self.get_node(source_node_tag)
-                if source_node and source_node.field_type:
+                # UNCOMMENTED FIX: Use target node context, not source node context
+                if target_node_tag:
+                    target_node = self.get_node(target_node_tag)
+                    validation_node = target_node
+                else:
+                    # Fallback to source node if target not provided (backward compatibility)
+                    validation_node = self.get_node(source_node_tag)
+
+                # ORIGINAL CODE (BUGGY): validates against source node instead of target node
+                # source_node = self.get_node(source_node_tag)
+                # validation_node = source_node
+                # validation_tag = source_node_tag
+
+                if validation_node and validation_node.field_type:
                     first_component = path_components[0]
                     if (
-                        hasattr(source_node.field_type, "model_fields")
-                        and first_component not in source_node.field_type.model_fields
+                        hasattr(validation_node.field_type, "model_fields")
+                        and first_component
+                        not in validation_node.field_type.model_fields
                     ):
                         raise VariableTargetValidationError(
                             target_path=variable_path,
@@ -1696,10 +1714,10 @@ class RunStructure:
         """
         from langtree.prompt.exceptions import FieldValidationError
 
-        BARE_COLLECTION_TYPES = (list, dict, set)
+        bare_collection_types = (list, dict, set)
 
         # Check if this is a bare collection type (no type parameters)
-        if annotation in BARE_COLLECTION_TYPES:
+        if annotation in bare_collection_types:
             collection_name = annotation.__name__
             raise FieldValidationError(
                 field_path=field_tag,
@@ -1709,7 +1727,7 @@ class RunStructure:
             )
 
         # Check if origin is a bare collection type (this handles typing.List, typing.Dict, etc.)
-        if origin in BARE_COLLECTION_TYPES and (args is None or len(args) == 0):
+        if origin in bare_collection_types and (args is None or len(args) == 0):
             collection_name = origin.__name__
             raise FieldValidationError(
                 field_path=field_tag,

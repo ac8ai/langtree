@@ -831,13 +831,13 @@ Collecting relevant data sources.
 
         # Test realistic conflict scenario
         content = """Task with template variables:
-        
+
         {PROMPT_SUBTREE}
-        
+
         Additional processing:
-        
+
         {COLLECTED_CONTEXT}
-        
+
         Using assembly variables: {data_source} and {output_format}"""
 
         # Test conflicts with reserved template variable names
@@ -1051,9 +1051,9 @@ class TestTemplateVariableResolution:
     def test_validate_template_variable_conflicts_comprehensive(self):
         """Test comprehensive template variable conflict validation."""
         content = """Template with multiple potential conflicts:
-        
+
         {PROMPT_SUBTREE}
-        
+
         Using assembly variables: {PROMPT_SUBTREE} and {other_var}
 
         {COLLECTED_CONTEXT}
@@ -1142,10 +1142,10 @@ class TestDPCLCommandIntegration:
         """Test that Assembly Variable conflicts are detected with DPCL commands."""
         content = """
         Process data with DPCL:
-        
+
         {{EXTRACT PROMPT_SUBTREE}} from source
         {{FILTER COLLECTED_CONTEXT | valid == true}}
-        
+
         Template variables:
         {PROMPT_SUBTREE}
         {COLLECTED_CONTEXT}
@@ -1172,17 +1172,17 @@ class TestDPCLCommandIntegration:
         # Content mixing template variables and runtime variable placeholders
         content = """
         Initial processing:
-        
+
         {PROMPT_SUBTREE}
-        
+
         Runtime data processing:
         - Use {{runtime_data}} for calculations
         - Apply {{processing_mode}} settings
-        
+
         Context integration:
-        
+
         {COLLECTED_CONTEXT}
-        
+
         Final output with {{output_format}} formatting.
         """
 
@@ -1407,12 +1407,12 @@ class TestArchitecturalDesignCompliance:
         # Test that template variables have clear closure semantics
         content_with_variables = """
         Processing with closure:
-        
+
         {PROMPT_SUBTREE}
-        
+
         Additional context:
         {COLLECTED_CONTEXT}
-        
+
         No other template variables should be recognized.
         """
 
@@ -1423,12 +1423,12 @@ class TestArchitecturalDesignCompliance:
         # Test that other brace patterns don't interfere with closure
         content_with_noise = """
         {PROMPT_SUBTREE}
-        
+
         {invalid_variable}
         {{assembly_variable}}
         {{{triple_braces}}}
         {UNKNOWN_TEMPLATE}
-        
+
         {COLLECTED_CONTEXT}
         """
 
@@ -1552,12 +1552,12 @@ class TestErrorHandlingComprehensive:
         # Content with both valid and problematic elements
         mixed_content = """
         Valid section:
-        
+
         {PROMPT_SUBTREE}
-        
+
         Invalid section:
         Invalid{COLLECTED_CONTEXT}Content
-        
+
         Another valid section would be here.
         """
 

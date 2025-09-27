@@ -1375,7 +1375,7 @@ class TestCommentParsing:
             result = self.parser.parse(command_str)
             # Only check comment for new command types that support comments
             if isinstance(
-                result, (VariableAssignmentCommand, ExecutionCommand, ResamplingCommand)
+                result, VariableAssignmentCommand | ExecutionCommand | ResamplingCommand
             ):
                 assert result.comment == expected_comment
 
@@ -1391,7 +1391,7 @@ class TestCommentParsing:
             result = self.parser.parse(command)
             # Only check comment for new command types that support comments
             if isinstance(
-                result, (VariableAssignmentCommand, ExecutionCommand, ResamplingCommand)
+                result, VariableAssignmentCommand | ExecutionCommand | ResamplingCommand
             ):
                 assert result.comment is None
 
@@ -1770,7 +1770,7 @@ def test_comment_examples_from_specification():
         result = parser.parse(command_str)
         # Only check comment for new command types that support comments
         if isinstance(
-            result, (VariableAssignmentCommand, ExecutionCommand, ResamplingCommand)
+            result, VariableAssignmentCommand | ExecutionCommand | ResamplingCommand
         ):
             assert result.comment == expected_comment
 
@@ -2675,9 +2675,9 @@ class TestIterableDepthTracking:
         class NodeA1(PromptTreeNode):
             level2: list[NodeA2] = []
 
-        nodeA = NodeA1()
-        pathA = ["level2", "level3"]  # 2 iterables
-        depthA = self.parser.calculate_iterable_depth(nodeA, pathA)
+        node_a = NodeA1()
+        path_a = ["level2", "level3"]  # 2 iterables
+        depth_a = self.parser.calculate_iterable_depth(node_a, path_a)
 
         # Structure B: iterable1.noniterable.noniterable.iterable2 (maximal spacing)
         class NodeB4(PromptTreeNode):
@@ -2695,12 +2695,12 @@ class TestIterableDepthTracking:
         class RootB(PromptTreeNode):
             level1: list[NodeB1] = []
 
-        nodeB = RootB()
-        pathB = ["level1", "level2", "level3", "level4"]  # 2 iterables with spacing
-        depthB = self.parser.calculate_iterable_depth(nodeB, pathB)
+        node_b = RootB()
+        path_b = ["level1", "level2", "level3", "level4"]  # 2 iterables with spacing
+        depth_b = self.parser.calculate_iterable_depth(node_b, path_b)
 
-        assert depthA == depthB == 2, (
-            f"Expected both depths to be 2, got A={depthA}, B={depthB}"
+        assert depth_a == depth_b == 2, (
+            f"Expected both depths to be 2, got A={depth_a}, B={depth_b}"
         )
 
 

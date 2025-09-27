@@ -64,10 +64,7 @@ class TaskAnotherMissing(PromptTreeNode):
     pass
 
 
-class TaskProcessor(PromptTreeNode):
-    """Generic processor task."""
-
-    pass
+# TaskProcessor already defined above
 
 
 class TaskHandler(PromptTreeNode):
@@ -76,10 +73,7 @@ class TaskHandler(PromptTreeNode):
     pass
 
 
-class TaskDocumentProcessor(PromptTreeNode):
-    """Document processor task."""
-
-    pass
+# TaskDocumentProcessor already defined above
 
 
 class TaskContentAnalyzer(PromptTreeNode):
@@ -92,52 +86,52 @@ class TaskContentAnalyzer(PromptTreeNode):
 """
 class TestTextContentProcessor:
     \"\"\"Test text content processing and command extraction.\"\"\"
-    
+
     def test_extract_commands_from_docstring(self):
         \"\"\"Test extraction of commands from class docstrings.\"\"\"
         docstring = '''
         ! @each[sections.subsections]->task.analyze_comparison@{{value.main_analysis.title=sections.title}}*
-        
+
         Document structure is defined as a list of sections, where each section has a title.
         '''
-        
+
         processor = TextContentProcessor()
         commands, clean_content = processor.extract_commands(docstring)
-        
+
         assert len(commands) == 1
         assert commands[0].startswith('!')
         assert 'Document structure is defined' in clean_content
         assert '!' not in clean_content  # Commands should be removed
-    
+
     def test_extract_multiple_commands(self):
         \"\"\"Test extraction of multiple commands from single text.\"\"\"
         text_with_multiple = '''
         ! @each[items]->task.process@{{value.item=items}}*
         ! @->task.summarize@{{prompt.all_data=*}}
-        
+
         This is the remaining prompt content.
         It should be clean of commands.
         '''
-        
+
         processor = TextContentProcessor()
         commands, clean_content = processor.extract_commands(text_with_multiple)
-        
+
         assert len(commands) == 2
         assert all(cmd.startswith('!') for cmd in commands)
         assert 'remaining prompt content' in clean_content
         assert '!' not in clean_content
-    
+
     def test_extract_commands_from_field_description(self):
         \"\"\"Test extraction of commands from field descriptions.\"\"\"
         field_description = '''
         ! @->task.output_aggregator@{{prompt.source_data=*}}
-        
+
         Your summary of source document:
         '''
-        
+
         processor = TextContentProcessor()
         commands, clean_content = processor.extract_commands(field_description)
-        
+
         assert len(commands) == 1
         assert 'Your summary of source document:' in clean_content
         assert '!' not in clean_content
@@ -145,17 +139,17 @@ class TestTextContentProcessor:
     def test_edge_cases(self):
         \"\"\"Test edge cases for text content processing.\"\"\"
         processor = TextContentProcessor()
-        
+
         # Test None input
         commands, clean = processor.extract_commands(None)
         assert commands == []
         assert clean == ""
-        
+
         # Test empty input
         commands, clean = processor.extract_commands("")
         assert commands == []
         assert clean == ""
-        
+
         # Test text with no commands
         text_no_commands = "This is just regular text with no commands."
         commands, clean = processor.extract_commands(text_no_commands)
@@ -826,13 +820,13 @@ class TestExecutionPlanGeneration:
         assert plan["unresolved_issues"][0]["type"] == "unresolved_target"
         assert plan["unresolved_issues"][0]["target"] == "task.processor"
 
-    def test_execution_plan_with_external_inputs(self):
-        """Test execution plan identifies external inputs correctly."""
+    def test_execution_plan_with_unresolved_targets(self):
+        """Test execution plan identifies unresolved target issues correctly."""
 
-        class TaskExternalInputs(PromptTreeNode):
+        class TaskWithUnresolvedReferences(PromptTreeNode):
             """
             ! @->task.processor@{{value.external_var=*}}
-            Task with external input requirements.
+            Task with references to non-existent target nodes.
             """
 
             class TaskProcessor(PromptTreeNode):
@@ -841,28 +835,37 @@ class TestExecutionPlanGeneration:
                 result: str = "internal summary"
 
             # Field-level command to avoid docstring @all RHS scoping violation
-            unsatisfied_source: str = Field(
+            source_field: str = Field(
                 default="test",
-                description="! @->task.external_summarizer@{{prompt.summary=unsatisfied_source}}",
+                description="! @->task.nonexistent_summarizer@{{prompt.summary=source_field}}",
             )
 
         structure = RunStructure()
-        structure.add(TaskExternalInputs)
+        structure.add(TaskWithUnresolvedReferences)
 
         plan = structure.get_execution_plan()
 
-        # Should identify external inputs (unsatisfied variables)
-        assert len(plan["external_inputs"]) >= 1
+        # Should identify unresolved targets as blocking issues
+        assert len(plan["unresolved_issues"]) >= 2, (
+            "Should have at least 2 unresolved target issues"
+        )
 
-        # Check that unsatisfied source is captured in variable flows
+        # Check specific unresolved targets
+        unresolved_targets = [issue["target"] for issue in plan["unresolved_issues"]]
+        assert "task.processor" in unresolved_targets, (
+            "Should identify missing task.processor"
+        )
+        assert "task.nonexistent_summarizer" in unresolved_targets, (
+            "Should identify missing task.nonexistent_summarizer"
+        )
+
+        # Check that valid source field is captured in variable flows
         variable_flows = plan.get("variable_flows", [])
-        unsatisfied_sources = [
-            flow["from"]
-            for flow in variable_flows
-            if flow["from"] == "unsatisfied_source"
+        source_flows = [
+            flow["from"] for flow in variable_flows if flow["from"] == "source_field"
         ]
-        assert len(unsatisfied_sources) > 0, (
-            "Should identify 'unsatisfied_source' in variable flows"
+        assert len(source_flows) > 0, (
+            "Should identify 'source_field' in variable flows even with unresolved target"
         )
 
     def test_execution_plan_variable_flows(self):
@@ -2608,7 +2611,7 @@ class TestLangTreeChainIntrospection:
 
         # Test chain step building with this content
         try:
-            step_chain = builder._build_step_chain(analyzer_step, "reasoning")
+            step_chain = builder._build_step_chain(processor_node, "reasoning")
             assert step_chain is not None, "Chain step should build successfully"
 
             # Verify chain step is properly wrapped with context propagation
