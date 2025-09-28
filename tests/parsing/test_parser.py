@@ -2872,3 +2872,61 @@ class TestLastMatchingIterableValidation:
             node, inclusion_path, rhs_paths
         )
         assert result["valid"]
+
+
+# Comment parsing tests merged from test_comprehensive_comment_parsing.py
+class TestComprehensiveCommentParsing:
+    """Test comprehensive comment parsing in all contexts."""
+
+    def test_standalone_comment_parsing(self):
+        """Test standalone comment commands are parsed correctly."""
+        from langtree.parsing.parser import CommentCommand
+
+        # Test with space after #
+        cmd1 = parse_command("! # docstring comment solo")
+        assert isinstance(cmd1, CommentCommand)
+        assert cmd1.comment == "docstring comment solo"
+
+        # Test without space after #
+        cmd2 = parse_command("!# param comment before command")
+        assert isinstance(cmd2, CommentCommand)
+        assert cmd2.comment == "param comment before command"
+
+        # Test with special characters
+        cmd3 = parse_command("! # comment with symbols !@#$%^&*()")
+        assert isinstance(cmd3, CommentCommand)
+        assert cmd3.comment == "comment with symbols !@#$%^&*()"
+
+    def test_edge_case_comment_scenarios(self):
+        """Test edge cases and boundary conditions for comments."""
+        from langtree.parsing.parser import CommentCommand
+
+        # Empty comment
+        cmd1 = parse_command("! #")
+        assert isinstance(cmd1, CommentCommand)
+        assert cmd1.comment == ""
+
+        # Comment with hash symbols inside
+        cmd3 = parse_command("! # This comment has # hash symbols")
+        assert isinstance(cmd3, CommentCommand)
+        assert cmd3.comment == "This comment has # hash symbols"
+
+    def test_comments_do_not_break_existing_functionality(self):
+        """Test that adding comment support doesn't break existing command parsing."""
+        from langtree.parsing.parser import (
+            ExecutionCommand,
+            ParsedCommand,
+            VariableAssignmentCommand,
+        )
+
+        # Variable assignment
+        cmd1 = parse_command('! model="claude-3"')
+        assert isinstance(cmd1, VariableAssignmentCommand)
+
+        # Execution command
+        cmd2 = parse_command('! llm("gpt-4")')
+        assert isinstance(cmd2, ExecutionCommand)
+
+        # Traditional command
+        cmd5 = parse_command("! @each[items]->task.processor@{{value.data=items}}*")
+        assert isinstance(cmd5, ParsedCommand)

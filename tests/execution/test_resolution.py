@@ -1,27 +1,151 @@
 """
-Tests for real context resolution logic in prompt_structure module.
+Tests for execution resolution functionality.
 
-These tests define the intended behavior for real context resolution,
-replacing the current placeholder implementations that return debug strings.
-The tests should drive the implementation of actual data access and validation.
+This module tests all aspects of variable resolution including:
+- Assembly variable separation from runtime variables
+- Runtime variable validation and expansion
+- Variable registry integration
+- Context resolution workflows
 """
 
-# Group 1: External direct imports (alphabetical)
 import pytest
-
-# Group 2: External from imports (alphabetical by source module)
 from pydantic import Field
 
-from langtree.core import TreeNode
+from langtree import TreeNode
 from langtree.exceptions import (
     NodeTagValidationError,
     PathValidationError,
     RuntimeVariableError,
 )
 from langtree.execution.resolution import resolve_runtime_variables
-
-# Group 4: Internal from imports (alphabetical by source module)
 from langtree.structure import RunStructure, StructureTreeNode
+
+
+class TestAssemblyVariableSeparation:
+    """Test strict assembly variable separation from runtime variables."""
+
+    def test_assembly_variable_in_runtime_template_should_fail(self):
+        """Assembly variables should be rejected in runtime contexts per assembly variable separation principle."""
+
+        class TaskWithAssemblyVar(TreeNode):
+            """! assembly_var="test_value" """
+
+            field_var: str = "field_value"
+
+        structure = RunStructure()
+        structure.add(TaskWithAssemblyVar)
+        node = structure.get_node("task.with_assembly_var")
+
+        # Assembly variable should be rejected in runtime contexts
+        from langtree.execution.resolution import resolve_runtime_variables
+
+        with pytest.raises(RuntimeVariableError) as exc_info:
+            resolve_runtime_variables("Content: {assembly_var}", structure, node)
+
+        error_msg = str(exc_info.value)
+        assert "assembly variable" in error_msg.lower()
+        assert "cannot be used in runtime contexts" in error_msg
+
+        # Field variable should still be valid
+        result = resolve_runtime_variables("Content: {field_var}", structure, node)
+        assert "{prompt__with_assembly_var__field_var}" in result
+
+    def test_assembly_variable_error_message_clarity(self):
+        """Test that assembly variable errors provide clear, helpful messages."""
+
+        class TaskWithMultipleVars(TreeNode):
+            """
+            ! threshold=2.5
+            ! model="gpt-4"
+            Task with multiple assembly variables.
+            """
+
+            field_var: str = "field_value"
+
+        structure = RunStructure()
+        structure.add(TaskWithMultipleVars)
+        node = structure.get_node("task.with_multiple_vars")
+
+        from langtree.execution.resolution import resolve_runtime_variables
+
+        with pytest.raises(RuntimeVariableError) as exc_info:
+            resolve_runtime_variables("Threshold: {threshold}", structure, node)
+
+        error_msg = str(exc_info.value)
+        assert "threshold" in error_msg
+        assert "assembly variable" in error_msg.lower()
+        assert "runtime contexts" in error_msg.lower()
+
+
+class TestRuntimeVariableValidation:
+    """Test runtime variable validation behavior per LANGUAGE_SPECIFICATION.md."""
+
+    def test_undefined_field_variable_should_raise_error(self):
+        """Undefined field variables should raise RuntimeVariableError with helpful message."""
+
+        class TaskWithFields(TreeNode):
+            """Task with specific fields defined."""
+
+            valid_field: str = "value"
+            another_field: int = 42
+
+        structure = RunStructure()
+        structure.add(TaskWithFields)
+        node = structure.get_node("task.with_fields")
+
+        from langtree.execution.resolution import resolve_runtime_variables
+
+        # Should raise detailed error for undefined field variable when validation enabled
+        with pytest.raises(RuntimeVariableError) as exc_info:
+            resolve_runtime_variables(
+                "Content: {undefined_field}", structure, node, validate=True
+            )
+
+        error_msg = str(exc_info.value)
+        assert "undefined_field" in error_msg
+        assert "undefined" in error_msg.lower()
+
+    def test_malformed_variable_syntax_should_raise_error(self):
+        """Malformed variable syntax should raise RuntimeVariableError."""
+
+        class TaskForSyntaxTest(TreeNode):
+            field_var: str = "value"
+
+        structure = RunStructure()
+        structure.add(TaskForSyntaxTest)
+        node = structure.get_node("task.for_syntax_test")
+
+        from langtree.execution.resolution import resolve_runtime_variables
+
+        # Dots should be rejected
+        with pytest.raises(RuntimeVariableError) as exc_info:
+            resolve_runtime_variables("Content: {var.with.dots}", structure, node)
+
+        assert "dots" in str(exc_info.value).lower()
+
+    def test_deferred_validation_expands_without_checking_existence(self):
+        """By default, undefined variables should expand to namespaced form without validation."""
+
+        class TaskWithLimitedContext(TreeNode):
+            known_field: str = "value"
+
+        structure = RunStructure()
+        structure.add(TaskWithLimitedContext)
+        node = structure.get_node("task.with_limited_context")
+
+        from langtree.execution.resolution import resolve_runtime_variables
+
+        # Variables expand to namespaced form - validation deferred to runtime
+        content = "Known: {known_field}, Unknown: {unknown_field}"
+        expanded = resolve_runtime_variables(content, structure, node, validate=False)
+        # Both expand to namespaced form - existence check happens at runtime
+        assert (
+            expanded
+            == "Known: {prompt__with_limited_context__known_field}, Unknown: {prompt__with_limited_context__unknown_field}"
+        )
+
+
+# ===== RESTORED FROM BACKUP: tests_backup/prompt/test_resolution.py =====
 
 
 class TestIntegrationWorkflow:

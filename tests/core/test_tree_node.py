@@ -1,15 +1,15 @@
 """
-Tests for LangTree DSL prompt utility functions.
+Tests for TreeNode core functionality.
 
 Focus Areas:
 1. Naming convention validation for TreeNode classes
-2. Command extraction and text processing
+2. TreeNode base class behavior
 """
 
 import pytest
 
 from langtree import TreeNode
-from langtree.templates.utils import extract_commands, get_root_tag
+from langtree.templates.utils import get_root_tag
 
 
 class TestNamingConventionValidation:
@@ -167,37 +167,3 @@ class TestNamingConventionValidation:
 
         result = get_root_tag(Task2Analysis)
         assert result == "task.2_analysis"
-
-
-class TestCommandExtraction:
-    """Test command extraction functionality."""
-
-    def test_extract_commands_basic(self):
-        """Test basic command extraction."""
-        content = """! command1
-        ! command2
-
-        Regular text here"""
-
-        commands, clean_content = extract_commands(content)
-
-        assert len(commands) == 2
-        assert "command1" in commands[0]
-        assert "command2" in commands[1]
-        assert clean_content.strip() == "Regular text here"
-
-    def test_extract_commands_empty_content(self):
-        """Test command extraction with empty content."""
-        commands, clean_content = extract_commands("")
-
-        assert commands == []
-        assert clean_content == ""
-
-    def test_extract_commands_no_commands(self):
-        """Test command extraction with no commands."""
-        content = "Just regular text"
-
-        commands, clean_content = extract_commands(content)
-
-        assert commands == []
-        assert clean_content.strip() == "Just regular text"

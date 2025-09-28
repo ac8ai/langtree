@@ -14,7 +14,10 @@ import pytest
 from pydantic import Field
 
 from langtree import TreeNode
-from langtree.exceptions import FieldValidationError
+from langtree.exceptions import (
+    FieldValidationError,
+    VariableSourceValidationError,
+)
 from langtree.parsing.parser import CommandParseError
 from langtree.structure import RunStructure
 
@@ -159,7 +162,6 @@ class TestLangTreeDSLStructuralValidation:
 
         # Should fail because 'nonexistent_rhs' doesn't exist
         # Structural validation catches this before field existence validation
-        from langtree.exceptions import VariableSourceValidationError
 
         with pytest.raises(
             (CommandParseError, VariableSourceValidationError)
@@ -266,3 +268,160 @@ class TestRuntimeVariableEnumeration:
         # Should return empty list
         runtime_vars = structure.list_runtime_variables()
         assert runtime_vars == []
+
+
+# Key semantic validation tests added from test_semantic_validation_specification.py
+class TestFieldExistenceValidationRHS:
+    """Test field existence validation for variable mapping source fields (RHS).
+
+    Per LANGUAGE_SPECIFICATION.md: RHS fields must exist in current node scope.
+    """
+
+    def setup_method(self):
+        """Create fixtures for field existence tests."""
+        self.structure = RunStructure()
+
+    def test_nonexistent_field_in_variable_mapping_fails(self):
+        """Test that nonexistent fields in variable mappings cause immediate validation failure."""
+
+        class Section(TreeNode):
+            title: str
+            content: str
+
+        class TaskWithNonexistentField(TreeNode):
+            """Task referencing nonexistent field in variable mapping."""
+
+            # Command in 'sections' field - can use inclusion_path starting with 'sections'
+            # This should fail: sections.nonexistent_field doesn't exist on Section objects
+            sections: list[Section] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.nonexistent_field}}*"
+            )
+            valid_list: list[
+                Section
+            ] = []  # Needed to satisfy "at least one must match" rule
+
+        # Should fail immediately during tree building - field validation
+        with pytest.raises(VariableSourceValidationError) as exc_info:
+            self.structure.add(TaskWithNonexistentField)
+
+        assert "nonexistent_field" in str(exc_info.value)
+        assert "does not exist" in str(exc_info.value)
+
+    def test_existing_field_in_variable_mapping_passes(self):
+        """Test that existing fields in variable mappings pass validation."""
+
+        class Section(TreeNode):
+            title: str
+            content: str
+
+        class TaskWithExistingField(TreeNode):
+            """Task referencing existing field in variable mapping."""
+
+            # Command in 'sections' field - can use inclusion_path starting with 'sections'
+            # This should pass: sections.title exists on Section objects and we have a matching level
+            sections: list[Section] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.title}}*"
+            )
+            # Need a list field to satisfy "at least one must match" rule (1 level for @each[sections])
+            valid_list: list[Section] = []
+
+        # Should pass validation
+        self.structure.add(TaskWithExistingField)
+        assert self.structure.get_node("task.with_existing_field") is not None
+
+    def test_invalid_nested_field_access_fails(self):
+        """Test that invalid nested field access fails validation."""
+
+        class SubSection(TreeNode):
+            title: str
+            content: str
+
+        class TaskWithInvalidNested(TreeNode):
+            """Task with invalid nested field access."""
+
+            # Command in 'sections' field - can use inclusion_path starting with 'sections'
+            # This should fail: sections.nonexistent doesn't exist
+            sections: list[SubSection] = Field(
+                description="! @each[sections]->task.analyzer@{{value.valid_list=sections,value.title=sections.nonexistent}}*"
+            )
+            # Need a list field to satisfy "at least one must match" rule (1 level for @each[sections])
+            valid_list: list[SubSection] = []
+
+        # Should fail - nested field doesn't exist
+        with pytest.raises(VariableSourceValidationError) as exc_info:
+            self.structure.add(TaskWithInvalidNested)
+
+        assert "nonexistent" in str(exc_info.value)
+
+
+# ===== RESTORED FROM BACKUP: validation tests =====
+
+
+# From test_semantic_validation_specification.py:
+
+
+# Common task classes referenced by tests
+class TaskDocumentProcessor(TreeNode):
+    """Generic analyzer task referenced by test commands."""
+
+    pass
+
+
+class TaskProcessor(TreeNode):
+    """Generic processor task referenced by test commands."""
+
+    pass
+
+
+class TaskProcessorFour(TreeNode):
+    """Four-level processor task."""
+
+    pass
+
+
+class TaskStructureAThreeLevels(TreeNode):
+    """Three-level structure task."""
+
+    pass
+
+
+class TaskProcessorFive(TreeNode):
+    """Five-level processor task."""
+
+    pass
+
+
+class TaskDocumentProcessorSeven(TreeNode):
+    """Seven-level analyzer task."""
+
+    pass
+
+
+class TaskStructureAMinimalSpacing(TreeNode):
+    """Minimal spacing structure task."""
+
+    pass
+
+
+class TaskTarget(TreeNode):
+    """Target task for general processing."""
+
+    pass
+
+
+class TaskStructureA(TreeNode):
+    """Structure A task."""
+
+    pass
+
+
+class TaskStructureBZeroLayers(TreeNode):
+    """Structure B zero layers task."""
+
+    pass
+
+
+class TaskStructureATwoLayers(TreeNode):
+    """Structure A two layers task."""
+
+    pass
