@@ -13,7 +13,8 @@ from typing import NamedTuple
 
 import pytest
 
-from langtree.commands.parser import (
+from langtree.core.tree_node import TreeNode
+from langtree.parsing.parser import (
     CommandParseError,
     CommandParser,
     CommandType,
@@ -1778,7 +1779,7 @@ def test_comment_examples_from_specification():
 # Assembly Variable Registry Tests
 def test_assembly_variable_registry_basic_operations():
     """Test basic Assembly Variable Registry operations."""
-    from langtree.prompt.registry import AssemblyVariableRegistry
+    from langtree.structure.registry import AssemblyVariableRegistry
 
     registry = AssemblyVariableRegistry()
 
@@ -1805,7 +1806,7 @@ def test_assembly_variable_registry_basic_operations():
 
 def test_assembly_variable_registry_conflict_detection():
     """Test Assembly Variable conflict detection and error handling."""
-    from langtree.prompt.registry import (
+    from langtree.structure.registry import (
         AssemblyVariableConflictError,
         AssemblyVariableRegistry,
     )
@@ -1828,7 +1829,7 @@ def test_assembly_variable_registry_conflict_detection():
 
 def test_assembly_variable_registry_variable_reference_resolution():
     """Test Assembly Variable reference pattern resolution."""
-    from langtree.prompt.registry import AssemblyVariableRegistry
+    from langtree.structure.registry import AssemblyVariableRegistry
 
     registry = AssemblyVariableRegistry()
 
@@ -1852,7 +1853,7 @@ def test_assembly_variable_registry_variable_reference_resolution():
 
 def test_assembly_variable_registry_node_filtering():
     """Test filtering variables by source node."""
-    from langtree.prompt.registry import AssemblyVariableRegistry
+    from langtree.structure.registry import AssemblyVariableRegistry
 
     registry = AssemblyVariableRegistry()
 
@@ -1877,7 +1878,7 @@ def test_assembly_variable_registry_node_filtering():
 
 def test_assembly_variable_registry_list_all_variables():
     """Test listing all variables in registry."""
-    from langtree.prompt.registry import AssemblyVariableRegistry
+    from langtree.structure.registry import AssemblyVariableRegistry
 
     registry = AssemblyVariableRegistry()
 
@@ -1902,7 +1903,7 @@ def test_assembly_variable_registry_list_all_variables():
 
 def test_assembly_variable_registry_variable_metadata():
     """Test Assembly Variable metadata storage and retrieval."""
-    from langtree.prompt.registry import AssemblyVariableRegistry
+    from langtree.structure.registry import AssemblyVariableRegistry
 
     registry = AssemblyVariableRegistry()
 
@@ -1924,7 +1925,7 @@ def test_assembly_variable_registry_variable_metadata():
 
 def test_assembly_variable_registry_type_support():
     """Test Assembly Variable Registry supports all required types."""
-    from langtree.prompt.registry import AssemblyVariableRegistry
+    from langtree.structure.registry import AssemblyVariableRegistry
 
     registry = AssemblyVariableRegistry()
 
@@ -2584,7 +2585,6 @@ class TestIterableDepthTracking:
 
     def test_simple_iterable_path_depth(self):
         """Test depth assignment for simple iterable path: iterable1."""
-        from langtree.prompt.structure import TreeNode
 
         class SimpleNode(TreeNode):
             items: list[str] = []
@@ -2600,7 +2600,6 @@ class TestIterableDepthTracking:
 
     def test_nested_iterable_path_depth(self):
         """Test depth assignment for nested iterable path: iterable1.noniterable.iterable2."""
-        from langtree.prompt.structure import TreeNode
 
         class Level2Node(TreeNode):
             subitems: list[str] = []
@@ -2620,7 +2619,6 @@ class TestIterableDepthTracking:
 
     def test_complex_iterable_path_depth(self):
         """Test depth for complex path: iterable1.noniterable.iterable2.noniterable.iterable3."""
-        from langtree.prompt.structure import TreeNode
 
         class Level3Node(TreeNode):
             tags: list[str] = []
@@ -2644,7 +2642,6 @@ class TestIterableDepthTracking:
 
     def test_noniterable_only_path_depth(self):
         """Test depth for path with only non-iterable fields."""
-        from langtree.prompt.structure import TreeNode
 
         class ConfigNode(TreeNode):
             data: str = ""
@@ -2663,7 +2660,6 @@ class TestIterableDepthTracking:
 
     def test_mixed_spacing_same_depth(self):
         """Test that different non-iterable spacing gives same depth for same iterable count."""
-        from langtree.prompt.structure import TreeNode
 
         # Structure A: iterable1.iterable2.iterable3 (minimal spacing)
         class NodeA3(TreeNode):
@@ -2713,7 +2709,6 @@ class TestParserIterableDepthIntegration:
 
     def test_parser_calculates_inclusion_path_depth(self):
         """Test that parser can calculate inclusion path depth using existing functionality."""
-        from langtree.prompt.structure import TreeNode
 
         # Create TreeNode structure: sections.items (depth 2)
         class ItemNode(TreeNode):
@@ -2735,7 +2730,6 @@ class TestParserIterableDepthIntegration:
 
     def test_parser_calculates_rhs_path_depths(self):
         """Test that parser can calculate RHS path depths using existing functionality."""
-        from langtree.prompt.structure import TreeNode
 
         # Create TreeNode structure matching the command
         class ItemNode(TreeNode):
@@ -2770,7 +2764,6 @@ class TestLastMatchingIterableValidation:
 
     def test_complete_coverage_valid(self):
         """Test case with complete coverage - at least one RHS reaches inclusion's last iterable."""
-        from langtree.prompt.structure import TreeNode
 
         class Sentence(TreeNode):
             text: str = ""
@@ -2797,8 +2790,7 @@ class TestLastMatchingIterableValidation:
 
     def test_empty_paths_illegal(self):
         """Test that empty paths raise CommandParseError (violate LangTree DSL syntax)."""
-        from langtree.commands.parser import CommandParseError
-        from langtree.prompt.structure import TreeNode
+        from langtree.parsing.parser import CommandParseError
 
         class SimpleNode(TreeNode):
             items: list[str] = []
@@ -2815,7 +2807,6 @@ class TestLastMatchingIterableValidation:
 
     def test_identical_paths_valid(self):
         """Test case where RHS exactly matches inclusion_path."""
-        from langtree.prompt.structure import TreeNode
 
         class Item(TreeNode):
             text: str = ""
@@ -2834,8 +2825,7 @@ class TestLastMatchingIterableValidation:
 
     def test_non_iterable_only_paths_invalid(self):
         """Test that paths with no iterables violate @each semantics."""
-        from langtree.commands.parser import CommandParseError
-        from langtree.prompt.structure import TreeNode
+        from langtree.parsing.parser import CommandParseError
 
         class Config(TreeNode):
             name: str = ""
@@ -2855,7 +2845,6 @@ class TestLastMatchingIterableValidation:
 
     def test_mixed_iterable_positions_complex(self):
         """Test complex case with iterables at different positions."""
-        from langtree.prompt.structure import TreeNode
 
         class Tag(TreeNode):
             name: str = ""

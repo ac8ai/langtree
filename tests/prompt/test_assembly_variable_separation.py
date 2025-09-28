@@ -13,9 +13,10 @@ Expected Behavior:
 
 import pytest
 
-from langtree.prompt import RunStructure, TreeNode
-from langtree.prompt.exceptions import RuntimeVariableError
-from langtree.prompt.resolution import resolve_runtime_variables
+from langtree import TreeNode
+from langtree.exceptions import RuntimeVariableError
+from langtree.execution.resolution import resolve_runtime_variables
+from langtree.structure import RunStructure
 
 
 class TestAssemblyVariableSeparation:

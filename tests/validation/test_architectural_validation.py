@@ -13,9 +13,10 @@ Focus Areas:
 import pytest
 from pydantic import Field
 
-from langtree.commands.parser import CommandParseError
-from langtree.prompt import RunStructure, TreeNode
-from langtree.prompt.exceptions import FieldValidationError
+from langtree import TreeNode
+from langtree.exceptions import FieldValidationError
+from langtree.parsing.parser import CommandParseError
+from langtree.structure import RunStructure
 
 
 class TestBareCollectionTypeRejection:
@@ -158,7 +159,7 @@ class TestLangTreeDSLStructuralValidation:
 
         # Should fail because 'nonexistent_rhs' doesn't exist
         # Structural validation catches this before field existence validation
-        from langtree.prompt.exceptions import VariableSourceValidationError
+        from langtree.exceptions import VariableSourceValidationError
 
         with pytest.raises(
             (CommandParseError, VariableSourceValidationError)

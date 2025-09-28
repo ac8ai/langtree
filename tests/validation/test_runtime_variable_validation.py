@@ -13,9 +13,10 @@ Focus Areas:
 
 import pytest
 
-from langtree.prompt import RunStructure, TreeNode
-from langtree.prompt.exceptions import RuntimeVariableError
-from langtree.prompt.resolution import resolve_runtime_variables
+from langtree import TreeNode
+from langtree.exceptions import RuntimeVariableError
+from langtree.execution.resolution import resolve_runtime_variables
+from langtree.structure import RunStructure
 
 
 class TestRuntimeVariableValidationBehavior:
@@ -61,7 +62,7 @@ class TestRuntimeVariableValidationBehavior:
         node = structure.get_node("task.with_assembly_var")
 
         # Assembly variable should be rejected in runtime contexts
-        from langtree.prompt.exceptions import RuntimeVariableError
+        from langtree.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables("Content: {assembly_var}", structure, node)

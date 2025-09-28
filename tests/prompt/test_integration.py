@@ -14,13 +14,15 @@ This module tests the new execution design implementation including:
 import pytest
 from pydantic import Field
 
-from langtree.commands.parser import CommandParseError, ParsedCommand
-from langtree.prompt import RunStructure, TreeNode, get_scope
-from langtree.prompt.exceptions import (
+from langtree import TreeNode
+from langtree.exceptions import (
     FieldValidationError,
     VariableSourceValidationError,
     VariableTargetValidationError,
 )
+from langtree.execution.scopes import get_scope
+from langtree.parsing.parser import CommandParseError, ParsedCommand
+from langtree.structure import RunStructure
 
 
 # Common task classes referenced by integration tests
@@ -159,7 +161,7 @@ class TestExtractCommandsBoundaryBehavior:
 
     def test_command_parsing_stops_at_regular_text(self):
         """Test your exact example: command parsing stops when regular text appears."""
-        from langtree.prompt.utils import extract_commands
+        from langtree.templates.utils import extract_commands
 
         content = """! repeat(5)
 
@@ -182,7 +184,7 @@ more text {variable}"""
 
     def test_multiple_commands_before_regular_text(self):
         """Test that multiple commands at start work, but stop at regular text."""
-        from langtree.prompt.utils import extract_commands
+        from langtree.templates.utils import extract_commands
 
         content = """! command1
 ! command2
@@ -269,7 +271,7 @@ class TestErrorHandling:
     def test_unsatisfied_variable_detection(self):
         """Test detection of truly unsatisfied variables."""
         # Create a variable registry directly to test unsatisfied detection
-        from langtree.prompt import VariableRegistry
+        from langtree.structure import VariableRegistry
 
         registry = VariableRegistry()
 
@@ -579,7 +581,7 @@ class TestRealWorldComplexity:
 
     def test_missing_source_fields_edge_case(self):
         """Test commands that reference non-existent source fields."""
-        from langtree.prompt.exceptions import VariableSourceValidationError
+        from langtree.exceptions import VariableSourceValidationError
 
         structure = RunStructure()
 
@@ -592,7 +594,7 @@ class TestRealWorldComplexity:
 
     def test_partially_missing_structure_edge_case(self):
         """Test where iteration path exists but variable mapping sources are missing."""
-        from langtree.prompt.exceptions import VariableSourceValidationError
+        from langtree.exceptions import VariableSourceValidationError
 
         structure = RunStructure()
 
@@ -606,7 +608,7 @@ class TestRealWorldComplexity:
 
     def test_completely_missing_iteration_edge_case(self):
         """Test @each command referencing completely non-existent iteration path."""
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         structure = RunStructure()
 
@@ -1678,8 +1680,8 @@ class TestComprehensiveValidation:
         structure = RunStructure()
 
         # Should fail when adding the node due to @each validation
-        from langtree.commands.parser import CommandParseError
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
+        from langtree.parsing.parser import CommandParseError
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             structure.add(TaskWithImpossibleMapping)
@@ -1732,7 +1734,7 @@ class TestComprehensiveValidation:
         structure = RunStructure()
 
         # Should fail when adding the node due to @each validation
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError) as exc_info:
             structure.add(TaskWithMultipleIssues)
@@ -1778,7 +1780,7 @@ class TestLangTreeIntegrationLayerBasics:
     def test_integration_module_imports(self):
         """Test that all integration components can be imported correctly."""
         # Import here to avoid unused import warnings
-        from langtree.prompt.integration import (
+        from langtree.execution.integration import (
             ContextPropagator,
             ExecutionOrchestrator,
             LangTreeChainBuilder,
@@ -1793,7 +1795,7 @@ class TestLangTreeIntegrationLayerBasics:
 
     def test_acl_chain_builder_initialization(self):
         """Test LangTreeChainBuilder initializes correctly with all components."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
         chain_builder = LangTreeChainBuilder(run_structure)
@@ -1808,7 +1810,7 @@ class TestLangTreeIntegrationLayerBasics:
 
     def test_component_interfaces_exist(self):
         """Test all components have expected interface methods."""
-        from langtree.prompt.integration import (
+        from langtree.execution.integration import (
             ExecutionOrchestrator,
             LangTreeChainBuilder,
         )
@@ -1878,7 +1880,7 @@ class TestLangTreeChainBuilderAdversarial:
         run_structure.add(TaskB)
         run_structure.add(TaskC)
 
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         builder = LangTreeChainBuilder(run_structure)
 
@@ -1995,7 +1997,7 @@ class TestLangTreeChainIntrospection:
 
     def test_simple_chain_structure_validation(self, mock_llm_provider):
         """Test that a simple chain contains expected components in correct order."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Arrange: Create a simple linear dependency chain
         run_structure = RunStructure()
@@ -2155,7 +2157,7 @@ class TestLangTreeChainIntrospection:
 
     def test_complex_chain_structure_validation(self, mock_llm_provider):
         """Test that a complex multi-branch chain has correct structure."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Arrange: Create a complex branching structure
         #   DataSource
@@ -2271,7 +2273,7 @@ class TestLangTreeChainIntrospection:
 
     def test_large_tree_execution_plan_properties(self):
         """Test execution plan properties for a large tree structure."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Arrange: Create a large tree with predictable structure
         # Root -> Level1 (3 nodes) -> Level2 (6 nodes) -> Level3 (12 nodes)
@@ -2389,7 +2391,7 @@ class TestLangTreeChainIntrospection:
 
     def test_chain_execution_simulation(self, mock_llm_provider):
         """Test that the built chain can be simulated to verify execution flow."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Arrange: Create a simple chain that we can trace execution through
         run_structure = RunStructure()
@@ -2485,7 +2487,7 @@ class TestLangTreeChainIntrospection:
 
     def test_chain_step_content_validation(self):
         """Test that individual chain steps contain expected prompt components."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Arrange: Create a structure with nodes that ACTUALLY participate in execution
         run_structure = RunStructure()
@@ -2805,7 +2807,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
     def test_build_step_chain_with_missing_node(self):
         """Test step chain building fails gracefully when node is missing."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
         builder = LangTreeChainBuilder(run_structure)
@@ -2920,7 +2922,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
     def test_build_execution_chain_with_invalid_structure(self):
         """Test execution chain building with completely invalid structure."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Arrange: Create structure that will fail validation
         run_structure = RunStructure()
@@ -2985,7 +2987,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         run_structure.add(TaskCircularB)
 
         # TaskMissingFields should fail during add() due to LangTree DSL validation
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError, match="nonexistent_field"):
             run_structure.add(TaskMissingFields)
@@ -3138,14 +3140,14 @@ class TestLangTreeChainBuilderAdversarialContinued:
             pass
 
         # TaskBadSyntax should fail during add() due to LangTree DSL validation
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError, match="outputs.also_missing"):
             run_structure.add(TaskBadSyntax)
 
     def test_compose_dependency_chain_with_impossible_dependencies(self):
         """Test dependency composition with unsatisfiable dependencies."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
         builder = LangTreeChainBuilder(run_structure)
@@ -3344,7 +3346,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
     def test_build_step_chain_with_malformed_syntax(self):
         """Test step chain building with syntactically malformed LangTree DSL commands."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
         builder = LangTreeChainBuilder(run_structure)
@@ -3556,7 +3558,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
     def test_topological_plan_with_massive_dependency_graph(self):
         """Test topological planning performance with huge dependency graphs."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
 
@@ -3824,7 +3826,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
     def test_build_execution_chain_with_complex_variable_scopes(self):
         """Test execution chain building with complex variable scope edge cases."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
 
@@ -4029,7 +4031,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
     def test_build_execution_chain_with_template_variable_edge_cases(self):
         """Test execution chain building with complex template variable syntax."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
 
@@ -4284,7 +4286,7 @@ class TestAssemblyValidation:
 
     def test_assembly_validation_destination_field_nesting_mismatch(self):
         """Test that assembly validation catches LHS-RHS nesting mismatch for destination fields."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         # Test case: destination field with 0 nesting, iteration with 2 levels
         class SubItem(TreeNode):
@@ -4330,7 +4332,7 @@ class TestAssemblyValidation:
 
     def test_assembly_validation_source_field_passes(self):
         """Test that assembly validation allows source fields (validated during semantic phase)."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         class SubItem(TreeNode):
             data: str = "test"
@@ -4374,7 +4376,7 @@ class TestAssemblyValidation:
 
     def test_assembly_validation_no_iteration_passes(self):
         """Test that assembly validation passes when there's no iteration."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         class Item(TreeNode):
             data: str = Field(
@@ -4450,7 +4452,7 @@ class TestAssemblyValidation:
 
     def test_assembly_validation_infrastructure_exists(self):
         """Test that assembly validation infrastructure is properly integrated."""
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         structure = RunStructure()
         builder = LangTreeChainBuilder(structure)
@@ -4515,7 +4517,7 @@ class TestAssemblyValidation:
         assert structure1.get_node("task.all_destination") is not None
 
         # Assembly validation should catch the issue
-        from langtree.prompt.integration import LangTreeChainBuilder
+        from langtree.execution.integration import LangTreeChainBuilder
 
         builder1 = LangTreeChainBuilder(structure1)
         assembly_errors = builder1._validate_assembly_phase()

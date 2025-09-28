@@ -97,7 +97,7 @@ Both use `!` prefix and `@` keywords for consistency.
 - [x] Define @sequential/@parallel semantics
 
 ### Phase 2: Implementation
-- [ ] Update `structure.py` for tag-based forwarding
+- [ ] Update `structure/builder.py` for tag-based forwarding
 - [ ] Implement node modifier parsing and handling
 - [ ] Update context resolution for deterministic ordering
 - [ ] Update all tests to reflect new architecture

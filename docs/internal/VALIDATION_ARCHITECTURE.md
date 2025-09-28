@@ -73,7 +73,7 @@ class CommandParser:
 ```
 
 ### Phase 2: Tree Building with Immediate Validation
-**File:** `langtree/prompt/structure.py`
+**File:** `langtree/structure/builder.py`
 ```python
 class RunStructure:
     def add(self, node_class: type[TreeNode]) -> None:
@@ -104,7 +104,7 @@ class RunStructure:
 ```
 
 ### Phase 3: Deferred Resolution and Validation
-**File:** `langtree/prompt/integration.py`
+**File:** `langtree/execution/integration.py`
 ```python
 class LangTreeChainBuilder:
     def build_execution_chain(self) -> Runnable:
@@ -187,13 +187,13 @@ def build_execution_chain(self):
 - Test that parser allows semantic issues to pass through
 
 ### Category 2 Tests
-**File:** `tests/langtree/prompt/test_validation.py`
+**File:** `tests/validation/test_validation.py`
 - Test that forward references are properly deferred
 - Test that cross-node dependencies resolve correctly
 - Test that circular dependencies are detected
 
 ### Integration Tests
-**File:** `tests/langtree/prompt/test_integration.py`
+**File:** `tests/prompt/test_integration.py`
 - Test complete validation flow from parsing to chain building
 - Test error reporting and recovery
 - Test complex dependency scenarios
@@ -249,7 +249,7 @@ def build_execution_chain(self):
 
 ### Field Existence Validation
 **Purpose:** Ensure RHS fields in variable mappings exist in current node scope
-**Implementation:** `_validate_variable_source_field()` in structure.py
+**Implementation:** `_validate_variable_source_field()` in structure/builder.py
 **Test Coverage:** 4 tests in `test_semantic_validation_specification.py`
 
 ```python
@@ -262,7 +262,7 @@ def build_execution_chain(self):
 
 ### Loop Nesting Validation
 **Purpose:** Ensure variable mappings match iteration structure per specification
-**Implementation:** `_validate_variable_mapping_nesting()` in structure.py
+**Implementation:** `_validate_variable_mapping_nesting()` in structure/builder.py
 **Key Rule:** At least one mapping must match iteration level exactly
 **Test Coverage:** 5 tests in `test_semantic_validation_specification.py`
 
@@ -277,7 +277,7 @@ def build_execution_chain(self):
 
 ### Task Target Completeness
 **Purpose:** Catch incomplete task references per specification
-**Implementation:** `_validate_task_target_completeness()` in structure.py
+**Implementation:** `_validate_task_target_completeness()` in structure/builder.py
 **Test Coverage:** 2 tests in `test_semantic_validation_specification.py`
 
 ```python

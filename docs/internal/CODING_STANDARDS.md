@@ -144,7 +144,7 @@ def function_name(param1: Type, param2: Type) -> ReturnType:
 #### Absolute Imports Only
 **All imports must use absolute paths**:
 - **Never use relative imports**: No `from .module import item` or `from ..parent import item`
-- **Always specify full module path**: `from langtree.prompt.structure import RunStructure`
+- **Always specify full module path**: `from langtree.structure import RunStructure`
 - **Consistent with project structure**: Import paths must match actual package hierarchy
 - **Exception**: TYPE_CHECKING blocks may use forward references as strings
 
@@ -171,10 +171,12 @@ import langtree.chains
 import langtree.models
 
 # Group 4: Internal from imports (alphabetical by source module)
-from langtree.commands.parser import parse_command
-from langtree.prompt.registry import VariableRegistry
-from langtree.prompt.structure import TreeNode, RunStructure
+from langtree.parsing.parser import parse_command
+from langtree.structure.registry import VariableRegistry
+from langtree.structure import RunStructure
+from langtree import TreeNode
 ```
+Do not replicate line comments on top of each groups. They are just a part of description.
 
 #### Blank Line Separation
 - **One blank line** between each of the four groups

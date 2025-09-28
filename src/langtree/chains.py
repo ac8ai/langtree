@@ -15,15 +15,13 @@ Design notes:
     - Sampling utilities wrap an existing chain instead of duplicating logic.
 """
 
-from uuid import uuid4
-
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
 )
-from langchain_core.runnables import Runnable, RunnableLambda
+from langchain_core.runnables import Runnable
 from pydantic import BaseModel
 
 from langtree.dynamic import describe_model
@@ -109,65 +107,3 @@ def prepare_chain(
             raise ValueError("Structured output is not allowed in this chain.")
         chain = chain | StrOutputParser()
     return chain
-
-
-def sample_mapper(input_data: dict[str, str]) -> dict[str, str]:
-    """Inject a unique signature marker into input mapping for sampling runs.
-
-    The injected `<ignore>` signature enables downstream prompts to distinguish
-    and safely ignore per-sample metadata while preserving traceability.
-
-    Params:
-        input_data: Original mapping passed into the chain invocation.
-
-    Returns:
-        A shallow copy of `input_data` with an added `signature` key whose value
-        is a UUID wrapped in an `<ignore>` tag.
-    """
-    output_data = input_data.copy()
-    output_data["signature"] = f"<ignore>{str(uuid4())}</ignore>"
-    return output_data
-
-
-def sample_chain(
-    chain: Runnable,
-    n_samples: int,
-    original_task: str,
-    prompts: dict[str, str],
-    skip_context_prompt: bool = False,
-    output_as_string: bool = False,
-) -> Runnable:
-    """Wrap an existing chain to produce N independently sampled executions.
-
-    A lightweight resampling prompt (summarization LLM) is constructed that
-    consumes individual sample outputs as templated placeholders. Each sample
-    is produced by piping the original `chain` through a UUID signature mapper.
-
-    Params:
-        chain: Base runnable to execute for each sample slot.
-        n_samples: Number of samples to generate.
-        original_task: Task text injected into the resampling template.
-        prompts: Dictionary of prompt sections (system, context, task, output).
-        skip_context_prompt: If True, omit context block in sampling template.
-        output_as_string: If True, final aggregated resample output is parsed to raw string.
-
-    Returns:
-        Runnable producing aggregated re‑prompt output (string or model-bound response).
-    """
-    if skip_context_prompt:
-        prompts["prompt_context"] = None
-    prompts["prompt_task"] = prompts["prompt_task"].format(original_task=original_task)
-    samples_template = "\n\n".join(
-        "<sample>\n{sample_" + str(i + 1) + "}\n</sample>" for i in range(n_samples)
-    )
-    sampling_chain = prepare_chain(
-        llm_name="summarization",
-        **prompts,
-        samples_template=samples_template,
-    )
-    signed_chain = RunnableLambda(sample_mapper) | chain
-    samples = {f"sample_{i + 1}": signed_chain for i in range(n_samples)}
-    resample = samples | sampling_chain
-    if output_as_string:
-        resample = resample | StrOutputParser()
-    return resample

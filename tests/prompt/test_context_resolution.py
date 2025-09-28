@@ -11,7 +11,9 @@ This module tests the context resolution capabilities including:
 import pytest
 from pydantic import Field
 
-from langtree.prompt import RunStructure, TreeNode
+from langtree import TreeNode
+from langtree.exceptions import FieldValidationError
+from langtree.structure import RunStructure
 
 
 class TestScopeResolvers:
@@ -356,7 +358,6 @@ class TestContextTypes:
         structure = RunStructure()
 
         # Should raise validation error for RHS path not matching iteration root
-        from langtree.prompt.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError) as exc_info:
             structure.add(TaskWithNestedData)
@@ -387,7 +388,6 @@ class TestContextTypes:
         structure = RunStructure()
 
         # Should raise validation error for @each in docstring
-        from langtree.prompt.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError) as exc_info:
             structure.add(TaskWithInvalidEachInDocstring)

@@ -5,7 +5,7 @@ This module contains validation functions for field types, ensuring proper type
 specifications and compliance with LangTree DSL framework requirements.
 """
 
-from langtree.commands.parser import CommandParseError
+from langtree.parsing.parser import CommandParseError
 
 
 def validate_field_types(component: str, field_type) -> None:

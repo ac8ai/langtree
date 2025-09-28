@@ -7,12 +7,12 @@ This module tests the variable and pending target registry components:
 - Variable info tracking and validation
 """
 
-from langtree.commands.parser import parse_command
-from langtree.prompt import (
+from langtree.execution.scopes import get_scope
+from langtree.parsing.parser import parse_command
+from langtree.structure import (
     PendingTargetRegistry,
     RunStructure,
     VariableRegistry,
-    get_scope,
 )
 
 

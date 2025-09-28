@@ -487,11 +487,12 @@ prompt.context = *   # Forward entire current subtree
 
 ## Framework Architecture
 
-### Core LangTree DSL Modules (`langtree/prompt/`)
+### Core LangTree DSL Modules
 
-#### `structure.py` - Main Framework Classes
-- `TreeNode`: Base class for all prompt nodes with tag parsing
-- `RunStructure`: Main orchestration class for building and analyzing chains
+#### Structure Module (`langtree/structure/`)
+- `core/tree_node.py`: `TreeNode` base class for all prompt nodes
+- `structure/builder.py`: `RunStructure` main orchestration class for building and analyzing chains
+- `structure/registry.py`: Variable and target registries
 - Core validation and execution planning logic
 
 #### `registry.py` - Variable and Target Management  
@@ -802,13 +803,13 @@ Performance testing validates:
 
 ```bash
 # All tests
-python -m pytest tests/langtree/prompt/ --tb=short
+python -m pytest tests/prompt/ --tb=short
 
 # Specific component
-python -m pytest tests/langtree/commands/test_parser.py -v
+python -m pytest tests/commands/test_parser.py -v
 
 # Skip deferred tests
-python -m pytest tests/langtree/prompt/ -k "not test_deferred"
+python -m pytest tests/prompt/ -k "not test_deferred"
 ```
 
 ### **IMPLEMENTATION COMPLETE - MAINTENANCE MODE**
@@ -1128,7 +1129,7 @@ When making changes to the LangTree DSL framework, follow these testing guidelin
 pytest
 
 # Run specific test categories
-pytest tests/test_prompt_structure.py  # Core structure tests
+pytest tests/prompt/test_structure.py  # Core structure tests
 pytest tests/test_registry.py          # Registry tests
 pytest tests/test_validation.py        # Validation tests
 pytest tests/test_resolution.py        # Resolution tests

@@ -12,9 +12,8 @@ from typing import TYPE_CHECKING
 from inflection import underscore
 
 if TYPE_CHECKING:
-    from langtree.prompt.structure import TreeNode
+    from langtree.core.tree_node import TreeNode
 
-# Text processing utilities - matches commands that may span multiple lines within brackets/braces
 COMMAND_PATTERN = re.compile(r"^\s*!\s*[^!\n]*(?:\n(?!\s*!)[^\n]*)*", re.MULTILINE)
 
 

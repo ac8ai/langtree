@@ -6,8 +6,9 @@ LangTree provides a DSL for building hierarchical prompt structures with action 
 
 from importlib.metadata import version
 
+from langtree.core import TreeNode
 from langtree.models import LLMProvider
-from langtree.prompt.structure import RunStructure, TreeNode
+from langtree.structure import RunStructure
 
 __version__ = version("langtree")
 

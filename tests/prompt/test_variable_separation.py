@@ -20,9 +20,11 @@ According to LANGUAGE_SPECIFICATION.md:
 
 import pytest
 
-from langtree.prompt import RunStructure, TreeNode
-from langtree.prompt.exceptions import RuntimeVariableError
-from langtree.prompt.resolution import resolve_runtime_variables
+from langtree import TreeNode
+from langtree.exceptions import LangTreeDSLError, RuntimeVariableError
+from langtree.execution.resolution import resolve_runtime_variables
+from langtree.structure import RunStructure
+from langtree.structure.registry import AssemblyVariableConflictError
 
 
 class TestAssemblyRuntimeSeparation:
@@ -50,7 +52,6 @@ class TestAssemblyRuntimeSeparation:
         content = "Count: {count}, Threshold: {threshold}"
 
         # Should raise RuntimeVariableError when trying to use assembly variable in runtime
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)
@@ -78,8 +79,6 @@ class TestAssemblyRuntimeSeparation:
 
         # Assembly variables should be rejected in runtime contexts
         content = "Priority: {priority_var}"
-
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)
@@ -159,8 +158,6 @@ class TestAssemblyRuntimeSeparation:
         # Assembly variables should be rejected in runtime contexts
         content = "Config: {config_value}"
 
-        from langtree.prompt.exceptions import RuntimeVariableError
-
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)
 
@@ -233,8 +230,7 @@ class TestArchitecturalIntegrity:
         """Test that parser enforces separation between assembly and runtime variable contexts."""
 
         # Test that malformed bridging syntax is rejected by resolution layer
-        from langtree.prompt.exceptions import RuntimeVariableError
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         class TaskForBridgingTest(TreeNode):
             """
@@ -261,7 +257,6 @@ class TestArchitecturalIntegrity:
         assert expanded == "Runtime: {prompt__for_bridging_test__runtime_field}"
 
         # Test that assembly variables are rejected in runtime contexts
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables("Assembly: {assembly_var}", structure, node)
@@ -298,7 +293,6 @@ class TestArchitecturalIntegrity:
 
         # Assembly variable should be rejected in runtime contexts
         content = "Assembly: {assembly_var}"
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)
@@ -340,7 +334,6 @@ class TestArchitecturalIntegrity:
 
         # Assembly variables should be rejected in runtime contexts
         content = "Iterations: {iterations}"
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)
@@ -443,7 +436,6 @@ class TestCompleteVariableTypeCoverage:
 
         # Assembly variables should be rejected in runtime contexts
         content = "Iterations: {iterations}, Model: {model_name}"
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)
@@ -682,7 +674,6 @@ class TestSpecificationCompliance:
         assert node is not None
 
         # Assembly variables should be rejected in runtime contexts
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         assembly_tests = [
             "Config: {config_value}",
@@ -739,7 +730,6 @@ class TestSpecificationCompliance:
         assert node is not None
 
         # Assembly variables should be rejected in runtime contexts
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables("{assembly_var}", structure, node)
@@ -769,11 +759,6 @@ class TestSpecificationCompliance:
         Note: Currently skipped pending implementation of conflict detection.
         """
         import pytest
-
-        from langtree.prompt.exceptions import (
-            LangTreeDSLError,
-        )
-        from langtree.prompt.registry import AssemblyVariableConflictError
 
         # Test 1: Variable name conflicts with field names should raise error
         class TaskConflictingVariableField(TreeNode):
@@ -855,7 +840,6 @@ class TestSpecificationCompliance:
 
         # Assembly variables should be rejected in runtime contexts
         content = "Count: {count}, Threshold: {threshold}"
-        from langtree.prompt.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content, structure, node)

@@ -13,18 +13,16 @@ Key Components:
 - ExecutionOrchestrator: Coordination of chain execution order and dependencies
 """
 
-# Group 2: External from imports (alphabetical by source module)
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
-# Group 4: Internal from imports (alphabetical by source module)
-from langtree.prompt.resolution import resolve_runtime_variables
+from langtree.execution.resolution import resolve_runtime_variables
 
 if TYPE_CHECKING:
     from langchain_core.runnables import Runnable
 
-    from langtree.prompt.structure import RunStructure, StructureTreeNode
+    from langtree.structure.builder import RunStructure, StructureTreeNode
 
 
 class LangTreeChainBuilder:
@@ -49,7 +47,7 @@ class LangTreeChainBuilder:
         """
         Build complete LangChain execution pipeline from LangTree structure.
 
-        Args:
+        Params:
             llm_name: LLM identifier for chain construction
             **chain_kwargs: Additional arguments passed to prepare_chain
 
@@ -145,13 +143,13 @@ class LangTreeChainBuilder:
         """
         Generate alternative target path formats for resolution.
 
-        Args:
+        Params:
             target_path: Original target path that couldn't be resolved
 
         Returns:
             List of alternative path formats to try
         """
-        from langtree.prompt.utils import underscore
+        from langtree.templates.utils import underscore
 
         alternatives = []
 
@@ -305,7 +303,7 @@ class LangTreeChainBuilder:
         """
         Perform topological sort on execution steps based on dependencies.
 
-        Args:
+        Params:
             steps: List of execution steps from the plan
             dependencies: Dict mapping node_tag to set of dependency node_tags
 
@@ -354,7 +352,7 @@ class LangTreeChainBuilder:
         """
         Find circular dependency chains in the dependency graph.
 
-        Args:
+        Params:
             dependencies: Dict mapping node_tag to set of dependency node_tags
 
         Returns:
@@ -400,7 +398,7 @@ class LangTreeChainBuilder:
         """
         Build LangChain Runnable for a single execution step.
 
-        Args:
+        Params:
             step: Execution step from plan containing node info and commands
             llm_name: LLM identifier for chain construction
             **chain_kwargs: Additional arguments for prepare_chain
@@ -446,7 +444,7 @@ class LangTreeChainBuilder:
         """
         Determine if node requires structured output based on its field types.
 
-        Args:
+        Params:
             node: Structure tree node to analyze
 
         Returns:
@@ -463,7 +461,7 @@ class LangTreeChainBuilder:
         """
         Compose multiple chain steps with proper dependency ordering.
 
-        Args:
+        Params:
             chain_steps: Dictionary of node_tag -> Runnable mappings
             execution_plan: Execution plan with dependency information
 
@@ -512,7 +510,7 @@ class LangTreeChainBuilder:
         """
         Validate dependency graph for circular dependencies and missing nodes.
 
-        Args:
+        Params:
             chain_steps: Available chain steps
             chain_steps_list: List of steps with their dependencies
 
@@ -582,7 +580,7 @@ class LangTreeChainBuilder:
         """
         Identify groups of steps that can run in parallel.
 
-        Args:
+        Params:
             dependency_order: List of nodes in dependency order
             execution_plan: Full execution plan
 
@@ -647,7 +645,7 @@ class LangTreeChainBuilder:
         This validates destination fields that were skipped during semantic validation
         because the target node structure wasn't available.
 
-        Args:
+        Params:
             command: LangTree DSL command with variable mappings to validate
             source_node_tag: Tag of the source node containing the command
 
@@ -731,7 +729,7 @@ class PromptAssembler:
         """
         Assemble hierarchical prompt for a node.
 
-        Args:
+        Params:
             node: Structure tree node to assemble prompt for
 
         Returns:
@@ -743,7 +741,7 @@ class PromptAssembler:
 
         # Process template variables in both system prompt and field descriptions
         if system_prompt:
-            from langtree.prompt.template_variables import (
+            from langtree.templates.variables import (
                 resolve_template_variables_in_content,
             )
 
@@ -763,7 +761,7 @@ class PromptAssembler:
         # Process template variables in field descriptions
         processed_field_descriptions = {}
         if field_descriptions:
-            from langtree.prompt.template_variables import (
+            from langtree.templates.variables import (
                 resolve_template_variables_in_content,
             )
 
@@ -803,7 +801,7 @@ class PromptAssembler:
         """
         Assemble context sections from parent hierarchy.
 
-        Args:
+        Params:
             node: Node to assemble context for
 
         Returns:
@@ -828,7 +826,7 @@ class PromptAssembler:
         """
         Extract task instructions from system prompt and field descriptions.
 
-        Args:
+        Params:
             system_prompt: Main system prompt text
             field_descriptions: Field descriptions from node
 
@@ -843,7 +841,7 @@ class PromptAssembler:
         """
         Extract output format specifications from field descriptions.
 
-        Args:
+        Params:
             field_descriptions: Field descriptions from node
 
         Returns:
@@ -877,7 +875,7 @@ class ContextPropagator:
         """
         Wrap a chain with context propagation capabilities.
 
-        Args:
+        Params:
             base_chain: Base LangChain Runnable to wrap
             node_tag: Tag of the node this chain represents
             node: Structure tree node
@@ -890,7 +888,7 @@ class ContextPropagator:
             """
             Wrapper function that handles context propagation.
 
-            Args:
+            Params:
                 input_data: Input data dictionary with variables and context
 
             Returns:

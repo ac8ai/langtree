@@ -12,14 +12,16 @@ import pytest
 # Group 2: External from imports (alphabetical by source module)
 from pydantic import Field
 
-# Group 4: Internal from imports (alphabetical by source module)
-from langtree.prompt import RunStructure, StructureTreeNode, TreeNode
-from langtree.prompt.exceptions import (
+from langtree.core import TreeNode
+from langtree.exceptions import (
     NodeTagValidationError,
     PathValidationError,
     RuntimeVariableError,
 )
-from langtree.prompt.resolution import resolve_runtime_variables
+from langtree.execution.resolution import resolve_runtime_variables
+
+# Group 4: Internal from imports (alphabetical by source module)
+from langtree.structure import RunStructure, StructureTreeNode
 
 
 class TestIntegrationWorkflow:
@@ -246,8 +248,8 @@ class TestIntegrationWorkflow:
         run_structure = RunStructure()
 
         # Manually create a pending target with invalid source
-        from langtree.commands.parser import CommandType, ParsedCommand
-        from langtree.prompt.registry import PendingTarget
+        from langtree.parsing.parser import CommandType, ParsedCommand
+        from langtree.structure.registry import PendingTarget
 
         # Create a mock command
         mock_command = ParsedCommand(
@@ -1005,7 +1007,7 @@ class TestRuntimeVariableSystemSpecCompliance:
 
         # Test that {assembly_model} should be rejected in runtime contexts
         content_assembly = "Using model: {assembly_model}"
-        from langtree.prompt.exceptions import RuntimeVariableError
+        from langtree.exceptions import RuntimeVariableError
 
         with pytest.raises(RuntimeVariableError) as exc_info:
             resolve_runtime_variables(content_assembly, run_structure, node)
@@ -1053,7 +1055,7 @@ class TestSpecificationViolationDetection:
 
     def test_detect_invalid_command_combinations(self):
         """Test detection of invalid command combinations per LANGUAGE_SPECIFICATION.md."""
-        from langtree.commands.parser import CommandParseError
+        from langtree.parsing.parser import CommandParseError
 
         run_structure = RunStructure()
 
@@ -1098,7 +1100,7 @@ class TestSpecificationViolationDetection:
 
     def test_detect_template_variable_violations(self):
         """Test detection of template variable violations per specification."""
-        from langtree.prompt.exceptions import TemplateVariableError
+        from langtree.exceptions import TemplateVariableError
 
         run_structure = RunStructure()
 
@@ -1136,7 +1138,7 @@ class TestSpecificationViolationDetection:
 
     def test_path_validation_edge_cases(self):
         """Test path validation edge cases that should fail."""
-        from langtree.commands.parser import CommandParseError
+        from langtree.parsing.parser import CommandParseError
 
         run_structure = RunStructure()
 
@@ -1632,7 +1634,7 @@ class TestSpecificationContractEnforcement:
 
     def test_assembly_variable_conflict_detection_edge_cases(self):
         """Test Assembly Variable conflict detection from LANGUAGE_SPECIFICATION.md."""
-        from langtree.prompt.exceptions import LangTreeDSLError
+        from langtree.exceptions import LangTreeDSLError
 
         run_structure = RunStructure()
 
@@ -1828,8 +1830,8 @@ class TestRuntimeVariableErrorHandlingCompliance:
 
     def test_undefined_runtime_variable_handling(self):
         """Test handling of undefined runtime variables per specification."""
-        from langtree.prompt.exceptions import RuntimeVariableError
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.exceptions import RuntimeVariableError
+        from langtree.execution.resolution import resolve_runtime_variables
 
         run_structure = RunStructure()
 
@@ -2354,7 +2356,7 @@ class TestContextResolutionImplementation:
 
     def test_resolve_inclusion_context_basic(self):
         """Test basic inclusion context resolution."""
-        from langtree.prompt.resolution import _resolve_inclusion_context
+        from langtree.execution.resolution import _resolve_inclusion_context
 
         rs = RunStructure()
 
@@ -2366,7 +2368,7 @@ class TestContextResolutionImplementation:
 
     def test_resolve_destination_context_pending(self):
         """Test destination context resolution with pending target."""
-        from langtree.prompt.resolution import _resolve_destination_context
+        from langtree.execution.resolution import _resolve_destination_context
 
         rs = RunStructure()
 
@@ -2379,7 +2381,7 @@ class TestContextResolutionImplementation:
 
     def test_resolve_destination_context_empty_path(self):
         """Test destination context resolution with empty path."""
-        from langtree.prompt.resolution import _resolve_destination_context
+        from langtree.execution.resolution import _resolve_destination_context
 
         rs = RunStructure()
 
@@ -2391,7 +2393,7 @@ class TestContextResolutionImplementation:
 
     def test_resolve_variable_mapping_context_basic(self):
         """Test basic variable mapping context resolution."""
-        from langtree.prompt.resolution import _resolve_variable_mapping_context
+        from langtree.execution.resolution import _resolve_variable_mapping_context
 
         rs = RunStructure()
 
@@ -2403,7 +2405,7 @@ class TestContextResolutionImplementation:
 
     def test_resolve_variable_mapping_wildcard_source(self):
         """Test variable mapping with wildcard source."""
-        from langtree.prompt.resolution import _resolve_variable_mapping_context
+        from langtree.execution.resolution import _resolve_variable_mapping_context
 
         rs = RunStructure()
 
@@ -2422,11 +2424,9 @@ class TestContextResolutionImplementation:
 
     def test_resolve_variable_mapping_outputs_scope(self):
         """Test variable mapping with outputs scope."""
-        from langtree.prompt.resolution import _resolve_variable_mapping_context
+        from langtree.execution.resolution import _resolve_variable_mapping_context
 
         rs = RunStructure()
-
-        from langtree.prompt.structure import StructureTreeNode, TreeNode
 
         class MockTarget(TreeNode):
             pass
@@ -2464,7 +2464,7 @@ class TestRuntimeVariableResolution:
 
     def test_basic_runtime_variable_resolution(self):
         """Test basic {variable} resolution in prompts during execution."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         class TaskWithRuntimeVar(TreeNode):
             """
@@ -2506,7 +2506,7 @@ class TestRuntimeVariableResolution:
 
     def test_scoped_runtime_variable_resolution(self):
         """Test scoped runtime variables like {task.field} and {value.field}."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         class TaskWithScopedVars(TreeNode):
             """
@@ -2707,7 +2707,7 @@ class TestDoubleUnderscoreExpansion:
 
     def test_simple_runtime_variable_expansion(self):
         """Test that simple runtime variables get double underscore expansion."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = "Hello {model_name} and {temperature}"
         current_node = "task.analyzer"
@@ -2721,7 +2721,7 @@ class TestDoubleUnderscoreExpansion:
 
     def test_nested_node_path_expansion(self):
         """Test expansion works with deeply nested node paths."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = "Using {config_value} for analysis"
         current_node = "task.analytics.deep.processor.step1"
@@ -2735,7 +2735,7 @@ class TestDoubleUnderscoreExpansion:
 
     def test_no_expansion_for_template_variables(self):
         """Test that template variables are not expanded with double underscores."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = "Content: {PROMPT_SUBTREE} and {COLLECTED_CONTEXT}"
         current_node = "task.analyzer"
@@ -2747,8 +2747,8 @@ class TestDoubleUnderscoreExpansion:
 
     def test_runtime_variables_with_double_underscores_rejected(self):
         """Test that runtime variables with double underscores are rejected."""
-        from langtree.prompt.exceptions import RuntimeVariableError
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.exceptions import RuntimeVariableError
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = "Value: {prompt__analyzer__already_expanded}"
         current_node = "task.analyzer"
@@ -2761,8 +2761,8 @@ class TestDoubleUnderscoreExpansion:
 
     def test_runtime_variables_with_dots_rejected(self):
         """Test that runtime variables with dots are rejected."""
-        from langtree.prompt.exceptions import RuntimeVariableError
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.exceptions import RuntimeVariableError
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = "Value: {task.field}"
         current_node = "task.analyzer"
@@ -2773,7 +2773,7 @@ class TestDoubleUnderscoreExpansion:
 
     def test_expansion_without_current_node(self):
         """Test expansion behavior when current_node is None or empty."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = "Hello {model_name}"
 
@@ -2785,7 +2785,7 @@ class TestDoubleUnderscoreExpansion:
 
     def test_mixed_valid_and_template_variables(self):
         """Test expansion works correctly with valid runtime and template variables."""
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         content = """
         Template: {PROMPT_SUBTREE}
@@ -2807,7 +2807,7 @@ class TestDoubleUnderscoreValidation:
 
     def test_reject_user_variables_with_double_underscore(self):
         """Test that user variables containing __ are rejected during validation."""
-        from langtree.prompt.template_variables import validate_template_variable_names
+        from langtree.templates.variables import validate_template_variable_names
 
         content = "Invalid: {user__variable} and valid: {normal_var}"
         errors = validate_template_variable_names(content)
@@ -2818,7 +2818,7 @@ class TestDoubleUnderscoreValidation:
 
     def test_allow_variables_without_double_underscore(self):
         """Test that normal variables without __ pass validation."""
-        from langtree.prompt.template_variables import validate_template_variable_names
+        from langtree.templates.variables import validate_template_variable_names
 
         content = "Valid: {model_name} and {temperature_setting}"
         errors = validate_template_variable_names(content)
@@ -2827,7 +2827,7 @@ class TestDoubleUnderscoreValidation:
 
     def test_validation_with_template_variables(self):
         """Test that template variables are not checked for double underscore."""
-        from langtree.prompt.template_variables import validate_template_variable_names
+        from langtree.templates.variables import validate_template_variable_names
 
         content = "Template: {PROMPT_SUBTREE} Invalid: {user__var} Valid: {normal_var}"
         errors = validate_template_variable_names(content)
@@ -2838,7 +2838,7 @@ class TestDoubleUnderscoreValidation:
 
     def test_integration_with_structure_processing(self):
         """Test that double underscore validation is enforced during node processing."""
-        from langtree.prompt.exceptions import TemplateVariableNameError
+        from langtree.exceptions import TemplateVariableNameError
 
         run_structure = RunStructure()
 
@@ -2858,7 +2858,7 @@ class TestCWDPathResolution:
 
     def test_relative_path_resolution_with_cwd(self):
         """Test that relative paths are resolved from CWD."""
-        from langtree.commands.path_resolver import PathResolver
+        from langtree.parsing.path_resolver import PathResolver
 
         cwd = "task.analyzer.step1"
         result = PathResolver.resolve_path_with_cwd("summary", cwd)
@@ -2869,7 +2869,7 @@ class TestCWDPathResolution:
 
     def test_absolute_path_with_task_scope_ignores_cwd(self):
         """Test that absolute paths starting with task. ignore CWD."""
-        from langtree.commands.path_resolver import PathResolver, ScopeModifier
+        from langtree.parsing.path_resolver import PathResolver, ScopeModifier
 
         cwd = "task.analyzer.step1"
         result = PathResolver.resolve_path_with_cwd("task.other.field", cwd)
@@ -2880,7 +2880,7 @@ class TestCWDPathResolution:
 
     def test_absolute_path_with_scope_modifier_ignores_cwd(self):
         """Test that paths with scope modifiers ignore CWD."""
-        from langtree.commands.path_resolver import PathResolver, ScopeModifier
+        from langtree.parsing.path_resolver import PathResolver, ScopeModifier
 
         cwd = "task.analyzer.step1"
 
@@ -2901,7 +2901,7 @@ class TestCWDPathResolution:
 
     def test_empty_path_with_cwd(self):
         """Test behavior with empty paths."""
-        from langtree.commands.path_resolver import PathResolver
+        from langtree.parsing.path_resolver import PathResolver
 
         cwd = "task.analyzer.step1"
         result = PathResolver.resolve_path_with_cwd("", cwd)
@@ -2912,7 +2912,7 @@ class TestCWDPathResolution:
 
     def test_path_without_dots_with_cwd(self):
         """Test single-token paths with CWD."""
-        from langtree.commands.path_resolver import PathResolver
+        from langtree.parsing.path_resolver import PathResolver
 
         cwd = "task.analyzer.step1"
         result = PathResolver.resolve_path_with_cwd("result", cwd)
@@ -2923,7 +2923,7 @@ class TestCWDPathResolution:
 
     def test_variable_mapping_with_cwd(self):
         """Test variable mapping resolution with CWD."""
-        from langtree.commands.path_resolver import PathResolver, ScopeModifier
+        from langtree.core.path_utils import PathResolver, ScopeModifier
 
         cwd = "task.analyzer.step1"
 
@@ -2933,16 +2933,16 @@ class TestCWDPathResolution:
         )
 
         # Target should be resolved with CWD
-        assert mapping.target_path.scope_modifier is None
-        assert mapping.target_path.path_remainder == "task.analyzer.step1.summary"
+        assert mapping.resolved_target.scope_modifier is None
+        assert mapping.resolved_target.path_remainder == "task.analyzer.step1.summary"
 
         # Source should ignore CWD (absolute)
-        assert mapping.source_path.scope_modifier == ScopeModifier.TASK
-        assert mapping.source_path.path_remainder == "data.source"
+        assert mapping.resolved_source.scope_modifier == ScopeModifier.TASK
+        assert mapping.resolved_source.path_remainder == "data.source"
 
     def test_deeply_nested_cwd_resolution(self):
         """Test CWD resolution with deeply nested paths."""
-        from langtree.commands.path_resolver import PathResolver
+        from langtree.parsing.path_resolver import PathResolver
 
         cwd = "task.analytics.deep.processor.final_step"
         result = PathResolver.resolve_path_with_cwd("output", cwd)
@@ -2955,7 +2955,7 @@ class TestCWDPathResolution:
 
     def test_cwd_with_none_empty_values(self):
         """Test edge cases with None and empty values."""
-        from langtree.commands.path_resolver import PathResolver
+        from langtree.parsing.path_resolver import PathResolver
 
         # None CWD
         result = PathResolver.resolve_path_with_cwd("field", None)
@@ -2975,7 +2975,7 @@ class TestIterationMatchingValidation:
 
     def test_valid_iteration_source_paths(self):
         """Test that valid iteration source paths are accepted."""
-        from langtree.commands.parser import CommandParser
+        from langtree.parsing.parser import CommandParser
 
         parser = CommandParser()
 
@@ -3001,7 +3001,8 @@ class TestIterationMatchingValidation:
         """Test that invalid iteration source paths are rejected at structure level."""
         from pydantic import Field
 
-        from langtree.prompt import RunStructure, TreeNode
+        from langtree import TreeNode
+        from langtree.structure import RunStructure
 
         class TaskProcessor(TreeNode):
             """Target task for processing."""
@@ -3022,7 +3023,7 @@ class TestIterationMatchingValidation:
         run_structure.add(TaskProcessor)
 
         # Should raise validation error for invalid source path
-        from langtree.commands.parser import CommandParseError
+        from langtree.parsing.parser import CommandParseError
 
         with pytest.raises(
             CommandParseError, match="must start from iteration root 'sections'"
@@ -3031,7 +3032,7 @@ class TestIterationMatchingValidation:
 
     def test_scope_modified_paths_bypass_validation(self):
         """Test that scope-modified paths are not subject to iteration validation."""
-        from langtree.commands.parser import CommandParser
+        from langtree.parsing.parser import CommandParser
 
         parser = CommandParser()
 
@@ -3048,7 +3049,7 @@ class TestIterationMatchingValidation:
 
     def test_deep_iteration_matching(self):
         """Test iteration matching with deeply nested iteration paths."""
-        from langtree.commands.parser import CommandParseError, CommandParser
+        from langtree.parsing.parser import CommandParseError, CommandParser
 
         parser = CommandParser()
 
@@ -3074,7 +3075,7 @@ class TestIterationMatchingValidation:
 
     def test_single_level_iteration(self):
         """Test iteration matching with single-level iteration."""
-        from langtree.commands.parser import CommandParseError, CommandParser
+        from langtree.parsing.parser import CommandParseError, CommandParser
 
         parser = CommandParser()
 
@@ -3094,7 +3095,7 @@ class TestIterationMatchingValidation:
 
     def test_wildcard_paths_bypass_validation(self):
         """Test that wildcard paths are not subject to iteration validation."""
-        from langtree.commands.parser import CommandParseError, CommandParser
+        from langtree.parsing.parser import CommandParseError, CommandParser
 
         parser = CommandParser()
 
@@ -3106,7 +3107,7 @@ class TestIterationMatchingValidation:
 
     def test_mixed_valid_invalid_mappings(self):
         """Test commands with mixed valid and invalid mappings."""
-        from langtree.commands.parser import CommandParseError, CommandParser
+        from langtree.parsing.parser import CommandParseError, CommandParser
 
         parser = CommandParser()
 

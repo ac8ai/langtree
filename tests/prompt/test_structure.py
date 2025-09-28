@@ -11,13 +11,15 @@ This module tests the core structure components:
 import pytest
 from pydantic import Field
 
-from langtree.prompt import RunStructure, StructureTreeNode, TreeNode
-from langtree.prompt.exceptions import (
+from langtree import TreeNode
+from langtree.exceptions import (
+    DuplicateTargetError,
     TemplateVariableError,
     TemplateVariableSpacingError,
     VariableTargetValidationError,
 )
-from langtree.prompt.registry import PendingTarget
+from langtree.structure import RunStructure, StructureTreeNode
+from langtree.structure.registry import PendingTarget
 
 
 class TestStructureTreeNodeEnhanced:
@@ -123,7 +125,7 @@ class TestTemplateVariableSystem:
 
     def test_prompt_subtree_resolution(self):
         """Test that {PROMPT_SUBTREE} is resolved into field titles and descriptions."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             resolve_template_variables_in_content,
         )
 
@@ -474,7 +476,7 @@ class TestTemplateVariableSystem:
         assert node is not None, "Node should be added to structure"
 
         # Verify template variables are properly processed
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             process_template_variables,
             resolve_template_variables_in_content,
         )
@@ -520,7 +522,7 @@ class TestTemplateVariableSystem:
         )
 
         # Test 6: Verify proper heading levels in PROMPT_SUBTREE resolution
-        from langtree.prompt.template_variables import resolve_prompt_subtree
+        from langtree.templates.variables import resolve_prompt_subtree
 
         prompt_result = resolve_prompt_subtree(node, base_heading_level=3)
         assert "### Data Extraction" in prompt_result, (
@@ -692,7 +694,7 @@ class TestTemplateVariableIntegration:
         assert node is not None
 
         # Test template variable processing doesn't break runtime variables
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             process_template_variables,
             resolve_template_variables_in_content,
         )
@@ -999,7 +1001,7 @@ class TestPendingTargetEdgeCasesAdvanced:
 
     def test_nonexistent_source_node_graceful_handling_comprehensive(self):
         """Test graceful handling when source node doesn't exist during completion."""
-        from langtree.commands.parser import CommandType, ParsedCommand
+        from langtree.parsing.parser import CommandType, ParsedCommand
 
         # Create mock pending target with invalid source
         mock_command = ParsedCommand(
@@ -1110,7 +1112,6 @@ class TestPendingTargetIntegrationWithResolution:
 
     def test_duplicate_target_definitions_conflict_detection(self):
         """Test detection and reporting of duplicate target definitions."""
-        from langtree.prompt.exceptions import DuplicateTargetError
 
         # Add first definition with specific path
         class TaskDuplicateTarget(TreeNode):

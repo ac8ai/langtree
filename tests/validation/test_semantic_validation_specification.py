@@ -13,13 +13,14 @@ Tests follow TDD approach: define expected behavior first, then implement to pas
 import pytest
 from pydantic import BaseModel, Field
 
-from langtree.commands.parser import CommandParseError
-from langtree.prompt import RunStructure, TreeNode
-from langtree.prompt.exceptions import (
+from langtree import TreeNode
+from langtree.exceptions import (
     FieldValidationError,
     VariableSourceValidationError,
 )
-from langtree.prompt.utils import get_root_tag
+from langtree.parsing.parser import CommandParseError
+from langtree.structure import RunStructure
+from langtree.templates.utils import get_root_tag
 
 
 # Common task classes referenced by tests
@@ -350,7 +351,7 @@ class TestLoopNestingValidation:
             item: str
 
         # Should fail because inclusion path starts with non-iterable 'title'
-        from langtree.commands.parser import CommandParseError
+        from langtree.parsing.parser import CommandParseError
 
         with pytest.raises((FieldValidationError, CommandParseError)) as exc_info:
             self.structure.add(TaskInvalidStart)
@@ -494,7 +495,7 @@ class TestVariableMappingConstraints:
 
         # This test now catches RHS path validation error during semantic validation
         # The LHS-RHS nesting validation will be deferred to assembly stage
-        from langtree.prompt.exceptions import VariableSourceValidationError
+        from langtree.exceptions import VariableSourceValidationError
 
         with pytest.raises(
             (FieldValidationError, VariableSourceValidationError)

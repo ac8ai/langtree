@@ -7,8 +7,9 @@ validation to ensure the system properly handles every scenario.
 
 import pytest
 
-from langtree.prompt import RunStructure, TreeNode
-from langtree.prompt.template_variables import (
+from langtree import TreeNode
+from langtree.structure import RunStructure, StructureTreeNode
+from langtree.templates.variables import (
     TemplateVariableSpacingError,
     add_automatic_prompt_subtree,
     detect_heading_level,
@@ -71,7 +72,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_single_newline_violations(self):
         """Test violations with single newlines (need double newlines)."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -118,7 +119,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_edge_case_template_variable_only(self):
         """Test edge case where content is ONLY the template variable."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -151,7 +152,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_start_end_of_content_edge_cases(self):
         """Test template variables at start/end of content."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -195,7 +196,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_multiple_template_variables_spacing(self):
         """Test spacing between multiple template variables."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -229,7 +230,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_collected_context_edge_cases(self):
         """Test edge cases specific to COLLECTED_CONTEXT."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -283,7 +284,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_complex_content_structures(self):
         """Test template variables in complex content structures."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -325,7 +326,7 @@ class TestTemplateVariableSpacingEdgeCases:
 
     def test_spacing_validation_with_actual_nodes(self):
         """Test spacing validation in actual TreeNode processing."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             TemplateVariableSpacingError,
             process_template_variables,
         )
@@ -386,7 +387,7 @@ class TestTemplateVariableSpacingFixes:
 
     def test_improved_spacing_detection(self):
         """Test a more comprehensive spacing detection algorithm."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_spacing,
         )
 
@@ -658,8 +659,6 @@ class TestTemplateVariableIntegration:
         """Test complete template variable resolution with real nodes."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-
         # Create a real Pydantic model for testing
         class TestTaskModel(TreeNode):
             analysis: str = Field(description="Detailed analysis step")
@@ -707,8 +706,7 @@ class TestTemplateVariableIntegration:
         """Test template variable processing with spacing validation."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-        from langtree.prompt.template_variables import process_template_variables
+        from langtree.templates.variables import process_template_variables
 
         # Create test node
         class TestModel(TreeNode):
@@ -738,8 +736,7 @@ class TestTemplateVariableIntegration:
         """Test PROMPT_SUBTREE resolution with actual Pydantic field processing."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-        from langtree.prompt.template_variables import resolve_prompt_subtree
+        from langtree.templates.variables import resolve_prompt_subtree
 
         # Create complex model with various field types
         class MetadataInfo(TreeNode):
@@ -783,7 +780,7 @@ class TestTemplateVariableIntegration:
 
     def test_heading_level_detection_integration(self):
         """Test heading level detection with realistic content scenarios."""
-        from langtree.prompt.template_variables import detect_heading_level
+        from langtree.templates.variables import detect_heading_level
 
         # Test complex nested heading structure
         content = """# Project Overview
@@ -823,7 +820,7 @@ Collecting relevant data sources.
 
     def test_template_variable_conflict_detection_integration(self):
         """Test template variable conflict detection with real assembly variables."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             validate_template_variable_conflicts,
         )
 
@@ -935,8 +932,6 @@ class TestTemplateVariableResolution:
         """Test complete template variable resolution with real nodes."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-
         # Create a real Pydantic model for testing
         class TestTaskModel(TreeNode):
             analysis: str = Field(description="Detailed analysis step")
@@ -974,8 +969,6 @@ class TestTemplateVariableResolution:
         """Test template variable processing with spacing validation."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-
         # Create test node
         class TestModel(TreeNode):
             result: str = Field(description="Test result")
@@ -1003,8 +996,6 @@ class TestTemplateVariableResolution:
     def test_resolve_prompt_subtree_with_real_fields(self):
         """Test PROMPT_SUBTREE resolution with actual Pydantic field processing."""
         from pydantic import Field
-
-        from langtree.prompt.structure import StructureTreeNode
 
         # Create complex model with various field types
         class MetadataInfo(TreeNode):
@@ -1088,8 +1079,6 @@ class TestLangTreeDSLCommandIntegration:
         """Test template variables work correctly with LangTree DSL command syntax in docstrings."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-
         # Create a model with LangTree DSL commands in docstring
         class LangTreeDSLTaskModel(TreeNode):
             """
@@ -1165,7 +1154,7 @@ class TestLangTreeDSLCommandIntegration:
 
     def test_runtime_variable_integration(self):
         """Test template variables work alongside Runtime Variables."""
-        from langtree.prompt.template_variables import detect_template_variables
+        from langtree.templates.variables import detect_template_variables
 
         # Content mixing template variables and runtime variable placeholders
         content = """
@@ -1296,8 +1285,6 @@ Step 4: Output generation
         """Test template variables work with hierarchical prompt execution system."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-
         # Create hierarchical structure (parent-child relationship)
         class ParentTaskModel(TreeNode):
             """
@@ -1360,8 +1347,6 @@ class TestArchitecturalDesignCompliance:
     def test_deterministic_assembly_time_processing(self):
         """Test that template variable processing is deterministic at assembly-time."""
         from pydantic import Field
-
-        from langtree.prompt.structure import StructureTreeNode
 
         class DeterministicModel(TreeNode):
             """
@@ -1464,8 +1449,6 @@ End of assembly phase.
 
         # Runtime phase: Template variables should be resolved, runtime vars preserved
         from pydantic import Field
-
-        from langtree.prompt.structure import StructureTreeNode
 
         class RuntimeModel(TreeNode):
             runtime_field: str = Field(description="Runtime processing field")
@@ -1617,8 +1600,7 @@ class TestLangTreeDSLCommandIntegrationNew:
         """Test template variables work correctly with LangTree DSL command syntax in docstrings."""
         from pydantic import Field
 
-        from langtree.prompt.structure import RunStructure
-        from langtree.prompt.template_variables import process_template_variables
+        from langtree.templates.variables import process_template_variables
 
         # Create a model with LangTree DSL commands in docstring
         class TaskLangTreeDSLAnalysis(TreeNode):
@@ -1684,8 +1666,7 @@ class TestLangTreeDSLCommandIntegrationNew:
         """Test Assembly Variable conflict detection with real RunStructure context."""
         from pydantic import Field
 
-        from langtree.prompt.structure import RunStructure
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             get_assembly_variables_for_node_with_structure,
             validate_template_variable_conflicts,
         )
@@ -1736,8 +1717,7 @@ class TestLangTreeDSLCommandIntegrationNew:
         """Test that Runtime Variables and Template Variables work together correctly."""
         from pydantic import Field
 
-        from langtree.prompt.structure import RunStructure
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             resolve_template_variables_in_content,
         )
 
@@ -1799,7 +1779,7 @@ class TestSpecificationCompliance:
 
     def test_template_variables_in_acl_grammar_context(self):
         """Test template variables work within LangTree DSL syntax grammar context."""
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             detect_template_variables,
             validate_template_variable_spacing,
         )
@@ -1836,8 +1816,7 @@ Additional context for processing:
         """Test template variables work correctly with variable scope system (prompt, value, outputs, task)."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             resolve_template_variables_in_content,
         )
 
@@ -1893,8 +1872,7 @@ Additional context for processing:
         """Test template variables integrate correctly with hierarchical prompt execution system."""
         from pydantic import Field
 
-        from langtree.prompt.structure import StructureTreeNode
-        from langtree.prompt.template_variables import (
+        from langtree.templates.variables import (
             resolve_collected_context,
             resolve_prompt_subtree,
         )

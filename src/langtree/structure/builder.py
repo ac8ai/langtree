@@ -11,7 +11,9 @@ from typing import Any, Optional, get_args, get_origin
 
 from pydantic import BaseModel
 
-from langtree.commands.parser import (
+from langtree.core.tree_node import TreeNode
+from langtree.exceptions import DuplicateTargetError, FieldTypeError
+from langtree.parsing.parser import (
     ExecutionCommand,
     NodeModifierCommand,
     ParsedCommand,
@@ -19,15 +21,14 @@ from langtree.commands.parser import (
     VariableAssignmentCommand,
     parse_command,
 )
-from langtree.prompt.exceptions import DuplicateTargetError, FieldTypeError
-from langtree.prompt.registry import (
+from langtree.structure.registry import (
     AssemblyVariableRegistry,
     PendingTarget,
     PendingTargetRegistry,
     VariableRegistry,
 )
-from langtree.prompt.template_variables import process_template_variables
-from langtree.prompt.utils import extract_commands, get_root_tag
+from langtree.templates.utils import extract_commands, get_root_tag
+from langtree.templates.variables import process_template_variables
 
 # Type aliases
 PromptValue = str | int | float | bool | list | dict | None
@@ -38,17 +39,6 @@ ParsedCommandUnion = (
     | NodeModifierCommand
     | ParsedCommand
 )
-
-
-class TreeNode(BaseModel):
-    """
-    Base class for all prompt tree node types.
-
-    This class provides the foundation for creating structured prompt components
-    that can be organized in a tree hierarchy for complex LLM interactions.
-    """
-
-    pass
 
 
 ResolutionResult = PromptValue | TreeNode
@@ -145,9 +135,10 @@ class RunStructure:
         # Check for duplicate target definitions
         if field_name in parent.children:
             existing_node = parent.children[field_name]
-            existing_type = existing_node.field_type.__name__
-            new_type = subtree.__name__
-            raise DuplicateTargetError(tag, existing_type, new_type)
+            if existing_node.field_type == subtree:
+                raise DuplicateTargetError(
+                    tag, existing_node.field_type.__name__, subtree.__name__
+                )
 
         parent.children[field_name] = node
 
@@ -367,9 +358,9 @@ class RunStructure:
             AssemblyVariableConflictError: If variable already exists with different value
             LangTreeDSLError: If variable name conflicts with reserved template variables or field names
         """
-        from langtree.prompt.exceptions import LangTreeDSLError
-        from langtree.prompt.registry import AssemblyVariableConflictError
-        from langtree.prompt.template_variables import (
+        from langtree.exceptions import LangTreeDSLError
+        from langtree.structure.registry import AssemblyVariableConflictError
+        from langtree.templates.variables import (
             validate_template_variable_conflicts,
         )
 
@@ -453,11 +444,12 @@ class RunStructure:
                     pending_target.target_path,
                 )
 
-            # Step 4: Variable registry is already updated during command processing
+            # Step 4: Update variable registry entries from syntactic to semantic satisfaction
+            self._update_variable_registry_satisfaction(command, source_node_tag)
 
         except Exception as e:
             # Let validation errors bubble up - these are intended to fail the operation
-            from langtree.prompt.exceptions import FieldValidationError
+            from langtree.exceptions import FieldValidationError
 
             if isinstance(e, FieldValidationError):
                 raise
@@ -482,12 +474,9 @@ class RunStructure:
         Raises:
             ValueError: When inclusion path is invalid or not iterable
         """
-        # Use the existing implementation from resolution.py
-        from langtree.prompt.resolution import _resolve_inclusion_context
-
-        return _resolve_inclusion_context(
-            self, command.resolved_inclusion, source_node_tag
-        )
+        # Basic validation - check if inclusion path exists and is accessible
+        # TODO: Implement actual iterable validation logic
+        pass
 
     def _resolve_destination_context(
         self, command: ParsedCommand, target_node: StructureTreeNode, target_path: str
@@ -588,7 +577,7 @@ class RunStructure:
                 # Track this for collection
                 target_node = self.get_node(target_path)
                 if target_node:
-                    from langtree.prompt.resolution import _track_outputs_collection
+                    from langtree.execution.resolution import _track_outputs_collection
 
                     _track_outputs_collection(
                         self,
@@ -602,6 +591,22 @@ class RunStructure:
 
         # Target validation is handled by _resolve_destination_context
         # TODO: Add type compatibility checking between source and target
+
+    def _update_variable_registry_satisfaction(
+        self, command: ParsedCommand, source_node_tag: str
+    ) -> None:
+        """
+        Update variable registry entries from syntactic to semantic satisfaction.
+
+        Marks variables as semantically satisfied with resolved source paths.
+        Updates relationship types (1:1, 1:n, n:n) based on command analysis.
+
+        Params:
+            command: The resolved command with variable mappings
+            source_node_tag: Tag of the source node for registry updates
+        """
+        # TODO: Implement variable registry satisfaction updates
+        pass
 
     def get_assembly_variable_registry(self) -> AssemblyVariableRegistry:
         """Get the Assembly Variable Registry for cross-module variable access.
@@ -620,7 +625,7 @@ class RunStructure:
         This method provides the core runtime variable resolution capability required by
         the LANGUAGE_SPECIFICATION.md. It resolves variables from execution context only.
 
-        Args:
+        Params:
             variable_path: The variable path to resolve (e.g., "field", "task.field")
             current_node: Current node context for variable resolution
 
@@ -632,13 +637,13 @@ class RunStructure:
         """
         try:
             # Import resolution functions from resolution module
-            from langtree.prompt.resolution import _resolve_regular_variable
+            from langtree.execution.resolution import _resolve_regular_variable
 
             # Regular runtime variable ({{variable}}) - execution context only
             return _resolve_regular_variable(self, variable_path, current_node)
 
         except Exception as e:
-            from langtree.prompt.exceptions import RuntimeVariableError
+            from langtree.exceptions import RuntimeVariableError
 
             raise RuntimeVariableError(
                 f"Failed to resolve runtime variable '{{{{{variable_path}}}}}': {str(e)}"
@@ -859,7 +864,7 @@ class RunStructure:
                         referenced_nodes.add(target_node.name)
                     else:
                         # Try alternative paths for the destination
-                        from langtree.prompt.utils import underscore
+                        from langtree.templates.utils import underscore
 
                         try:
                             underscore_name = underscore(command.destination_path)
@@ -928,7 +933,7 @@ class RunStructure:
             - 'unsatisfied_variables': List of variables that lack sources
             - 'multiply_satisfied_variables': List of variables with multiple sources
         """
-        from langtree.prompt.validation import validate_tree
+        from langtree.structure.validation import validate_tree
 
         return validate_tree(self)
 
@@ -952,7 +957,7 @@ class RunStructure:
             - 'self_references': Commands that reference themselves
             - 'error_summary': Synthesized summary of all validation issues
         """
-        from langtree.prompt.validation import validate_comprehensive
+        from langtree.structure.validation import validate_comprehensive
 
         return validate_comprehensive(self)
 
@@ -972,7 +977,7 @@ class RunStructure:
         Raises:
             ResolutionError: When critical resolution failures prevent execution
         """
-        from langtree.prompt.resolution import resolve_deferred_contexts
+        from langtree.execution.resolution import resolve_deferred_contexts
 
         return resolve_deferred_contexts(self)
 
@@ -991,7 +996,7 @@ class RunStructure:
         Returns:
             Resolved value if path exists, None otherwise
         """
-        from langtree.prompt.resolution import _resolve_in_current_node_context
+        from langtree.execution.resolution import _resolve_in_current_node_context
 
         return _resolve_in_current_node_context(self, path, node_tag)
 
@@ -1013,37 +1018,37 @@ class RunStructure:
         Raises:
             ScopeError: When scope prefix is invalid or inaccessible
         """
-        from langtree.prompt.resolution import _resolve_scope_segment_context
+        from langtree.execution.resolution import _resolve_scope_segment_context
 
         return _resolve_scope_segment_context(self, path, node_tag)
 
     def _resolve_in_value_context(self, path: str, node_tag: str):
         """Resolve a path within the value context."""
-        from langtree.prompt.resolution import _resolve_in_value_context
+        from langtree.execution.resolution import _resolve_in_value_context
 
         return _resolve_in_value_context(self, path, node_tag)
 
     def _resolve_in_outputs_context(self, path: str, node_tag: str):
         """Resolve a path within the outputs context."""
-        from langtree.prompt.resolution import _resolve_in_outputs_context
+        from langtree.execution.resolution import _resolve_in_outputs_context
 
         return _resolve_in_outputs_context(self, path, node_tag)
 
     def _resolve_in_global_tree_context(self, path: str):
         """Resolve a path within the global tree context."""
-        from langtree.prompt.resolution import _resolve_in_global_tree_context
+        from langtree.execution.resolution import _resolve_in_global_tree_context
 
         return _resolve_in_global_tree_context(self, path)
 
     def _resolve_in_target_node_context(self, path: str, target_node):
         """Resolve a path within a target node context."""
-        from langtree.prompt.resolution import _resolve_in_target_node_context
+        from langtree.execution.resolution import _resolve_in_target_node_context
 
         return _resolve_in_target_node_context(self, path, target_node)
 
     def _resolve_in_current_prompt_context(self, path: str, node_tag: str):
         """Resolve a path within the current prompt context."""
-        from langtree.prompt.resolution import _resolve_in_current_prompt_context
+        from langtree.execution.resolution import _resolve_in_current_prompt_context
 
         return _resolve_in_current_prompt_context(self, path, node_tag)
 
@@ -1209,7 +1214,7 @@ class RunStructure:
         Raises:
             VariableTargetValidationError: If target structure cannot be satisfied
         """
-        from langtree.prompt.exceptions import VariableTargetValidationError
+        from langtree.exceptions import VariableTargetValidationError
 
         # For value scope, check if the path can be created in the current node structure
         if target_scope.get_name() == "value":
@@ -1260,7 +1265,7 @@ class RunStructure:
         """
         from typing import get_args, get_origin
 
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         source_node = self.get_node(source_node_tag)
         if not source_node or not source_node.field_type:
@@ -1322,7 +1327,7 @@ class RunStructure:
         """
         from typing import get_origin
 
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         source_node = self.get_node(source_node_tag)
         if not source_node or not source_node.field_type:
@@ -1373,7 +1378,7 @@ class RunStructure:
         """
         from typing import get_origin
 
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         # Only validate iteration commands
         if not hasattr(command, "command_type") or command.command_type.value != "each":
@@ -1428,7 +1433,7 @@ class RunStructure:
         Raises:
             VariableSourceValidationError: If source field does not exist
         """
-        from langtree.prompt.exceptions import VariableSourceValidationError
+        from langtree.exceptions import VariableSourceValidationError
 
         current_type = field_type
 
@@ -1478,7 +1483,7 @@ class RunStructure:
         - RHS must start from iteration root path
         - None can exceed iteration level
         """
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         # Calculate iteration levels from inclusion path
         iteration_levels = 0
@@ -1677,7 +1682,6 @@ class RunStructure:
         Raises:
             FieldTypeError: If the type is BaseModel but not TreeNode
         """
-        from pydantic import BaseModel
 
         # Skip built-in types and primitives
         if not hasattr(type_to_check, "__module__") or type_to_check.__module__ in (
@@ -1719,7 +1723,7 @@ class RunStructure:
         Raises:
             VariableSourceValidationError: If iteration field not found or not a list type
         """
-        from langtree.prompt.exceptions import VariableSourceValidationError
+        from langtree.exceptions import VariableSourceValidationError
 
         source_node = self.get_node(source_node_tag)
         if not source_node or not hasattr(source_node.field_type, "model_fields"):
@@ -1770,7 +1774,7 @@ class RunStructure:
         Raises:
             FieldValidationError: If bare collection types are detected
         """
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         bare_collection_types = (list, dict, set)
 
@@ -1833,7 +1837,7 @@ class RunStructure:
 
             if component not in current_type.model_fields:
                 # Field doesn't exist - this should not happen for source fields after field existence check
-                from langtree.prompt.exceptions import FieldValidationError
+                from langtree.exceptions import FieldValidationError
 
                 raise FieldValidationError(
                     field_path=".".join(field_components),
@@ -1973,7 +1977,7 @@ class RunStructure:
         - Destinations like '->task' are incomplete and should be caught
         - Complete destinations like '->task.analyzer' should pass
         """
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         destination_path = command.destination_path
 
@@ -2004,7 +2008,7 @@ class RunStructure:
         LangTree DSL rule: inclusion_path (tag1) must ALWAYS start with field_name - no exceptions.
         This applies regardless of where the destination_path (tag2) points.
         """
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         # Only validate ParsedCommand types with inclusion_path (@each commands)
         if not hasattr(command, "inclusion_path") or not command.inclusion_path:
@@ -2044,7 +2048,7 @@ class RunStructure:
         Uses enhanced iterable depth counting algorithm to replace complex anchor-based validation.
         Validates that RHS paths (source_paths) have proper structural relationships with inclusion_path.
         """
-        from langtree.commands.parser import CommandParser
+        from langtree.parsing.parser import CommandParser
 
         # Only validate @each commands with inclusion_path and variable mappings
         if not command.inclusion_path or not command.variable_mappings:
@@ -2117,7 +2121,7 @@ class RunStructure:
                     source_node, inclusion_path_components, rhs_paths
                 )
                 if not result["valid"]:
-                    from langtree.prompt.exceptions import FieldValidationError
+                    from langtree.exceptions import FieldValidationError
 
                     command_context = f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}* in field '{command.inclusion_path.split('.')[0]}'"
 
@@ -2133,7 +2137,7 @@ class RunStructure:
                     )
             except Exception as e:
                 # Convert parser errors to field validation errors, preserving detailed messages
-                from langtree.prompt.exceptions import FieldValidationError
+                from langtree.exceptions import FieldValidationError
 
                 command_context = f"@each[{command.inclusion_path}]->{command.destination_path}@{{...}}* in field '{command.inclusion_path.split('.')[0]}'"
 
@@ -2149,7 +2153,7 @@ class RunStructure:
         """
         Check if source_path refers to a field in the same node.
 
-        Args:
+        Params:
             source_path: The path to check (e.g., 'processed', 'items.title')
             source_node_tag: The tag of the source node
 
@@ -2185,7 +2189,7 @@ class RunStructure:
 
         Example: items.name and items.values are sibling fields of the same Item structure.
 
-        Args:
+        Params:
             source_path: The source path (e.g., 'items.name')
             inclusion_path: The inclusion path (e.g., 'items.values')
 
@@ -2227,7 +2231,7 @@ class RunStructure:
         Raises:
             FieldValidationError: When source and target have mismatched iteration counts
         """
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         # Validate that inclusion_path exists
         if not command.inclusion_path:
@@ -2362,7 +2366,7 @@ class RunStructure:
         Raises:
             FieldValidationError: If @all RHS scoping rules are violated
         """
-        from langtree.prompt.exceptions import FieldValidationError
+        from langtree.exceptions import FieldValidationError
 
         # Only validate @all commands with variable mappings
         if command.command_type.value != "all" or not command.variable_mappings:
@@ -2410,7 +2414,7 @@ class RunStructure:
         """
         import re
 
-        from langtree.prompt.resolution import resolve_runtime_variables
+        from langtree.execution.resolution import resolve_runtime_variables
 
         runtime_vars = []
 

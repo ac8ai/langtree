@@ -8,8 +8,8 @@ Focus Areas:
 
 import pytest
 
-from langtree.prompt import TreeNode
-from langtree.prompt.utils import extract_commands, get_root_tag
+from langtree import TreeNode
+from langtree.templates.utils import extract_commands, get_root_tag
 
 
 class TestNamingConventionValidation:

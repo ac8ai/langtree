@@ -12,14 +12,14 @@ import re
 from typing import TYPE_CHECKING, Optional
 
 # Group 4: Internal from imports (alphabetical by source module)
-from langtree.prompt.exceptions import (
+from langtree.exceptions import (
     TemplateVariableConflictError,
     TemplateVariableNameError,
     TemplateVariableSpacingError,
 )
 
 if TYPE_CHECKING:
-    from langtree.prompt.structure import RunStructure, StructureTreeNode
+    from langtree.structure.builder import RunStructure, StructureTreeNode
 
 
 # Valid template variable names

@@ -6,20 +6,15 @@ within the LangTree DSL prompt tree structure, including deferred context resolu
 scope-based path navigation, and cross-tree references.
 """
 
-# Group 1: External direct imports (alphabetical)
 import re
-
-# Group 2: External from imports (alphabetical by source module)
-from textwrap import dedent
 from typing import TYPE_CHECKING, Any, cast
 
-# Group 4: Internal from imports (alphabetical by source module)
-from langtree.prompt.registry import _get_node_instance, _validate_path_and_node_tag
-from langtree.prompt.scopes import get_scope
+from langtree.execution.scopes import get_scope
+from langtree.structure.utils import get_node_instance, validate_path_and_node_tag
 
 if TYPE_CHECKING:
-    from langtree.commands.parser import ParsedCommand
-    from langtree.prompt.structure import (
+    from langtree.parsing.parser import ParsedCommand
+    from langtree.structure.builder import (
         PromptValue,
         ResolutionResult,
         RunStructure,
@@ -538,7 +533,7 @@ def _resolve_in_current_node_context(
         KeyError: Non-existent intermediate / terminal path component.
         AttributeError: Attribute access failure during traversal.
     """
-    _validate_path_and_node_tag(path, node_tag)
+    validate_path_and_node_tag(path, node_tag)
 
     # Wildcard '*' returns entire node instance
     if path == "*":
@@ -546,7 +541,7 @@ def _resolve_in_current_node_context(
         node = run_structure.get_node(node_tag)
         if not node:
             raise ValueError(f"Node with tag '{node_tag}' not found in tree")
-        return cast("PromptValue", _get_node_instance(node, node_tag))
+        return cast("PromptValue", get_node_instance(node, node_tag))
 
     # Acquire node
     node = run_structure.get_node(node_tag)
@@ -554,7 +549,7 @@ def _resolve_in_current_node_context(
         raise ValueError(f"Node with tag '{node_tag}' not found in tree")
 
     # Navigate path components
-    node_instance = _get_node_instance(node, node_tag)
+    node_instance = get_node_instance(node, node_tag)
 
     try:
         return _navigate_object_path(
@@ -607,7 +602,7 @@ def _resolve_scope_segment_context(
     Returns:
         Result from the appropriate scope resolver - type depends on which resolver is used.
     """
-    _validate_path_and_node_tag(path, node_tag)
+    validate_path_and_node_tag(path, node_tag)
 
     # Build base context for scope handlers
     context = {"node_tag": node_tag, "run_structure": run_structure}
@@ -658,7 +653,7 @@ def _resolve_in_value_context(
         ValueError: Node not found / invalid path.
         KeyError: Missing path component.
     """
-    _validate_path_and_node_tag(path, node_tag)
+    validate_path_and_node_tag(path, node_tag)
 
     # Acquire node
     node = run_structure.get_node(node_tag)
@@ -666,7 +661,7 @@ def _resolve_in_value_context(
         raise ValueError(f"Node with tag '{node_tag}' not found in tree")
 
     # During chain assembly, value context is same as current node context
-    node_instance = _get_node_instance(node, node_tag)
+    node_instance = get_node_instance(node, node_tag)
     return _navigate_object_path(node_instance, path, "value context", node_tag)
 
 
@@ -739,7 +734,7 @@ def _resolve_in_outputs_context(
     Raises:
         ValueError: Node not found.
     """
-    _validate_path_and_node_tag(path, node_tag)
+    validate_path_and_node_tag(path, node_tag)
 
     # Check if we need to track collected outputs
     if not hasattr(run_structure, "_outputs_collection"):
@@ -818,7 +813,7 @@ def _resolve_in_global_tree_context(
         target_node = run_structure.get_node(full_node_path)
         if target_node:
             # We found a node, now access the field
-            node_instance = _get_node_instance(target_node, full_node_path)
+            node_instance = get_node_instance(target_node, full_node_path)
             return _navigate_object_path(
                 node_instance, field_name, "global tree context", full_node_path
             )
@@ -832,7 +827,7 @@ def _resolve_in_global_tree_context(
     target_node = run_structure.get_node(full_node_path)
     if target_node:
         # Return the node instance itself
-        return _get_node_instance(target_node, full_node_path)
+        return get_node_instance(target_node, full_node_path)
 
     # Pending forward reference check
     pending_targets = run_structure._pending_target_registry.pending_targets
@@ -1094,37 +1089,6 @@ def _navigate_object_path(
     return cast("PromptValue", current_obj)
 
 
-# Text processing utilities
-COMMAND_PATTERN = re.compile(r"^\s*!\s*.*$", re.MULTILINE)
-
-
-def extract_commands(content: str | None) -> tuple[list[str], str]:
-    """
-    Extract commands from text content and return clean prompt content.
-
-    Params:
-        content: Raw text content that may contain command lines (starting with !)
-
-    Returns:
-        Tuple of (extracted_commands, clean_content) where commands are stripped
-        of leading whitespace and clean_content has commands removed
-    """
-    if not content:
-        return [], ""
-
-    # Find all command lines and strip whitespace
-    command_matches = COMMAND_PATTERN.findall(content)
-    commands = [cmd.strip() for cmd in command_matches]
-
-    # Remove commands from content
-    clean_content = COMMAND_PATTERN.sub("", content)
-
-    # Clean up the content - remove empty lines and dedent
-    clean_content = dedent(clean_content).strip()
-
-    return commands, clean_content
-
-
 # Runtime Variable Resolution System
 # =================================
 
@@ -1165,7 +1129,7 @@ def resolve_runtime_variables(
     if not content:
         return content
 
-    from langtree.prompt.exceptions import RuntimeVariableError
+    from langtree.exceptions import RuntimeVariableError
 
     # Pattern matches {variable} - NO assembly variable syntax
     # Excludes reserved template variables PROMPT_SUBTREE and COLLECTED_CONTEXT
@@ -1175,7 +1139,7 @@ def resolve_runtime_variables(
         variable_path = match.group(1).strip()
 
         # Skip reserved template variables
-        from langtree.prompt.template_variables import VALID_TEMPLATE_VARIABLES
+        from langtree.templates.variables import VALID_TEMPLATE_VARIABLES
 
         if variable_path in VALID_TEMPLATE_VARIABLES:
             return match.group(0)  # Return the original {TEMPLATE_VAR} unchanged
@@ -1380,7 +1344,7 @@ def _resolve_scoped_runtime_variable(
         result = _resolve_in_current_node_context(run_structure, field_path, node_tag)
         return str(result) if result is not None else ""
 
-    from langtree.prompt.exceptions import RuntimeVariableError
+    from langtree.exceptions import RuntimeVariableError
 
     raise RuntimeVariableError(f"Unknown scope: {scope_name}")
 
@@ -1420,7 +1384,7 @@ def _resolve_nested_runtime_variable(
     except Exception:
         pass
 
-    from langtree.prompt.exceptions import RuntimeVariableError
+    from langtree.exceptions import RuntimeVariableError
 
     raise RuntimeVariableError(f"Could not resolve nested variable: {variable_path}")
 
@@ -1448,7 +1412,7 @@ def _resolve_node_field_variable(
             except Exception:
                 pass
 
-    from langtree.prompt.exceptions import RuntimeVariableError
+    from langtree.exceptions import RuntimeVariableError
 
     raise RuntimeVariableError(
         f"Failed to resolve runtime variable '{{{field_name}}}': field not found in current or parent context"

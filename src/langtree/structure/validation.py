@@ -8,11 +8,11 @@ and other issues in the prompt tree structure.
 
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from langtree.prompt.structure import RunStructure, StructureTreeNode
+from langtree.execution.resolution import _resolve_in_current_node_context
+from langtree.parsing.parser import CommandType
 
-from langtree.commands.parser import CommandType
-from langtree.prompt.resolution import _resolve_in_current_node_context
+if TYPE_CHECKING:
+    from langtree.structure.builder import RunStructure, StructureTreeNode
 
 
 def validate_tree(run_structure: "RunStructure") -> dict[str, list[str]]:

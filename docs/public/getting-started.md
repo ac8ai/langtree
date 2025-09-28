@@ -34,7 +34,7 @@ LangTree organizes prompts as **trees of data** they describe how to generate. K
 ## Your First Tree
 
 ```python
-from langtree.prompt import TreeNode
+from langtree import TreeNode
 from pydantic import Field
 
 class TaskDocumentAnalyzer(TreeNode):

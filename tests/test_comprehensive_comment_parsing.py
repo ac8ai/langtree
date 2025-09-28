@@ -13,8 +13,9 @@ Author: Claude Code
 import pytest
 from pydantic import Field
 
-from langtree.commands.parser import CommentCommand, parse_command
-from langtree.prompt import RunStructure, TreeNode
+from langtree import TreeNode
+from langtree.parsing.parser import CommentCommand, parse_command
+from langtree.structure import RunStructure
 
 
 class TestComprehensiveCommentParsing:
@@ -187,7 +188,7 @@ class TestComprehensiveCommentParsing:
         """Test that adding comment support doesn't break existing command parsing."""
 
         # All existing command types should still work
-        from langtree.commands.parser import (
+        from langtree.parsing.parser import (
             ExecutionCommand,
             NodeModifierCommand,
             ParsedCommand,

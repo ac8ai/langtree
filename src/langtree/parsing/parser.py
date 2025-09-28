@@ -8,10 +8,12 @@ between TreeNode instances in hierarchical prompt execution.
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
+
+from langtree.core.path_utils import PathResolver, ResolvedPath
 
 if TYPE_CHECKING:
-    from langtree.prompt import Scope
+    pass
 
 
 class CommandType(Enum):
@@ -34,36 +36,6 @@ class NodeModifierType(Enum):
     TOGETHER = "together"
 
 
-class ScopeModifier(Enum):
-    """Valid scope modifiers for variable mapping."""
-
-    PROMPT = "prompt"
-    VALUE = "value"
-    OUTPUTS = "outputs"
-    TASK = "task"
-
-
-@dataclass
-class ResolvedPath:
-    """Represents a path with its resolved scope instance."""
-
-    scope: Optional["Scope"]  # Forward reference to avoid circular import
-    path: str  # The path without scope prefix
-    original: str  # The original path as written
-
-    def __str__(self) -> str:
-        """Return the original path."""
-        return self.original
-
-    def resolve(self, context: dict):
-        """Resolve this path using its scope."""
-        if self.scope:
-            return self.scope.resolve(self.path, context)
-        else:
-            # No scope - use default resolution (will be handled by RunStructure)
-            return None
-
-
 @dataclass
 class VariableMapping:
     """Represents a variable mapping in the command."""
@@ -77,49 +49,12 @@ class VariableMapping:
 
     def __post_init__(self):
         """Resolve scope modifiers from all paths."""
-        self.resolved_target = self._resolve_path(self.target_path)
-        self.resolved_source = self._resolve_path(self.source_path)
-
-    def _resolve_path(self, path: str) -> ResolvedPath:
-        """
-        Resolve scope modifier from a path and create scope instance.
-
-        Extracts scope modifiers from path components and creates appropriate
-        scope instances for variable resolution during chain assembly.
-
-        Params:
-            path: The path to resolve (e.g., "prompt.title", "value.content")
-
-        Returns:
-            ResolvedPath object with scope instance and processed path
-
-        Raises:
-            None directly (relies on scope factory error handling)
-        """
-        if not path or "." not in path:
-            # No scope prefix - use current_node scope (implicit scope)
-            from langtree.prompt import get_scope
-
-            scope = get_scope("current_node")
-            return ResolvedPath(scope=scope, path=path, original=path)
-
-        first_part = path.split(".", 1)[0]
-        remainder = path.split(".", 1)[1]
-
-        # Create the appropriate scope instance immediately
-        valid_scopes = {"prompt", "value", "outputs", "task"}
-        if first_part in valid_scopes:
-            # Import here to avoid circular imports
-            from langtree.prompt import get_scope
-
-            scope = get_scope(first_part)
-            return ResolvedPath(scope=scope, path=remainder, original=path)
-        else:
-            # Not a known scope - treat as current_node scope with full path
-            from langtree.prompt import get_scope
-
-            scope = get_scope("current_node")
-            return ResolvedPath(scope=scope, path=path, original=path)
+        self.resolved_target = PathResolver.resolve_path_with_scope_instance(
+            self.target_path
+        )
+        self.resolved_source = PathResolver.resolve_path_with_scope_instance(
+            self.source_path
+        )
 
 
 @dataclass
@@ -351,9 +286,13 @@ class ParsedCommand:
 
     def __post_init__(self):
         """Resolve scope modifiers from all paths."""
-        self.resolved_destination = self._resolve_path(self.destination_path)
+        self.resolved_destination = PathResolver.resolve_path_with_scope_instance(
+            self.destination_path
+        )
         if self.inclusion_path:
-            self.resolved_inclusion = self._resolve_path(self.inclusion_path)
+            self.resolved_inclusion = PathResolver.resolve_path_with_scope_instance(
+                self.inclusion_path
+            )
 
     def __str__(self) -> str:
         """Return a string representation of the command."""
@@ -362,47 +301,6 @@ class ParsedCommand:
             command_str += f"[{self.inclusion_path}]"
         command_str += f"->{self.destination_path}"
         return command_str
-
-    def _resolve_path(self, path: str) -> ResolvedPath:
-        """
-        Resolve scope modifier from a path and create scope instance.
-
-        Extracts scope modifiers from path components and creates appropriate
-        scope instances for variable resolution during chain assembly.
-
-        Params:
-            path: The path to resolve (e.g., "task.analyze", "outputs.result")
-
-        Returns:
-            ResolvedPath object with scope instance and processed path
-
-        Raises:
-            None directly (relies on scope factory error handling)
-        """
-        if not path or "." not in path:
-            # No scope prefix - use current_node scope (implicit scope)
-            from langtree.prompt import get_scope
-
-            scope = get_scope("current_node")
-            return ResolvedPath(scope=scope, path=path, original=path)
-
-        first_part = path.split(".", 1)[0]
-        remainder = path.split(".", 1)[1]
-
-        # Create the appropriate scope instance immediately
-        valid_scopes = {"prompt", "value", "outputs", "task"}
-        if first_part in valid_scopes:
-            # Import here to avoid circular imports
-            from langtree.prompt import get_scope
-
-            scope = get_scope(first_part)
-            return ResolvedPath(scope=scope, path=remainder, original=path)
-        else:
-            # Not a known scope - treat as current_node scope with full path
-            from langtree.prompt import get_scope
-
-            scope = get_scope("current_node")
-            return ResolvedPath(scope=scope, path=path, original=path)
 
     def is_one_to_many(self) -> bool:
         """Check if this represents a 1:n relationship."""
@@ -477,7 +375,7 @@ class CommandParser:
         - Braces: {{...}}
         - Parentheses: (...)
 
-        Args:
+        Params:
             command: The potentially multiline command string
 
         Returns:
@@ -546,7 +444,7 @@ class CommandParser:
         - Non-ASCII unicode characters (outside quoted strings)
         - Control characters (tab, etc.) except newlines in multiline contexts
 
-        Args:
+        Params:
             command: Raw command string before normalization
 
         Raises:
@@ -609,7 +507,7 @@ class CommandParser:
         - Braces: {{...}}
         - Parentheses: (...)
 
-        Args:
+        Params:
             command: Command string that contains newlines
 
         Raises:
@@ -674,7 +572,7 @@ class CommandParser:
         1. Right side paths start from iteration root (sections.subsections)
         2. Left side mirrors iteration depth implicitly
 
-        Args:
+        Params:
             inclusion_path: The inclusion path like "sections.subsections"
             variable_mappings: List of variable mappings to validate
 
@@ -770,7 +668,7 @@ class CommandParser:
         - Must not have consecutive dots (..)
         - Components must be valid identifiers ([a-zA-Z_][a-zA-Z0-9_]*)
 
-        Args:
+        Params:
             path: The path to validate
             path_type: Description of the path type for error messages
 
@@ -825,7 +723,7 @@ class CommandParser:
         - No spaces around arrow (->)
         - No spaces around braces {{, }}
 
-        Args:
+        Params:
             command: The command string to validate
 
         Raises:
@@ -1511,7 +1409,7 @@ class CommandParser:
             origin = get_origin(field_type)
 
             # Validate field type specifications
-            from langtree.commands.validation import validate_field_types
+            from langtree.parsing.validation import validate_field_types
 
             validate_field_types(component, field_type)
 
@@ -1526,7 +1424,7 @@ class CommandParser:
                 if args:
                     element_type = args[0]
                     # Only continue if element is TreeNode
-                    from langtree.prompt.structure import TreeNode
+                    from langtree.structure.builder import TreeNode
 
                     try:
                         if hasattr(element_type, "__mro__") and issubclass(
@@ -1545,7 +1443,7 @@ class CommandParser:
 
             elif hasattr(field_type, "__mro__"):
                 # Check if it's a TreeNode (non-iterable)
-                from langtree.prompt.structure import TreeNode
+                from langtree.structure.builder import TreeNode
 
                 try:
                     if issubclass(field_type, TreeNode):
