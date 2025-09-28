@@ -188,6 +188,26 @@ class TemplateVariableNameError(TemplateVariableError):
     pass
 
 
+class DuplicateTargetError(LangTreeDSLError):
+    """Raised when attempting to add a target that already exists."""
+
+    def __init__(self, target_tag: str, existing_type: str, new_type: str):
+        """
+        Initialize the exception.
+
+        Params:
+            target_tag: The target tag that already exists
+            existing_type: The existing target's type name
+            new_type: The new target's type name that conflicts
+        """
+        self.target_tag = target_tag
+        self.existing_type = existing_type
+        self.new_type = new_type
+        super().__init__(
+            f"Target '{target_tag}' already exists (existing: {existing_type}, new: {new_type})"
+        )
+
+
 class ComprehensiveStructuralValidationError(LangTreeDSLError):
     """Raised when multiple structural validation issues are detected."""
 

@@ -5,7 +5,6 @@ This module contains validation functions for field types, ensuring proper type
 specifications and compliance with LangTree DSL framework requirements.
 """
 
-# Group 4: Internal from imports (alphabetical by source module)
 from langtree.commands.parser import CommandParseError
 
 

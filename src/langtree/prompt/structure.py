@@ -19,7 +19,7 @@ from langtree.commands.parser import (
     VariableAssignmentCommand,
     parse_command,
 )
-from langtree.prompt.exceptions import FieldTypeError
+from langtree.prompt.exceptions import DuplicateTargetError, FieldTypeError
 from langtree.prompt.registry import (
     AssemblyVariableRegistry,
     PendingTarget,
@@ -141,6 +141,14 @@ class RunStructure:
         """
         node = StructureTreeNode(name=tag, field_type=subtree, parent=parent)
         field_name = tag.split(".")[-1]
+
+        # Check for duplicate target definitions
+        if field_name in parent.children:
+            existing_node = parent.children[field_name]
+            existing_type = existing_node.field_type.__name__
+            new_type = subtree.__name__
+            raise DuplicateTargetError(tag, existing_type, new_type)
+
         parent.children[field_name] = node
 
         resolved_targets = self._pending_target_registry.resolve_pending(tag)
@@ -445,8 +453,7 @@ class RunStructure:
                     pending_target.target_path,
                 )
 
-            # Step 4: Update variable registry entries from syntactic to semantic satisfaction
-            self._update_variable_registry_satisfaction(command, source_node_tag)
+            # Step 4: Variable registry is already updated during command processing
 
         except Exception as e:
             # Let validation errors bubble up - these are intended to fail the operation
@@ -475,9 +482,12 @@ class RunStructure:
         Raises:
             ValueError: When inclusion path is invalid or not iterable
         """
-        # Basic validation - check if inclusion path exists and is accessible
-        # TODO: Implement actual iterable validation logic
-        pass
+        # Use the existing implementation from resolution.py
+        from langtree.prompt.resolution import _resolve_inclusion_context
+
+        return _resolve_inclusion_context(
+            self, command.resolved_inclusion, source_node_tag
+        )
 
     def _resolve_destination_context(
         self, command: ParsedCommand, target_node: StructureTreeNode, target_path: str
@@ -592,22 +602,6 @@ class RunStructure:
 
         # Target validation is handled by _resolve_destination_context
         # TODO: Add type compatibility checking between source and target
-
-    def _update_variable_registry_satisfaction(
-        self, command: ParsedCommand, source_node_tag: str
-    ) -> None:
-        """
-        Update variable registry entries from syntactic to semantic satisfaction.
-
-        Marks variables as semantically satisfied with resolved source paths.
-        Updates relationship types (1:1, 1:n, n:n) based on command analysis.
-
-        Params:
-            command: The resolved command with variable mappings
-            source_node_tag: Tag of the source node for registry updates
-        """
-        # TODO: Implement variable registry satisfaction updates
-        pass
 
     def get_assembly_variable_registry(self) -> AssemblyVariableRegistry:
         """Get the Assembly Variable Registry for cross-module variable access.

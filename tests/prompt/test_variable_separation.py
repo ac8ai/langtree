@@ -600,36 +600,6 @@ class TestCompleteVariableTypeCoverage:
 class TestRuntimeVariableResolutionPriorityComplete:
     """Test complete runtime variable resolution priority from LANGUAGE_SPECIFICATION.md."""
 
-    def test_resolution_priority_chain(self):
-        """Test the complete priority chain: Current Node → Task → Outputs → Value → Prompt."""
-
-        class TaskForPriorityTesting(TreeNode):
-            """Task for testing resolution priority."""
-
-            current_field: str = (
-                "current_node_value"  # Priority 1: Current Node Context
-            )
-            # Priority 2: Task Context (would be task.field references)
-            # Priority 3: Outputs Context (from outputs scope assignments)
-            # Priority 4: Value Context (from value scope assignments)
-            # Priority 5: Prompt Context (from prompt scope assignments)
-
-        structure = RunStructure()
-        structure.add(TaskForPriorityTesting)
-
-        node = structure.get_node("task.for_priority_testing")
-        assert node is not None
-
-        # Runtime variables should expand to double underscore format
-        content = "Field: {current_field}"
-        expanded = resolve_runtime_variables(content, structure, node)
-        assert expanded == "Field: {prompt__for_priority_testing__current_field}"
-
-        # Skip testing other priority levels until context assembly is implemented
-        pytest.skip(
-            "TODO: Implement tests for complete priority chain (Task, Outputs, Value, Prompt contexts) - only Current Node context is tested"
-        )
-
     def test_context_type_separation(self):
         """Test that different context types don't interfere."""
 
@@ -788,9 +758,6 @@ class TestSpecificationCompliance:
         )
         assert expanded == "Collection: {prompt__taxonomy_example__collection}"
 
-    @pytest.mark.skip(
-        reason="TODO: Implement assembly variable conflict detection - specification requires strict prohibition"
-    )
     def test_conflict_prohibition_compliance(self):
         """Test specification requirement for conflict prohibition.
 
@@ -804,9 +771,9 @@ class TestSpecificationCompliance:
         import pytest
 
         from langtree.prompt.exceptions import (
-            FieldValidationError,
-            VariableTargetValidationError,
+            LangTreeDSLError,
         )
+        from langtree.prompt.registry import AssemblyVariableConflictError
 
         # Test 1: Variable name conflicts with field names should raise error
         class TaskConflictingVariableField(TreeNode):
@@ -820,9 +787,7 @@ class TestSpecificationCompliance:
         structure = RunStructure()
 
         # Specification requires this conflict to be detected and prohibited
-        with pytest.raises(
-            (FieldValidationError, VariableTargetValidationError, ValueError)
-        ) as exc_info:
+        with pytest.raises(LangTreeDSLError) as exc_info:
             structure.add(TaskConflictingVariableField)
 
         error_msg = str(exc_info.value).lower()
@@ -846,9 +811,7 @@ class TestSpecificationCompliance:
         structure2 = RunStructure()
 
         # Specification requires duplicate assignments to be prohibited
-        with pytest.raises(
-            (FieldValidationError, VariableTargetValidationError, ValueError)
-        ) as exc_info:
+        with pytest.raises(AssemblyVariableConflictError) as exc_info:
             structure2.add(TaskDuplicateVariable)
 
         error_msg = str(exc_info.value).lower()

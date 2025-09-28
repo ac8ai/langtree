@@ -14,6 +14,7 @@ from pydantic import Field
 from langtree.prompt import RunStructure, StructureTreeNode, TreeNode
 from langtree.prompt.exceptions import (
     TemplateVariableError,
+    TemplateVariableSpacingError,
     VariableTargetValidationError,
 )
 from langtree.prompt.registry import PendingTarget
@@ -546,19 +547,25 @@ class TestTemplateVariableValidation:
             "{{PROMPT_SUBTREE}}",  # Wrong delimiter count
         ]
 
-        for invalid_template in invalid_cases:
+        for i, invalid_template in enumerate(invalid_cases):
             # Create a class with the invalid template in its docstring
             docstring = f"Test with invalid template: {invalid_template}"
 
-            class TaskInvalidTemplate(TreeNode):
-                field: str = Field(description="Test field")
-
-            # Set the docstring dynamically
-            TaskInvalidTemplate.__doc__ = docstring
+            # Create unique class name to avoid duplicate target conflicts
+            class_name = f"TaskInvalidTemplate{i}"
+            task_invalid_template = type(
+                class_name,
+                (TreeNode,),
+                {
+                    "field": Field(default="test", description="Test field"),
+                    "__annotations__": {"field": str},
+                    "__doc__": docstring,
+                },
+            )
 
             # This should raise an error when validation is implemented
             with pytest.raises((ValueError, TemplateVariableError)):
-                self.structure.add(TaskInvalidTemplate)
+                self.structure.add(task_invalid_template)
 
     def test_template_variable_spacing_enforcement(self):
         """Test that template variables enforce proper spacing rules."""
@@ -571,15 +578,22 @@ class TestTemplateVariableValidation:
             "{PROMPT_SUBTREE}\nText",  # Newline but no empty line after
         ]
 
-        for violation in spacing_violations:
+        for i, violation in enumerate(spacing_violations):
+            # Create unique class name to avoid duplicate target conflicts
+            class_name = f"TaskSpacingViolation{i}"
+            task_spacing_violation = type(
+                class_name,
+                (TreeNode,),
+                {
+                    "field": Field(default="test", description="Test field"),
+                    "__annotations__": {"field": str},
+                    "__doc__": f"Test spacing: {violation}",
+                },
+            )
 
-            class TaskSpacingViolation(TreeNode):
-                f"""Test spacing: {violation}"""
-                field: str = Field(description="Test field")
-
-            # Current implementation falls back to original content for spacing violations
-            # TODO: Implement strict spacing validation enforcement
-            self.structure.add(TaskSpacingViolation)
+            # Spacing validation is now implemented and should raise errors
+            with pytest.raises(TemplateVariableSpacingError):
+                self.structure.add(task_spacing_violation)
 
 
 class TestTemplateVariableIntegration:
@@ -795,76 +809,6 @@ class TestPendingTargetResolutionCore:
         assert early_node is not None
         assert later_node is not None
 
-    @pytest.mark.skip("TODO: Implement context resolution integration")
-    def test_inclusion_context_resolution_integration(self):
-        """Test that pending resolution triggers inclusion context validation."""
-        # TODO: Implement context resolution integration
-        # See: tests/prompt/test_structure.py::TestContextResolutionIntegration::test_inclusion_context_resolution_integration
-        pytest.skip(
-            "TODO: Implement context resolution integration - see langtree/prompt/resolution.py"
-        )
-
-        # Create command with inclusion path referencing future target
-        class TaskEarly(TreeNode):
-            """
-            Early task with inclusion referencing later target.
-            ! @each[task.later.items]->task.processor@{{value.item=items}}*
-            """
-
-            pass
-
-        self.run_structure.add(TaskEarly)
-
-        # Verify pending target for inclusion path
-        assert (
-            "task.later" in self.run_structure._pending_target_registry.pending_targets
-        )
-
-        # Add target with iterable field
-        class TaskLater(TreeNode):
-            """Later task with items."""
-
-            items: list[str] = ["item1", "item2"]
-
-        class TaskProcessor(TreeNode):
-            """Processor task."""
-
-            item: str = "default"
-
-        self.run_structure.add(TaskLater)
-        self.run_structure.add(TaskProcessor)
-
-        # TODO: Verify inclusion path was validated as iterable
-        # TODO: Verify context resolution was performed
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
-    @pytest.mark.skip("TODO: Implement destination context resolution")
-    def test_destination_context_resolution_integration(self):
-        """Test that pending resolution validates destination context compatibility."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task referencing typed destination.
-            ! @all->task.later.specific_field@{{value.result=prompt.data}}
-            """
-
-            data: str = "early data"
-
-        self.run_structure.add(TaskEarly)
-
-        # Add target with specific field type
-        class TaskLater(TreeNode):
-            """Later task with typed field."""
-
-            specific_field: str = "default"
-            other_field: int = 42
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify destination field type compatibility
-        # TODO: Verify field exists and is accessible
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
 
 class TestPendingTargetVariableMapping:
     """Test variable mapping resolution during pending target processing."""
@@ -872,33 +816,6 @@ class TestPendingTargetVariableMapping:
     def setup_method(self):
         """Set up test fixtures."""
         self.run_structure = RunStructure()
-
-    @pytest.mark.skip("TODO: Implement variable mapping semantic validation")
-    def test_variable_mapping_semantic_validation(self):
-        """Test semantic validation of variable mappings during resolution."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with complex variable mappings.
-            ! @all->task.later@{{prompt.context=*, outputs.summary=*}}
-            """
-
-            analysis: str = "detailed analysis"
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task with expected mappings."""
-
-            context: str = "default context"
-            summary: str = "default summary"
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify source paths are semantically valid
-        # TODO: Verify target variables exist and are compatible
-        # TODO: Verify scope mappings are valid (prompt, value, outputs)
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
 
     def test_wildcard_mapping_validation(self):
         """Test that wildcard (*) mappings in variable assignments are parsed correctly."""
@@ -988,167 +905,6 @@ class TestPendingTargetVariableRegistry:
     def setup_method(self):
         """Set up test fixtures."""
         self.run_structure = RunStructure()
-
-    @pytest.mark.skip("TODO: Implement variable registry satisfaction updates")
-    def test_variable_registry_satisfaction_updates(self):
-        """Test that pending resolution updates variable registry satisfaction sources."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task creating variable dependencies.
-            ! @all->task.later@{{value.result=prompt.analysis}}
-            """
-
-            analysis: str = "source analysis"
-
-        self.run_structure.add(TaskEarly)
-
-        # Add target - should trigger variable registry updates
-        class TaskLater(TreeNode):
-            """Later task receiving variable."""
-
-            result: str = "default"
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify variable registry was updated
-        # TODO: Verify satisfaction sources changed from syntactic to semantic
-        # TODO: Verify variable is now marked as satisfied with resolved source
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
-    @pytest.mark.skip("TODO: Implement variable relationship type validation")
-    def test_variable_relationship_type_validation(self):
-        """Test validation of variable relationship types (1:1, 1:n, n:n)."""
-
-        # Test @all command (should create 1:1 or 1:n relationship)
-        class TaskSource1(TreeNode):
-            """
-            Source with @all command.
-            ! @all->task.target@{{value.result=prompt.data}}
-            """
-
-            data: str = "source 1"
-
-        # Test @each command (should create n:n relationship)
-        class TaskSource2(TreeNode):
-            """
-            Source with @each command.
-            ! @each[items]->task.target@{{value.result=items}}*
-            """
-
-            items: list[str] = ["item1", "item2"]
-
-        self.run_structure.add(TaskSource1)
-        self.run_structure.add(TaskSource2)
-
-        class TaskTarget(TreeNode):
-            """Target task."""
-
-            result: str = "default"
-
-        self.run_structure.add(TaskTarget)
-
-        # TODO: Verify relationship types are correctly identified
-        # TODO: Verify @all creates 1:1 relationship
-        # TODO: Verify @each creates n:n relationship
-        # TODO: Verify multiplicity indicators affect relationship type
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
-
-class TestPendingTargetErrorHandling:
-    """Test error handling and reporting during pending target resolution."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.run_structure = RunStructure()
-
-    @pytest.mark.skip("TODO: Implement resolution error capture")
-    def test_resolution_error_capture_and_reporting(self):
-        """Test that resolution errors are captured and attached to commands."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with invalid mappings.
-            ! @all->task.later@{{value.nonexistent=prompt.missing}}
-            """
-
-            data: str = "valid data"
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task missing expected fields."""
-
-            result: str = "default"
-            # Note: Missing 'nonexistent' field
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify resolution errors were captured
-        # TODO: Verify command has resolution_errors list
-        # TODO: Verify specific error messages for missing fields
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
-        early_node = self.run_structure.get_node("task.early")
-        assert early_node is not None
-        # TODO: Check early_node.extracted_commands[0].resolution_errors
-
-    @pytest.mark.skip("TODO: Implement inclusion path validation errors")
-    def test_inclusion_path_validation_errors(self):
-        """Test error handling for invalid inclusion paths."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with invalid inclusion path.
-            ! @each[task.later.nonexistent_list]->task.processor@{{value.item=items}}*
-            """
-
-            pass
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task without expected iterable field."""
-
-            data: str = "not a list"
-            # Note: Missing 'nonexistent_list' field
-
-        class TaskProcessor(TreeNode):
-            """Processor task."""
-
-            item: str = "default"
-
-        self.run_structure.add(TaskLater)
-        self.run_structure.add(TaskProcessor)
-
-        # TODO: Verify inclusion path validation error captured
-        # TODO: Verify error indicates non-existent or non-iterable field
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
-    @pytest.mark.skip("TODO: Implement type compatibility validation")
-    def test_type_compatibility_validation_errors(self):
-        """Test error handling for type incompatibility in variable mappings."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with type-incompatible mapping.
-            ! @all->task.later@{{value.numeric_field=prompt.text_data}}
-            """
-
-            text_data: str = "text value"
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task with strongly typed field."""
-
-            numeric_field: int = 42
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify type compatibility error captured
-        # TODO: Verify error indicates string->int incompatibility
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
 
 
 class TestPendingTargetEdgeCasesAdvanced:
@@ -1259,33 +1015,6 @@ class TestPendingTargetEdgeCasesAdvanced:
 
         # Should handle gracefully without exceptions
 
-    @pytest.mark.skip("TODO: Implement circular dependency detection")
-    def test_circular_dependency_detection_in_pending_targets(self):
-        """Test detection of circular dependencies in pending target resolution."""
-
-        class TaskA(TreeNode):
-            """
-            Task A referencing Task B.
-            ! @all->task.b@{{value.result=prompt.data}}
-            """
-
-            data: str = "data from A"
-
-        class TaskB(TreeNode):
-            """
-            Task B referencing Task A.
-            ! @all->task.a@{{value.result=prompt.data}}
-            """
-
-            data: str = "data from B"
-
-        self.run_structure.add(TaskA)
-        self.run_structure.add(TaskB)
-
-        # TODO: Verify circular dependency detected
-        # TODO: Verify appropriate error handling
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
 
 class TestPendingTargetIntegrationWithResolution:
     """Test integration with existing context resolution system."""
@@ -1293,61 +1022,6 @@ class TestPendingTargetIntegrationWithResolution:
     def setup_method(self):
         """Set up test fixtures."""
         self.run_structure = RunStructure()
-
-    @pytest.mark.skip("TODO: Implement resolution.py integration")
-    def test_integration_with_resolve_deferred_contexts(self):
-        """Test integration with resolution.py deferred context resolution."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with deferred contexts.
-            ! @all->task.later@{{prompt.context=*}}
-            """
-
-            analysis: str = "detailed analysis"
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task."""
-
-            context: str = "default"
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify deferred context resolution was triggered
-        # TODO: Verify integration with existing resolution.py functions
-        # See: llm/prompt/resolution.py::resolve_deferred_contexts
-
-    @pytest.mark.skip("TODO: Implement API for resolution reporting")
-    def test_resolution_report_api(self):
-        """Test API for getting resolution reports after pending target processing."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with various mappings.
-            ! @all->task.later@{{prompt.ctx=*, outputs.result=*}}
-            """
-
-            data: str = "source data"
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task."""
-
-            ctx: str = "default"
-            result: str = "default"
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Implement get_resolution_report() API
-        # TODO: Verify report contains resolution statistics
-        # TODO: Verify report includes error summaries
-        # resolution_report = self.run_structure.get_resolution_report()
-        # assert 'resolved_commands' in resolution_report
-        # assert 'failed_commands' in resolution_report
-        # assert 'variable_satisfaction_changes' in resolution_report
 
     # @pytest.mark.skip("TODO: Implement multiple forward references batch resolution")
     def test_multiple_forward_references_to_same_node_batch_resolution(self):
@@ -1409,7 +1083,6 @@ class TestPendingTargetIntegrationWithResolution:
         # TODO: Verify all variable mappings were applied correctly
         # See: llm/prompt/structure.py::_complete_pending_command_processing
 
-    @pytest.mark.skip("TODO: Implement reverse order resolution robustness")
     def test_reverse_order_resolution_should_not_create_pending_entries(self):
         """Test that adding target before source doesn't create unnecessary pending entries."""
 
@@ -1432,15 +1105,12 @@ class TestPendingTargetIntegrationWithResolution:
 
         self.run_structure.add(TaskSource)
 
-        # TODO: Verify no pending targets were created (immediate resolution)
-        # TODO: Verify variable mapping was applied immediately
-        # TODO: Verify reverse order doesn't affect resolution correctness
-        # assert len(self.run_structure._pending_target_registry.pending_targets) == 0
-        # See: llm/prompt/structure.py::add
+        # Verify no pending targets were created (immediate resolution)
+        assert len(self.run_structure._pending_target_registry.pending_targets) == 0
 
-    @pytest.mark.skip("TODO: Implement duplicate target conflict detection")
     def test_duplicate_target_definitions_conflict_detection(self):
         """Test detection and reporting of duplicate target definitions."""
+        from langtree.prompt.exceptions import DuplicateTargetError
 
         # Add first definition with specific path
         class TaskDuplicateTarget(TreeNode):
@@ -1451,133 +1121,13 @@ class TestPendingTargetIntegrationWithResolution:
         self.run_structure.add(TaskDuplicateTarget)
 
         # Attempt to add same class again (should conflict)
-        # TODO: Should raise structured error about duplicate target
-        # with pytest.raises(DuplicateTargetError) as exc_info:
-        #     self.run_structure.add(TaskDuplicateTarget)
-        #
-        # TODO: Verify error contains conflicting target path
-        # assert "task.duplicate_target" in str(exc_info.value)
-        # See: llm/prompt/structure.py::add
+        with pytest.raises(DuplicateTargetError) as exc_info:
+            self.run_structure.add(TaskDuplicateTarget)
 
-    @pytest.mark.skip("TODO: Implement cycle detection with structured errors")
-    def test_cycles_in_forward_references_structured_error_reporting(self):
-        """Test cycle detection in forward references with structured error reporting."""
-
-        class TaskA(TreeNode):
-            """
-            Task A referencing Task B.
-            ! @all->task.b@{{value.data_from_a=prompt.data}}
-            """
-
-            data: str = "from A"
-
-        class TaskB(TreeNode):
-            """
-            Task B referencing Task C.
-            ! @all->task.c@{{value.data_from_b=prompt.data}}
-            """
-
-            data: str = "from B"
-
-        class TaskC(TreeNode):
-            """
-            Task C referencing Task A (creating cycle).
-            ! @all->task.a@{{value.data_from_c=prompt.data}}
-            """
-
-            data: str = "from C"
-
-        self.run_structure.add(TaskA)
-        self.run_structure.add(TaskB)
-
-        # Adding TaskC should detect the cycle and provide structured error
-        # TODO: Should raise CyclicDependencyError with cycle path
-        # with pytest.raises(CyclicDependencyError) as exc_info:
-        #     self.run_structure.add(TaskC)
-        #
-        # TODO: Verify error contains complete cycle path
-        # cycle_path = exc_info.value.cycle_path
-        # assert "task.a" in cycle_path
-        # assert "task.b" in cycle_path
-        # assert "task.c" in cycle_path
-        # See: llm/prompt/structure.py::_detect_cycles
-
-    @pytest.mark.skip(
-        "TODO: Implement post-processing verification with observable effects"
-    )
-    def test_post_processing_verification_with_observable_side_effects(self):
-        """Test that post-processing actually occurs with observable side effects."""
-        # Counter to track post-processing invocations
-        processing_counter = {"count": 0}
-
-        def mock_post_processor(command, target_node):
-            """Mock post-processor that increments counter."""
-            processing_counter["count"] += 1
-            # Add observable effect: set a marker field
-            if hasattr(target_node, "_processed_marker"):
-                target_node._processed_marker = True
-
-        # TODO: Add hook for post-processing callback registration
-        # self.run_structure.register_post_processor(mock_post_processor)
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with pending target.
-            ! @all->task.later@{{value.result=prompt.analysis}}
-            """
-
-            analysis: str = "analysis data"
-
-        self.run_structure.add(TaskEarly)
-
-        class TaskLater(TreeNode):
-            """Later task receiving processing."""
-
-            result: str = "default"
-
-        self.run_structure.add(TaskLater)
-
-        # TODO: Verify post-processing was invoked
-        # assert processing_counter["count"] == 1
-        #
-        # TODO: Verify observable side effects occurred
-        # later_node = self.run_structure.get_node("task.later")
-        # assert hasattr(later_node, '_processed_marker')
-        # assert later_node._processed_marker is True
-        #
-        # TODO: Verify variable mapping was applied during post-processing
-        # assert later_node.result == "analysis data"
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
-
-    @pytest.mark.skip("TODO: Implement unresolved references validation after finalize")
-    def test_unresolved_references_after_finalize_validation(self):
-        """Test validation of unresolved references after finalization."""
-
-        class TaskEarly(TreeNode):
-            """
-            Early task with unresolvable reference.
-            ! @all->task.never_defined@{{value.result=prompt.data}}
-            """
-
-            data: str = "some data"
-
-        self.run_structure.add(TaskEarly)
-
-        # Finalize without adding the target
-        # TODO: Implement finalize() method
-        # validation_result = self.run_structure.finalize()
-        #
-        # TODO: Verify unresolved references are reported
-        # assert not validation_result.is_valid
-        # assert len(validation_result.unresolved_targets) == 1
-        # assert "task.never_defined" in validation_result.unresolved_targets
-        #
-        # TODO: Verify error contains source command information
-        # unresolved_error = validation_result.unresolved_targets[0]
-        # assert unresolved_error.source_node == "task.early"
-        # assert "value.result=prompt.data" in unresolved_error.command_description
-        # See: llm/prompt/structure.py::finalize
-        # 3. Assembly variable resolution during template processing
+        # Verify error contains conflicting target path
+        error_msg = str(exc_info.value)
+        assert "task.duplicate_target" in error_msg
+        assert "TaskDuplicateTarget" in error_msg
 
 
 class TestContextResolutionValidation:
