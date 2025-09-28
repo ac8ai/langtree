@@ -5,6 +5,7 @@ This package provides command parsing, path resolution, and parsing validation
 for the LangTree DSL framework.
 """
 
+from langtree.core.path_utils import ScopeModifier
 from langtree.parsing.parser import (
     CommandParseError,
     CommandParser,
@@ -14,7 +15,6 @@ from langtree.parsing.parser import (
     NodeModifierType,
     ParsedCommand,
     ResamplingCommand,
-    ScopeModifier,
     VariableAssignmentCommand,
     VariableMapping,
     parse_command,

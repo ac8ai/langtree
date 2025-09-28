@@ -2869,7 +2869,8 @@ class TestCWDPathResolution:
 
     def test_absolute_path_with_task_scope_ignores_cwd(self):
         """Test that absolute paths starting with task. ignore CWD."""
-        from langtree.parsing.path_resolver import PathResolver, ScopeModifier
+        from langtree.core.path_utils import ScopeModifier
+        from langtree.parsing.path_resolver import PathResolver
 
         cwd = "task.analyzer.step1"
         result = PathResolver.resolve_path_with_cwd("task.other.field", cwd)
@@ -2880,7 +2881,8 @@ class TestCWDPathResolution:
 
     def test_absolute_path_with_scope_modifier_ignores_cwd(self):
         """Test that paths with scope modifiers ignore CWD."""
-        from langtree.parsing.path_resolver import PathResolver, ScopeModifier
+        from langtree.core.path_utils import ScopeModifier
+        from langtree.parsing.path_resolver import PathResolver
 
         cwd = "task.analyzer.step1"
 
