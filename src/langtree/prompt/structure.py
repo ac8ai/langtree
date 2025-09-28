@@ -1,5 +1,5 @@
 """
-Core structure classes for DPCL prompt tree building and management.
+Core structure classes for LangTree DSL prompt tree building and management.
 
 This module contains the main classes for building and managing the
 prompt tree structure, including node classes and the main RunStructure
@@ -40,7 +40,7 @@ ParsedCommandUnion = (
 )
 
 
-class PromptTreeNode(BaseModel):
+class TreeNode(BaseModel):
     """
     Base class for all prompt tree node types.
 
@@ -51,7 +51,7 @@ class PromptTreeNode(BaseModel):
     pass
 
 
-ResolutionResult = PromptValue | PromptTreeNode
+ResolutionResult = PromptValue | TreeNode
 
 
 @dataclass
@@ -59,7 +59,7 @@ class StructureTreeNode:
     """Node in the structure tree representing a parsed prompt component."""
 
     name: str
-    field_type: type[PromptTreeNode] | None = None
+    field_type: type[TreeNode] | None = None
     parent: Optional["StructureTreeNode"] = None
     children: dict[str, "StructureTreeNode"] = field(default_factory=dict)
     clean_docstring: str | None = field(default=None)
@@ -76,15 +76,15 @@ class StructureTreeRoot(StructureTreeNode):
 
 
 class RunStructure:
-    """Coordinator for building and managing DPCL prompt tree structures.
+    """Coordinator for building and managing LangTree DSL prompt tree structures.
 
-    This framework assembles LangChain chains from DPCL-annotated prompt trees.
+    This framework assembles LangChain chains from LangTree DSL-annotated prompt trees.
     It builds the structural representation during assembly phase - LangChain
     handles all execution and output management.
 
     Responsibilities:
-    - Build structural tree of `PromptTreeNode` subclasses for chain assembly
-    - Extract and parse DPCL commands from docstrings and field descriptions
+    - Build structural tree of `TreeNode` subclasses for chain assembly
+    - Extract and parse LangTree DSL commands from docstrings and field descriptions
     - Register variables and pending (forward‑referenced) target destinations
     - Provide execution plan scaffolding for chain composition
     - Generate validation reports for command compatibility
@@ -99,15 +99,15 @@ class RunStructure:
         self._pending_target_registry = PendingTargetRegistry()
         self._assembly_variable_registry = AssemblyVariableRegistry()
 
-    def add(self, tree: type[PromptTreeNode]) -> None:
+    def add(self, tree: type[TreeNode]) -> None:
         """Add a root prompt tree node class to the structure.
 
-        This performs a depth‑first traversal over the supplied `PromptTreeNode` subclass,
-        creating `StructureTreeNode` entries, extracting & parsing any DPCL commands
+        This performs a depth‑first traversal over the supplied `TreeNode` subclass,
+        creating `StructureTreeNode` entries, extracting & parsing any LangTree DSL commands
         from docstrings / field descriptions, and registering variables & pending targets.
 
         Params:
-            tree: A subclass of `PromptTreeNode` representing a root task/tree entry.
+            tree: A subclass of `TreeNode` representing a root task/tree entry.
 
         Raises:
             ValueError: If class naming convention does not match expected kind (via `get_root_tag`).
@@ -121,7 +121,7 @@ class RunStructure:
         self._process_subtask(tree, self._root_nodes[designation], tag)
 
     def _process_subtask(
-        self, subtree: type[PromptTreeNode], parent: StructureTreeNode, tag: str
+        self, subtree: type[TreeNode], parent: StructureTreeNode, tag: str
     ) -> None:
         """Recursively materialize a subtree rooted at `subtree` into the structure.
 
@@ -129,10 +129,10 @@ class RunStructure:
         - Adds a `StructureTreeNode` entry under `parent`.
         - Extracts & parses commands from class docstring and field descriptions.
         - Registers variables & pending targets through registries.
-        - Traverses nested `PromptTreeNode` field annotations, including generics like `list[MyNode]`.
+        - Traverses nested `TreeNode` field annotations, including generics like `list[MyNode]`.
 
         Params:
-            subtree: The `PromptTreeNode` subclass being processed.
+            subtree: The `TreeNode` subclass being processed.
             parent: The parent `StructureTreeNode` into which this node is inserted.
             tag: Fully qualified hierarchical tag (e.g., `task.analysis.sections`).
 
@@ -197,11 +197,11 @@ class RunStructure:
             if annotation is None:
                 raise FieldTypeError(field_tag, "is missing type annotation")
 
-            # Validate inheritance: reject BaseModel classes that don't inherit from PromptTreeNode
+            # Validate inheritance: reject BaseModel classes that don't inherit from TreeNode
             self._validate_field_inheritance(field_tag, annotation, origin, args)
 
-            if issubclass(annotation, PromptTreeNode):
-                # For PromptTreeNode fields, validate command compatibility before processing subtask
+            if issubclass(annotation, TreeNode):
+                # For TreeNode fields, validate command compatibility before processing subtask
                 if field_def.description:
                     commands, _ = extract_commands(field_def.description)
                     for command_str in commands:
@@ -217,7 +217,7 @@ class RunStructure:
                 self._process_subtask(annotation, node, field_tag)
             elif origin is not None and args is not None:
                 for type_candidate in args:
-                    if issubclass(type_candidate, PromptTreeNode):
+                    if issubclass(type_candidate, TreeNode):
                         self._process_subtask(type_candidate, node, field_tag)
             elif origin is None and args is None:
                 raise FieldTypeError(
@@ -230,12 +230,12 @@ class RunStructure:
         """Register structural + variable metadata for a parsed command.
 
         Current behavior (Phase 1):
-        - For DPCL commands (ParsedCommand): Resolves destination paths and registers variables
+        - For LangTree DSL commands (ParsedCommand): Resolves destination paths and registers variables
         - For other commands: Store for later processing during execution
         - Defers semantic/context resolution to later phases (see `resolution.py`).
 
         Params:
-            command: Parsed DPCL command (already syntax‑validated by parser layer).
+            command: Parsed LangTree DSL command (already syntax‑validated by parser layer).
             source_node_tag: Tag of the node from which the command originated.
             field_name: Name of the field containing the command (None for docstring commands).
 
@@ -244,7 +244,7 @@ class RunStructure:
         """
 
         if isinstance(command, ParsedCommand):
-            self._process_dpcl_command(command, source_node_tag, field_name)
+            self._process_acl_command(command, source_node_tag, field_name)
         elif isinstance(command, VariableAssignmentCommand):
             self._process_variable_assignment(command, source_node_tag)
         elif isinstance(
@@ -252,10 +252,10 @@ class RunStructure:
         ):
             pass
 
-    def _process_dpcl_command(
+    def _process_acl_command(
         self, command: ParsedCommand, source_node_tag: str, field_name: str = None
     ) -> None:
-        """Process DPCL commands (@each, @all) with destinations and variable mappings."""
+        """Process LangTree DSL commands (@each, @all) with destinations and variable mappings."""
 
         # Step 1: Validate inclusion field exists if this is an @each command
         if command.inclusion_path:
@@ -324,7 +324,7 @@ class RunStructure:
                     variable_path=variable_path,
                     scope=target_scope,
                     source_node_tag=source_node_tag,
-                    command_type=command.command_type.value,  # Convert enum to string
+                    command_type=command.command_type,  # Convert enum to string
                     has_multiplicity=command.has_multiplicity,
                 )
 
@@ -332,7 +332,10 @@ class RunStructure:
                 self._variable_registry.add_satisfaction_source(
                     variable_path=variable_path,
                     scope=target_scope,
+                    source_node_tag=source_node_tag,
                     source_path=source_path,
+                    command_type=command.command_type,
+                    has_multiplicity=command.has_multiplicity,
                 )
 
         # NOTE: Context resolution is deferred until after tree building is complete
@@ -354,9 +357,9 @@ class RunStructure:
 
         Raises:
             AssemblyVariableConflictError: If variable already exists with different value
-            DPCLError: If variable name conflicts with reserved template variables or field names
+            LangTreeDSLError: If variable name conflicts with reserved template variables or field names
         """
-        from langtree.prompt.exceptions import DPCLError
+        from langtree.prompt.exceptions import LangTreeDSLError
         from langtree.prompt.registry import AssemblyVariableConflictError
         from langtree.prompt.template_variables import (
             validate_template_variable_conflicts,
@@ -374,7 +377,7 @@ class RunStructure:
         if source_node and source_node.field_type:
             field_names = set(source_node.field_type.model_fields.keys())
             if command.variable_name in field_names:
-                raise DPCLError(
+                raise LangTreeDSLError(
                     f"Assembly Variable '{command.variable_name}' conflicts with field name "
                     f"in {source_node_tag}. Variable names cannot conflict with field names in same subtree."
                 )
@@ -667,7 +670,7 @@ class RunStructure:
     def get_prompt_sequence(self, name: str) -> list[str]:
         """Construct ordered prompt content segments leading to a descendant field.
 
-        This traverses parent classes (MRO up to `PromptTreeNode`) and collects:
+        This traverses parent classes (MRO up to `TreeNode`) and collects:
         - Parent class docstrings (raw currently; TODO processing hooks pending)
         - Target field description found in the terminal node.
 
@@ -689,7 +692,7 @@ class RunStructure:
         for tag, tag_next in pairwise(path[1:]):
             node = node.children.get(tag)
             type_mro = node.field_type.__mro__
-            for parent in type_mro[: type_mro.index(PromptTreeNode)]:
+            for parent in type_mro[: type_mro.index(TreeNode)]:
                 parent_descr = parent.__doc__ or ""  # TODO: process prompt
                 # See: tests/langtree/prompt/test_todos.py::test_prompt_template_processing
                 prompts.append(parent_descr)
@@ -727,23 +730,26 @@ class RunStructure:
             "relationship_types": {
                 "1:1": len(
                     [
-                        v
+                        source
                         for v in self._variable_registry.variables.values()
-                        if v.get_relationship_type() == "1:1"
+                        for source in v.sources
+                        if source.get_relationship_type() == "1:1"
                     ]
                 ),
                 "1:n": len(
                     [
-                        v
+                        source
                         for v in self._variable_registry.variables.values()
-                        if v.get_relationship_type() == "1:n"
+                        for source in v.sources
+                        if source.get_relationship_type() == "1:n"
                     ]
                 ),
                 "n:n": len(
                     [
-                        v
+                        source
                         for v in self._variable_registry.variables.values()
-                        if v.get_relationship_type() == "n:n"
+                        for source in v.sources
+                        if source.get_relationship_type() == "n:n"
                     ]
                 ),
             },
@@ -780,13 +786,22 @@ class RunStructure:
                 if scope_name
                 else var_info.variable_path
             )
+            # Get the first source node tag if available
+            first_source_tag = (
+                var_info.sources[0].source_node_tag if var_info.sources else "unknown"
+            )
+            first_relationship_type = (
+                var_info.sources[0].get_relationship_type()
+                if var_info.sources
+                else "unknown"
+            )
             plan["external_inputs"].append(
                 {
                     "variable": full_name,
-                    "source_node": var_info.source_node_tag,
+                    "source_node": first_source_tag,
                     "scope": scope_name,
                     "path": var_info.variable_path,
-                    "required_type": var_info.get_relationship_type(),
+                    "required_type": first_relationship_type,
                 }
             )
 
@@ -809,13 +824,13 @@ class RunStructure:
         # Analyze variable flows and satisfaction relationships
         for var_name, var_info in self._variable_registry.variables.items():
             if var_info.is_satisfied():
-                for source in var_info.satisfaction_sources:
+                for source in var_info.sources:
                     plan["variable_flows"].append(
                         {
-                            "from": source,
+                            "from": source.source_field_path,
                             "to": var_name,
-                            "target_node": var_info.source_node_tag,
-                            "relationship_type": var_info.get_relationship_type(),
+                            "target_node": source.source_node_tag,
+                            "relationship_type": source.get_relationship_type(),
                             "scope": var_info.get_scope_name(),
                         }
                     )
@@ -1038,6 +1053,55 @@ class RunStructure:
 
         return _resolve_in_current_prompt_context(self, path, node_tag)
 
+    def resolve_full_path(self, full_path: str) -> Any:
+        """
+        Resolve a full path like 'task.node.field' directly to its value.
+
+        This is a convenience method that combines node and field resolution
+        into a single call. It automatically splits the path and routes to
+        the appropriate resolution method.
+
+        Params:
+            full_path: Complete path like 'task.node.field' or 'task.node'
+
+        Returns:
+            The resolved value at the path
+
+        Raises:
+            ValueError: When path format is invalid
+            KeyError: When path doesn't exist in the tree
+
+        Examples:
+            result = run_structure.resolve_full_path("task.analysis.title")
+            node = run_structure.resolve_full_path("task.analysis")
+        """
+        if not full_path or not isinstance(full_path, str):
+            raise ValueError("Path must be a non-empty string")
+
+        # Check if it's a global tree path (has at least one dot)
+        if "." in full_path:
+            # Try as global tree path first
+            try:
+                return self._resolve_in_global_tree_context(full_path)
+            except (KeyError, ValueError) as e:
+                # If global resolution fails, try splitting into node.field
+                parts = full_path.rsplit(".", 1)
+                if len(parts) == 2:
+                    node_path, field_name = parts
+                    try:
+                        return self._resolve_in_current_node_context(
+                            field_name, node_path
+                        )
+                    except (KeyError, ValueError):
+                        pass
+                # Re-raise original error
+                raise e
+        else:
+            # Single component - treat as field in current context if we have one
+            raise ValueError(
+                f"Path '{full_path}' must contain at least one dot for node.field format"
+            )
+
     def _validate_variable_source_field(
         self, source_path: str, source_node_tag: str, command: Any = None
     ) -> None:
@@ -1215,7 +1279,7 @@ class RunStructure:
         for i, component in enumerate(path_components):
             # Check if this component exists as a field in current type
             if not hasattr(current_type, "model_fields"):
-                # Can't validate further if not a PromptTreeNode
+                # Can't validate further if not a TreeNode
                 break
 
             if component not in current_type.model_fields:
@@ -1238,7 +1302,7 @@ class RunStructure:
                     if args and hasattr(args[0], "model_fields"):
                         current_type = args[0]
                     else:
-                        break  # Can't validate further if not a PromptTreeNode
+                        break  # Can't validate further if not a TreeNode
                 elif hasattr(field_type, "model_fields"):
                     current_type = field_type
                 else:
@@ -1275,7 +1339,7 @@ class RunStructure:
 
         # Check if base field exists
         if not hasattr(source_node.field_type, "model_fields"):
-            return  # Can't validate if not a PromptTreeNode
+            return  # Can't validate if not a TreeNode
 
         if base_field not in source_node.field_type.model_fields:
             # This should be caught by _validate_inclusion_field, but just in case
@@ -1574,10 +1638,10 @@ class RunStructure:
         self, field_tag: str, annotation: type, origin: type, args: tuple
     ) -> None:
         """
-        Validate that field types use proper inheritance (PromptTreeNode, not raw BaseModel).
+        Validate that field types use proper inheritance (TreeNode, not raw BaseModel).
 
-        Per framework requirements, all model classes must inherit from PromptTreeNode.
-        Raw BaseModel inheritance is not allowed in the DPCL framework.
+        Per framework requirements, all model classes must inherit from TreeNode.
+        Raw BaseModel inheritance is not allowed in the LangTree DSL framework.
         Also validates against list[list[...]] antipatterns.
 
         Params:
@@ -1587,7 +1651,7 @@ class RunStructure:
             args: Generic type arguments
 
         Raises:
-            FieldTypeError: If a BaseModel class that doesn't inherit from PromptTreeNode is found
+            FieldTypeError: If a BaseModel class that doesn't inherit from TreeNode is found
             FieldValidationError: If list[list[...]] antipattern is detected
         """
 
@@ -1617,7 +1681,7 @@ class RunStructure:
             type_to_check: Type to validate
 
         Raises:
-            FieldTypeError: If the type is BaseModel but not PromptTreeNode
+            FieldTypeError: If the type is BaseModel but not TreeNode
         """
         from pydantic import BaseModel
 
@@ -1631,12 +1695,12 @@ class RunStructure:
         # If it's a class that inherits from BaseModel
         try:
             if issubclass(type_to_check, BaseModel) and not issubclass(
-                type_to_check, PromptTreeNode
+                type_to_check, TreeNode
             ):
                 raise FieldTypeError(
                     field_tag,
                     f"uses BaseModel inheritance ({type_to_check.__name__}) which is not allowed. "
-                    f"All model classes must inherit from PromptTreeNode, not raw BaseModel.",
+                    f"All model classes must inherit from TreeNode, not raw BaseModel.",
                 )
         except TypeError:
             # issubclass can raise TypeError for some types like generics
@@ -1790,12 +1854,12 @@ class RunStructure:
             current_type = field_annotation
 
         # Now count how many iterable levels this final type has
-        # This includes both direct list nesting and PromptTreeNode field traversal
+        # This includes both direct list nesting and TreeNode field traversal
         return self._count_nested_iterations(current_type)
 
     def _count_nested_iterations(self, field_type: type) -> int:
         """
-        Count total iteration levels by examining both list nesting and PromptTreeNode hierarchies.
+        Count total iteration levels by examining both list nesting and TreeNode hierarchies.
 
         For example:
         - list[str] = 1 level
@@ -1819,7 +1883,7 @@ class RunStructure:
                 # Count this as one level, inner list will be counted recursively
                 return 1 + self._count_nested_iterations(inner_type)
 
-            # If inner type is a PromptTreeNode, count its maximum iterable depth
+            # If inner type is a TreeNode, count its maximum iterable depth
             if hasattr(inner_type, "model_fields"):
                 max_inner_depth = 0
                 for field_name, field_def in inner_type.model_fields.items():
@@ -1835,7 +1899,7 @@ class RunStructure:
                 # Inner type is not iterable (str, int, etc.)
                 return 1
         else:
-            # Not a list - check if it's a PromptTreeNode with iterable fields
+            # Not a list - check if it's a TreeNode with iterable fields
             if hasattr(field_type, "model_fields"):
                 max_depth = 0
                 for field_name, field_def in field_type.model_fields.items():
@@ -1943,7 +2007,7 @@ class RunStructure:
         """
         Validate field context scoping for @each commands.
 
-        DPCL rule: inclusion_path (tag1) must ALWAYS start with field_name - no exceptions.
+        LangTree DSL rule: inclusion_path (tag1) must ALWAYS start with field_name - no exceptions.
         This applies regardless of where the destination_path (tag2) points.
         """
         from langtree.prompt.exceptions import FieldValidationError
@@ -1964,7 +2028,7 @@ class RunStructure:
                 command_context=f"@each[{command.inclusion_path}] in docstring of {source_node_tag}",
             )
 
-        # DPCL scoping rule: inclusion_path must ALWAYS start with field_name
+        # LangTree DSL scoping rule: inclusion_path must ALWAYS start with field_name
         if not inclusion_path.startswith(field_name):
             # Build command context for error chaining
             command_context = f"@each[{command.inclusion_path}]->{command.destination_path or 'current'}@{{...}}* in field '{field_name}'"
@@ -1973,7 +2037,7 @@ class RunStructure:
                 field_path=inclusion_path,
                 container=source_node_tag,
                 message=f"inclusion_path '{inclusion_path}' must start with field '{field_name}' where command is defined. "
-                f"Commands can only reference the field they are defined in (DPCL scoping rule)",
+                f"Commands can only reference the field they are defined in (LangTree DSL scoping rule)",
                 command_context=command_context,
             )
 
@@ -2227,11 +2291,11 @@ class RunStructure:
         self, field_name: str, parent_type: type, context_tag: str
     ) -> int:
         """
-        Find the maximum iteration depth starting from a field by traversing nested PromptTreeNode types.
+        Find the maximum iteration depth starting from a field by traversing nested TreeNode types.
 
         Params:
             field_name: Name of the field to start traversal from
-            parent_type: The PromptTreeNode type containing the field
+            parent_type: The TreeNode type containing the field
             context_tag: Context tag for path resolution
 
         Returns:
@@ -2251,7 +2315,7 @@ class RunStructure:
             # This field is iterable - count 1 and recurse into its element type
             args = get_args(field_type)
             if args and hasattr(args[0], "model_fields"):
-                # Element type is a PromptTreeNode - find max depth in its fields
+                # Element type is a TreeNode - find max depth in its fields
                 element_type = args[0]
                 max_nested_depth = 0
                 for nested_field_name, _ in element_type.model_fields.items():
@@ -2261,10 +2325,10 @@ class RunStructure:
                     max_nested_depth = max(max_nested_depth, nested_depth)
                 return 1 + max_nested_depth
             else:
-                # Element type is not a PromptTreeNode - just 1 iteration level
+                # Element type is not a TreeNode - just 1 iteration level
                 return 1
         else:
-            # Field is not iterable itself - check if it's a PromptTreeNode we can recurse into
+            # Field is not iterable itself - check if it's a TreeNode we can recurse into
             if hasattr(field_type, "model_fields"):
                 max_nested_depth = 0
                 for nested_field_name, _ in field_type.model_fields.items():

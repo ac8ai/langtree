@@ -2,7 +2,7 @@
 
 ## Core Architectural Decision
 
-**Primary Goal**: Remove all runtime state management. DPCL framework assembles LangChain chains - LangChain handles execution and data flow.
+**Primary Goal**: Remove all runtime state management. LangTree DSL framework assembles LangChain chains - LangChain handles execution and data flow.
 
 ## Tag-Based Data Forwarding
 

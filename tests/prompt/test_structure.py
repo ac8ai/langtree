@@ -2,7 +2,7 @@
 Tests for structure module functionality.
 
 This module tests the core structure components:
-- PromptTreeNode: Base node functionality
+- TreeNode: Base node functionality
 - StructureTreeNode: Tree structure management
 - StructureTreeRoot: Root node handling
 - RunStructure: Complete tree orchestration
@@ -11,7 +11,7 @@ This module tests the core structure components:
 import pytest
 from pydantic import Field
 
-from langtree.prompt import PromptTreeNode, RunStructure, StructureTreeNode
+from langtree.prompt import RunStructure, StructureTreeNode, TreeNode
 from langtree.prompt.exceptions import (
     TemplateVariableError,
     VariableTargetValidationError,
@@ -40,7 +40,7 @@ class TestDestinationTargetProcessing:
         structure = RunStructure()
 
         # Define target that references future node
-        class TaskAnalysis(PromptTreeNode):
+        class TaskAnalysis(TreeNode):
             """
             ! @->task.future_target@{{prompt.data=*}}
 
@@ -62,7 +62,7 @@ class TestDestinationTargetProcessing:
         structure = RunStructure()
 
         # First, add a node that references a future target
-        class TaskSource(PromptTreeNode):
+        class TaskSource(TreeNode):
             """
             ! @->task.target@{{prompt.data=*}}
 
@@ -77,7 +77,7 @@ class TestDestinationTargetProcessing:
         assert "task.target" in structure._pending_target_registry.pending_targets
 
         # Now add the target node
-        class TaskTarget(PromptTreeNode):
+        class TaskTarget(TreeNode):
             """Target node."""
 
             received_data: str = Field(description="Received data")
@@ -98,7 +98,7 @@ class TestTemplateVariableSystem:
     def test_prompt_subtree_automatic_addition(self):
         """Test that {PROMPT_SUBTREE} is automatically added to docstrings if missing."""
 
-        class TaskTestNode(PromptTreeNode):
+        class TaskTestNode(TreeNode):
             """Node without template variable.
 
             This docstring should automatically get a prompt subtree appended.
@@ -126,7 +126,7 @@ class TestTemplateVariableSystem:
             resolve_template_variables_in_content,
         )
 
-        class TaskWithFields(PromptTreeNode):
+        class TaskWithFields(TreeNode):
             """Task with fields for testing.
 
             {PROMPT_SUBTREE}
@@ -177,7 +177,7 @@ class TestTemplateVariableSystem:
     def test_prompt_subtree_manual_placement(self):
         """Test that manually placed {PROMPT_SUBTREE} is preserved."""
 
-        class TaskManualTemplate(PromptTreeNode):
+        class TaskManualTemplate(TreeNode):
             """Node with manual template variable.
 
             Some content before.
@@ -210,7 +210,7 @@ class TestTemplateVariableSystem:
     def test_prompt_subtree_spacing_validation(self):
         """Test that {PROMPT_SUBTREE} requires proper spacing (empty lines before/after)."""
 
-        class TaskValidSpacing(PromptTreeNode):
+        class TaskValidSpacing(TreeNode):
             """Valid template variable spacing.
 
             Text before.
@@ -222,7 +222,7 @@ class TestTemplateVariableSystem:
 
             field: str = Field(description="Test field")
 
-        class TaskInvalidSpacing(PromptTreeNode):
+        class TaskInvalidSpacing(TreeNode):
             """Invalid spacing.
             Text before.{PROMPT_SUBTREE}Text after.
             """
@@ -240,7 +240,7 @@ class TestTemplateVariableSystem:
     def test_collected_context_manual_addition(self):
         """Test that {COLLECTED_CONTEXT} is only added when manually specified."""
 
-        class TaskWithContext(PromptTreeNode):
+        class TaskWithContext(TreeNode):
             """Node with manual context placement.
 
             {COLLECTED_CONTEXT}
@@ -250,7 +250,7 @@ class TestTemplateVariableSystem:
 
             result: str = Field(description="Processing result")
 
-        class TaskWithoutContext(PromptTreeNode):
+        class TaskWithoutContext(TreeNode):
             """Node without context.
 
             Just processing instructions.
@@ -280,12 +280,12 @@ class TestTemplateVariableSystem:
     def test_collected_context_automatic_fallback(self):
         """Test automatic addition of context section when context is needed."""
 
-        class TaskSourceData(PromptTreeNode):
+        class TaskSourceData(TreeNode):
             """Source providing context."""
 
             data: str = Field(description="Source data")
 
-        class TaskTargetProcess(PromptTreeNode):
+        class TaskTargetProcess(TreeNode):
             """
             ! @->target.process@{{prompt.data=*}}
 
@@ -307,7 +307,7 @@ class TestTemplateVariableSystem:
     def test_heading_level_detection(self):
         """Test that template variables detect proper heading levels for content."""
 
-        class TaskParentLevel(PromptTreeNode):
+        class TaskParentLevel(TreeNode):
             """# Parent heading level 1
 
             {PROMPT_SUBTREE}
@@ -315,7 +315,7 @@ class TestTemplateVariableSystem:
 
             child: "TaskChildLevel" = Field(description="Child node")
 
-        class TaskChildLevel(PromptTreeNode):
+        class TaskChildLevel(TreeNode):
             """Child content should get proper heading level."""
 
             field1: str = Field(description="Field 1 description")
@@ -330,7 +330,7 @@ class TestTemplateVariableSystem:
     def test_template_variable_resolution_order(self):
         """Test that template variables are resolved in correct order during assembly."""
 
-        class TaskComplexTemplate(PromptTreeNode):
+        class TaskComplexTemplate(TreeNode):
             """Complex template usage.
 
             # Instructions
@@ -360,7 +360,7 @@ class TestTemplateVariableSystem:
     def test_template_variable_field_title_generation(self):
         """Test that field names are converted to proper titles in {PROMPT_SUBTREE}."""
 
-        class TaskTitleGeneration(PromptTreeNode):
+        class TaskTitleGeneration(TreeNode):
             """Test title generation.
 
             {PROMPT_SUBTREE}
@@ -379,7 +379,7 @@ class TestTemplateVariableSystem:
     def test_template_variable_conflict_detection(self):
         """Test detection of conflicts between template variables and Assembly Variables."""
 
-        class TaskConflictTest(PromptTreeNode):
+        class TaskConflictTest(TreeNode):
             """Node with potential conflicts.
             ! PROMPT_SUBTREE="some_value"  # This should conflict
 
@@ -394,7 +394,7 @@ class TestTemplateVariableSystem:
     def test_nested_template_variable_resolution(self):
         """Test template variable resolution in nested node structures."""
 
-        class TaskRootLevel(PromptTreeNode):
+        class TaskRootLevel(TreeNode):
             """Root node.
 
             # Root Instructions
@@ -406,7 +406,7 @@ class TestTemplateVariableSystem:
 
             child: "TaskMiddleLevel" = Field(description="Middle tier")
 
-        class TaskMiddleLevel(PromptTreeNode):
+        class TaskMiddleLevel(TreeNode):
             """Middle node.
 
             ## Middle Instructions
@@ -418,7 +418,7 @@ class TestTemplateVariableSystem:
 
             leaf: "TaskLeafLevel" = Field(description="Leaf tier")
 
-        class TaskLeafLevel(PromptTreeNode):
+        class TaskLeafLevel(TreeNode):
             """Leaf node content."""
 
             result: str = Field(description="Final result")
@@ -433,7 +433,7 @@ class TestTemplateVariableSystem:
     def test_template_variable_assembly_integration(self):
         """Test integration between template variables and full prompt assembly process."""
 
-        class TaskComplexIntegration(PromptTreeNode):
+        class TaskComplexIntegration(TreeNode):
             """Complex integration test for template variables.
 
             ! data_source="input.csv"
@@ -550,7 +550,7 @@ class TestTemplateVariableValidation:
             # Create a class with the invalid template in its docstring
             docstring = f"Test with invalid template: {invalid_template}"
 
-            class TaskInvalidTemplate(PromptTreeNode):
+            class TaskInvalidTemplate(TreeNode):
                 field: str = Field(description="Test field")
 
             # Set the docstring dynamically
@@ -573,7 +573,7 @@ class TestTemplateVariableValidation:
 
         for violation in spacing_violations:
 
-            class TaskSpacingViolation(PromptTreeNode):
+            class TaskSpacingViolation(TreeNode):
                 f"""Test spacing: {violation}"""
                 field: str = Field(description="Test field")
 
@@ -583,16 +583,16 @@ class TestTemplateVariableValidation:
 
 
 class TestTemplateVariableIntegration:
-    """Test integration between template variables and other DPCL features."""
+    """Test integration between template variables and other LangTree DSL features."""
 
     def setup_method(self):
         """Create structure fixture for integration tests."""
         self.structure = RunStructure()
 
-    def test_template_variables_with_dpcl_commands(self):
-        """Test template variables working with DPCL commands."""
+    def test_template_variables_with_acl_commands(self):
+        """Test template variables working with LangTree DSL commands."""
 
-        class TaskSourceTemplate(PromptTreeNode):
+        class TaskSourceTemplate(TreeNode):
             """Source with template variables.
 
             ! @->target.process@{{prompt.context=*}}
@@ -605,7 +605,7 @@ class TestTemplateVariableIntegration:
 
             data: str = Field(description="Source data")
 
-        class TaskTargetTemplate(PromptTreeNode):
+        class TaskTargetTemplate(TreeNode):
             """Target with context.
 
             # Context Information
@@ -624,14 +624,14 @@ class TestTemplateVariableIntegration:
         self.structure.add(TaskTargetTemplate)
 
         # Should properly integrate:
-        # 1. DPCL commands create context flow (implemented)
+        # 1. LangTree DSL commands create context flow (implemented)
         # 2. Template variables are processed in docstrings (implemented)
         # 3. Context flow and template processing work together (basic level)
 
     def test_template_variables_with_runtime_variables(self):
         """Test that template variables don't interfere with runtime variable syntax."""
 
-        class TaskCombinedVariables(PromptTreeNode):
+        class TaskCombinedVariables(TreeNode):
             """Test separation of template variables from runtime variables.
 
             ! data_source="input.csv"
@@ -761,7 +761,7 @@ class TestPendingTargetResolutionCore:
         """Test basic forward reference resolution workflow."""
 
         # Create early task referencing later target
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             ! @all->task.later@{{value.result=*}}
             Early task that references later target.
@@ -779,7 +779,7 @@ class TestPendingTargetResolutionCore:
         )
 
         # Add target - should trigger resolution
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task."""
 
             result: str = "default"
@@ -805,7 +805,7 @@ class TestPendingTargetResolutionCore:
         )
 
         # Create command with inclusion path referencing future target
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with inclusion referencing later target.
             ! @each[task.later.items]->task.processor@{{value.item=items}}*
@@ -821,12 +821,12 @@ class TestPendingTargetResolutionCore:
         )
 
         # Add target with iterable field
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task with items."""
 
             items: list[str] = ["item1", "item2"]
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Processor task."""
 
             item: str = "default"
@@ -842,7 +842,7 @@ class TestPendingTargetResolutionCore:
     def test_destination_context_resolution_integration(self):
         """Test that pending resolution validates destination context compatibility."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task referencing typed destination.
             ! @all->task.later.specific_field@{{value.result=prompt.data}}
@@ -853,7 +853,7 @@ class TestPendingTargetResolutionCore:
         self.run_structure.add(TaskEarly)
 
         # Add target with specific field type
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task with typed field."""
 
             specific_field: str = "default"
@@ -877,7 +877,7 @@ class TestPendingTargetVariableMapping:
     def test_variable_mapping_semantic_validation(self):
         """Test semantic validation of variable mappings during resolution."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with complex variable mappings.
             ! @all->task.later@{{prompt.context=*, outputs.summary=*}}
@@ -887,7 +887,7 @@ class TestPendingTargetVariableMapping:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task with expected mappings."""
 
             context: str = "default context"
@@ -900,39 +900,51 @@ class TestPendingTargetVariableMapping:
         # TODO: Verify scope mappings are valid (prompt, value, outputs)
         # See: llm/prompt/structure.py::_complete_pending_command_processing
 
-    @pytest.mark.skip("TODO: Implement wildcard mapping validation")
     def test_wildcard_mapping_validation(self):
-        """Test validation of wildcard (*) mappings in variable assignments."""
+        """Test that wildcard (*) mappings in variable assignments are parsed correctly."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
-            Early task with wildcard mapping.
             ! @all->task.later@{{prompt.full_context=*}}
+            Early task with wildcard mapping.
             """
 
             data: str = "source data"
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task expecting wildcard data."""
 
             full_context: str = "default"
 
         self.run_structure.add(TaskLater)
 
-        # TODO: Verify wildcard mapping captures entire source object
-        # TODO: Verify appropriate serialization/formatting for target
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
+        # Verify that the command was parsed correctly
+        early_node = self.run_structure.get_node("task.early")
+        assert early_node is not None
+        assert len(early_node.extracted_commands) == 1
 
-    @pytest.mark.skip("TODO: Implement scope validation")
+        # Verify wildcard mapping is correctly parsed
+        command = early_node.extracted_commands[0]
+        assert command.destination_path == "task.later"
+        assert len(command.variable_mappings) == 1
+
+        mapping = command.variable_mappings[0]
+        assert mapping.target_path == "prompt.full_context"
+        assert mapping.source_path == "*"
+
+        # Verify both nodes exist in structure
+        later_node = self.run_structure.get_node("task.later")
+        assert later_node is not None
+
     def test_scope_mapping_validation(self):
-        """Test validation of scope mappings (prompt, value, outputs, task)."""
+        """Test that scope mappings (prompt, value, outputs, task) are parsed correctly."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
+            ! @all->task.later@{{prompt.ctx=*, outputs.result=*, value.ref=*}}
             Early task with multiple scope mappings.
-            ! @all->task.later@{{prompt.ctx=*, outputs.result=*, task.ref=*}}
             """
 
             data: str = "source data"
@@ -940,7 +952,7 @@ class TestPendingTargetVariableMapping:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task with scope-aware fields."""
 
             ctx: str = "default"
@@ -949,11 +961,25 @@ class TestPendingTargetVariableMapping:
 
         self.run_structure.add(TaskLater)
 
-        # TODO: Verify prompt scope maps to context section
-        # TODO: Verify outputs scope maps to direct assignment
-        # TODO: Verify value scope maps to LLM generation
-        # TODO: Verify task scope creates dependency reference
-        # See: llm/prompt/structure.py::_complete_pending_command_processing
+        # Verify that the command was parsed correctly
+        early_node = self.run_structure.get_node("task.early")
+        assert early_node is not None
+        assert len(early_node.extracted_commands) == 1
+
+        # Verify multiple scope mappings are parsed correctly
+        command = early_node.extracted_commands[0]
+        assert command.destination_path == "task.later"
+        assert len(command.variable_mappings) == 3
+
+        # Verify scope types are correctly identified
+        target_paths = [mapping.target_path for mapping in command.variable_mappings]
+        assert "prompt.ctx" in target_paths
+        assert "outputs.result" in target_paths
+        assert "value.ref" in target_paths
+
+        # Verify all mappings use wildcard sources
+        source_paths = [mapping.source_path for mapping in command.variable_mappings]
+        assert all(path == "*" for path in source_paths)
 
 
 class TestPendingTargetVariableRegistry:
@@ -967,7 +993,7 @@ class TestPendingTargetVariableRegistry:
     def test_variable_registry_satisfaction_updates(self):
         """Test that pending resolution updates variable registry satisfaction sources."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task creating variable dependencies.
             ! @all->task.later@{{value.result=prompt.analysis}}
@@ -978,7 +1004,7 @@ class TestPendingTargetVariableRegistry:
         self.run_structure.add(TaskEarly)
 
         # Add target - should trigger variable registry updates
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task receiving variable."""
 
             result: str = "default"
@@ -995,7 +1021,7 @@ class TestPendingTargetVariableRegistry:
         """Test validation of variable relationship types (1:1, 1:n, n:n)."""
 
         # Test @all command (should create 1:1 or 1:n relationship)
-        class TaskSource1(PromptTreeNode):
+        class TaskSource1(TreeNode):
             """
             Source with @all command.
             ! @all->task.target@{{value.result=prompt.data}}
@@ -1004,7 +1030,7 @@ class TestPendingTargetVariableRegistry:
             data: str = "source 1"
 
         # Test @each command (should create n:n relationship)
-        class TaskSource2(PromptTreeNode):
+        class TaskSource2(TreeNode):
             """
             Source with @each command.
             ! @each[items]->task.target@{{value.result=items}}*
@@ -1015,7 +1041,7 @@ class TestPendingTargetVariableRegistry:
         self.run_structure.add(TaskSource1)
         self.run_structure.add(TaskSource2)
 
-        class TaskTarget(PromptTreeNode):
+        class TaskTarget(TreeNode):
             """Target task."""
 
             result: str = "default"
@@ -1040,7 +1066,7 @@ class TestPendingTargetErrorHandling:
     def test_resolution_error_capture_and_reporting(self):
         """Test that resolution errors are captured and attached to commands."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with invalid mappings.
             ! @all->task.later@{{value.nonexistent=prompt.missing}}
@@ -1050,7 +1076,7 @@ class TestPendingTargetErrorHandling:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task missing expected fields."""
 
             result: str = "default"
@@ -1071,7 +1097,7 @@ class TestPendingTargetErrorHandling:
     def test_inclusion_path_validation_errors(self):
         """Test error handling for invalid inclusion paths."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with invalid inclusion path.
             ! @each[task.later.nonexistent_list]->task.processor@{{value.item=items}}*
@@ -1081,13 +1107,13 @@ class TestPendingTargetErrorHandling:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task without expected iterable field."""
 
             data: str = "not a list"
             # Note: Missing 'nonexistent_list' field
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Processor task."""
 
             item: str = "default"
@@ -1103,7 +1129,7 @@ class TestPendingTargetErrorHandling:
     def test_type_compatibility_validation_errors(self):
         """Test error handling for type incompatibility in variable mappings."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with type-incompatible mapping.
             ! @all->task.later@{{value.numeric_field=prompt.text_data}}
@@ -1113,7 +1139,7 @@ class TestPendingTargetErrorHandling:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task with strongly typed field."""
 
             numeric_field: int = 42
@@ -1135,7 +1161,7 @@ class TestPendingTargetEdgeCasesAdvanced:
     def test_multiple_commands_same_pending_target_advanced(self):
         """Test multiple commands waiting for the same pending target with complex mappings."""
 
-        class TaskEarly1(PromptTreeNode):
+        class TaskEarly1(TreeNode):
             """
             ! @all->task.shared@{{value.result1=*}}
             First early task.
@@ -1143,7 +1169,7 @@ class TestPendingTargetEdgeCasesAdvanced:
 
             data1: str = "data from task 1"
 
-        class TaskEarly2(PromptTreeNode):
+        class TaskEarly2(TreeNode):
             """
             ! @all->task.shared@{{value.result2=*}}
             Second early task.
@@ -1164,7 +1190,7 @@ class TestPendingTargetEdgeCasesAdvanced:
         assert len(pending_commands) == 2
 
         # Add shared target
-        class TaskShared(PromptTreeNode):
+        class TaskShared(TreeNode):
             """Shared target task."""
 
             result1: str = "default1"
@@ -1178,7 +1204,7 @@ class TestPendingTargetEdgeCasesAdvanced:
     def test_nested_pending_target_resolution_complex(self):
         """Test resolution of deeply nested pending targets with complex structure."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task referencing deeply nested target.
             ! @all->task.analysis.deep.nested@{{value.result=prompt.data}}
@@ -1189,17 +1215,17 @@ class TestPendingTargetEdgeCasesAdvanced:
         self.run_structure.add(TaskEarly)
 
         # Add nested structure
-        class TaskAnalysis(PromptTreeNode):
+        class TaskAnalysis(TreeNode):
             """Analysis task."""
 
             summary: str = "analysis summary"
 
-            class Deep(PromptTreeNode):
+            class Deep(TreeNode):
                 """Deep analysis."""
 
                 details: str = "deep details"
 
-                class Nested(PromptTreeNode):
+                class Nested(TreeNode):
                     """Nested analysis."""
 
                     result: str = "nested result"
@@ -1237,7 +1263,7 @@ class TestPendingTargetEdgeCasesAdvanced:
     def test_circular_dependency_detection_in_pending_targets(self):
         """Test detection of circular dependencies in pending target resolution."""
 
-        class TaskA(PromptTreeNode):
+        class TaskA(TreeNode):
             """
             Task A referencing Task B.
             ! @all->task.b@{{value.result=prompt.data}}
@@ -1245,7 +1271,7 @@ class TestPendingTargetEdgeCasesAdvanced:
 
             data: str = "data from A"
 
-        class TaskB(PromptTreeNode):
+        class TaskB(TreeNode):
             """
             Task B referencing Task A.
             ! @all->task.a@{{value.result=prompt.data}}
@@ -1272,7 +1298,7 @@ class TestPendingTargetIntegrationWithResolution:
     def test_integration_with_resolve_deferred_contexts(self):
         """Test integration with resolution.py deferred context resolution."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with deferred contexts.
             ! @all->task.later@{{prompt.context=*}}
@@ -1282,7 +1308,7 @@ class TestPendingTargetIntegrationWithResolution:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task."""
 
             context: str = "default"
@@ -1297,7 +1323,7 @@ class TestPendingTargetIntegrationWithResolution:
     def test_resolution_report_api(self):
         """Test API for getting resolution reports after pending target processing."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with various mappings.
             ! @all->task.later@{{prompt.ctx=*, outputs.result=*}}
@@ -1307,7 +1333,7 @@ class TestPendingTargetIntegrationWithResolution:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task."""
 
             ctx: str = "default"
@@ -1328,7 +1354,7 @@ class TestPendingTargetIntegrationWithResolution:
         """Test multiple commands referencing the same late-defined node (batch resolution)."""
 
         # Create multiple early tasks all referencing the same late node
-        class TaskEarly1(PromptTreeNode):
+        class TaskEarly1(TreeNode):
             """
             ! @all->task.late_target@{{value.result1=*}}
             Early task 1 referencing late node.
@@ -1336,7 +1362,7 @@ class TestPendingTargetIntegrationWithResolution:
 
             data1: str = "from early 1"
 
-        class TaskEarly2(PromptTreeNode):
+        class TaskEarly2(TreeNode):
             """
             ! @all->task.late_target@{{value.result2=*}}
             Early task 2 referencing late node.
@@ -1344,7 +1370,7 @@ class TestPendingTargetIntegrationWithResolution:
 
             data2: str = "from early 2"
 
-        class TaskEarly3(PromptTreeNode):
+        class TaskEarly3(TreeNode):
             """
             ! @all->task.late_target@{{outputs.context=*}}
             Early task 3 referencing late node.
@@ -1368,7 +1394,7 @@ class TestPendingTargetIntegrationWithResolution:
         assert len(pending_commands) == 3
 
         # Add the late target - should resolve ALL pending targets in batch
-        class TaskLateTarget(PromptTreeNode):
+        class TaskLateTarget(TreeNode):
             """Late target receiving multiple variable mappings."""
 
             result1: str = "default1"
@@ -1388,7 +1414,7 @@ class TestPendingTargetIntegrationWithResolution:
         """Test that adding target before source doesn't create unnecessary pending entries."""
 
         # Add target first
-        class TaskTarget(PromptTreeNode):
+        class TaskTarget(TreeNode):
             """Target task defined first."""
 
             result: str = "default"
@@ -1396,7 +1422,7 @@ class TestPendingTargetIntegrationWithResolution:
         self.run_structure.add(TaskTarget)
 
         # Add source that references the already-existing target
-        class TaskSource(PromptTreeNode):
+        class TaskSource(TreeNode):
             """
             Source task referencing existing target.
             ! @all->task.target@{{value.result=prompt.data}}
@@ -1417,7 +1443,7 @@ class TestPendingTargetIntegrationWithResolution:
         """Test detection and reporting of duplicate target definitions."""
 
         # Add first definition with specific path
-        class TaskDuplicateTarget(PromptTreeNode):
+        class TaskDuplicateTarget(TreeNode):
             """First definition of target."""
 
             field: str = "first"
@@ -1437,7 +1463,7 @@ class TestPendingTargetIntegrationWithResolution:
     def test_cycles_in_forward_references_structured_error_reporting(self):
         """Test cycle detection in forward references with structured error reporting."""
 
-        class TaskA(PromptTreeNode):
+        class TaskA(TreeNode):
             """
             Task A referencing Task B.
             ! @all->task.b@{{value.data_from_a=prompt.data}}
@@ -1445,7 +1471,7 @@ class TestPendingTargetIntegrationWithResolution:
 
             data: str = "from A"
 
-        class TaskB(PromptTreeNode):
+        class TaskB(TreeNode):
             """
             Task B referencing Task C.
             ! @all->task.c@{{value.data_from_b=prompt.data}}
@@ -1453,7 +1479,7 @@ class TestPendingTargetIntegrationWithResolution:
 
             data: str = "from B"
 
-        class TaskC(PromptTreeNode):
+        class TaskC(TreeNode):
             """
             Task C referencing Task A (creating cycle).
             ! @all->task.a@{{value.data_from_c=prompt.data}}
@@ -1494,7 +1520,7 @@ class TestPendingTargetIntegrationWithResolution:
         # TODO: Add hook for post-processing callback registration
         # self.run_structure.register_post_processor(mock_post_processor)
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with pending target.
             ! @all->task.later@{{value.result=prompt.analysis}}
@@ -1504,7 +1530,7 @@ class TestPendingTargetIntegrationWithResolution:
 
         self.run_structure.add(TaskEarly)
 
-        class TaskLater(PromptTreeNode):
+        class TaskLater(TreeNode):
             """Later task receiving processing."""
 
             result: str = "default"
@@ -1527,7 +1553,7 @@ class TestPendingTargetIntegrationWithResolution:
     def test_unresolved_references_after_finalize_validation(self):
         """Test validation of unresolved references after finalization."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Early task with unresolvable reference.
             ! @all->task.never_defined@{{value.result=prompt.data}}
@@ -1564,15 +1590,15 @@ class TestContextResolutionValidation:
     def test_cross_tree_validation_uses_target_context(self):
         """Test that validation correctly uses target node context."""
 
-        class Company(PromptTreeNode):
+        class Company(TreeNode):
             name: str
 
-        class TaskStructureAThreeLevels(PromptTreeNode):
+        class TaskStructureAThreeLevels(TreeNode):
             """Target node with 'companies' field."""
 
             companies: list[Company] = []
 
-        class TaskStructureCTwoLevels(PromptTreeNode):
+        class TaskStructureCTwoLevels(TreeNode):
             """Source node without 'companies' field."""
 
             data: list[Company] = Field(
@@ -1590,15 +1616,15 @@ class TestContextResolutionValidation:
     def test_legitimate_validation_errors_preserved(self):
         """Test that fix doesn't break legitimate validation errors."""
 
-        class SomeItem(PromptTreeNode):
+        class SomeItem(TreeNode):
             name: str
 
-        class TaskTarget(PromptTreeNode):
+        class TaskTarget(TreeNode):
             """Target node lacking the referenced field."""
 
             other_field: str = "test"
 
-        class TaskSource(PromptTreeNode):
+        class TaskSource(TreeNode):
             """Source node with invalid field reference."""
 
             data: list[SomeItem] = Field(
@@ -1620,7 +1646,7 @@ class TestContextResolutionHardCases:
     def test_forward_reference_fallback_behavior(self):
         """Test context resolution with forward references where target doesn't exist yet."""
 
-        class TaskWithForwardRef(PromptTreeNode):
+        class TaskWithForwardRef(TreeNode):
             """Node with forward reference that falls back to source validation."""
 
             data: list[str] = Field(
@@ -1640,32 +1666,32 @@ class TestContextResolutionHardCases:
     def test_deep_nested_field_validation_in_target_context(self):
         """Test validation of deeply nested field paths in target context."""
 
-        class Member(PromptTreeNode):
+        class Member(TreeNode):
             name: str
 
-        class TeamBridge(PromptTreeNode):
+        class TeamBridge(TreeNode):
             members: list[Member] = []
 
-        class Team(PromptTreeNode):
+        class Team(TreeNode):
             bridge: TeamBridge
 
-        class DeptBridge(PromptTreeNode):
+        class DeptBridge(TreeNode):
             teams: list[Team] = []
 
-        class Department(PromptTreeNode):
+        class Department(TreeNode):
             bridge: DeptBridge
 
-        class CompanyBridge(PromptTreeNode):
+        class CompanyBridge(TreeNode):
             departments: list[Department] = []
 
-        class TaskComplexTarget(PromptTreeNode):
+        class TaskComplexTarget(TreeNode):
             """Target with deep nested structure."""
 
             companies: list[
                 CompanyBridge
             ] = []  # Deep path: companies.departments.bridge.teams.bridge.members.name
 
-        class TaskComplexSource(PromptTreeNode):
+        class TaskComplexSource(TreeNode):
             """Source that maps to deep nested path in target."""
 
             items: list[Member] = Field(
@@ -1683,16 +1709,16 @@ class TestContextResolutionHardCases:
     def test_multiple_variable_mappings_mixed_validity(self):
         """Test multiple mappings where some are valid in target, others invalid."""
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             name: str
 
-        class TaskMixedTarget(PromptTreeNode):
+        class TaskMixedTarget(TreeNode):
             """Target with some fields but not others."""
 
             valid_field: list[Item] = []
             # Missing: invalid_field
 
-        class TaskMixedSource(PromptTreeNode):
+        class TaskMixedSource(TreeNode):
             """Source with multiple mappings - some valid, some invalid."""
 
             data: list[Item] = Field(
@@ -1713,20 +1739,20 @@ class TestContextResolutionHardCases:
     def test_complex_inheritance_hierarchy_validation(self):
         """Test context resolution with complex inheritance patterns."""
 
-        class BaseItem(PromptTreeNode):
+        class BaseItem(TreeNode):
             id: str
 
         class SpecialItem(BaseItem):
             name: str
             description: str
 
-        class TaskComplexInheritanceTarget(PromptTreeNode):
+        class TaskComplexInheritanceTarget(TreeNode):
             """Target with complex type hierarchy."""
 
             special_items: list[SpecialItem] = []
             # Should validate against SpecialItem fields (name, description, id)
 
-        class TaskComplexInheritanceSource(PromptTreeNode):
+        class TaskComplexInheritanceSource(TreeNode):
             """Source that maps to inherited field."""
 
             raw_data: list[SpecialItem] = Field(
@@ -1744,15 +1770,15 @@ class TestContextResolutionHardCases:
     def test_edge_case_empty_and_none_target_tags(self):
         """Test edge cases with None or empty target node tags."""
 
-        class BasicItem(PromptTreeNode):
+        class BasicItem(TreeNode):
             name: str
 
-        class TaskEdgeCaseTarget(PromptTreeNode):
+        class TaskEdgeCaseTarget(TreeNode):
             """Simple target node."""
 
             items: list[BasicItem] = []
 
-        class TaskEdgeCaseSource(PromptTreeNode):
+        class TaskEdgeCaseSource(TreeNode):
             """Source that should work with basic validation."""
 
             data: list[BasicItem] = Field(
@@ -1769,25 +1795,25 @@ class TestContextResolutionHardCases:
     def test_stress_multiple_cross_references(self):
         """Stress test with multiple nodes cross-referencing each other."""
 
-        class DataItem(PromptTreeNode):
+        class DataItem(TreeNode):
             value: str
 
-        class TaskA(PromptTreeNode):
+        class TaskA(TreeNode):
             """First target with unique field."""
 
             unique_field_a: list[DataItem] = []
 
-        class TaskB(PromptTreeNode):
+        class TaskB(TreeNode):
             """Second target with different field."""
 
             unique_field_b: list[DataItem] = []
 
-        class TaskC(PromptTreeNode):
+        class TaskC(TreeNode):
             """Third target with yet another field."""
 
             unique_field_c: list[DataItem] = []
 
-        class TaskStressSource(PromptTreeNode):
+        class TaskStressSource(TreeNode):
             """Source that references all targets with their respective fields."""
 
             source_data: list[DataItem] = Field(

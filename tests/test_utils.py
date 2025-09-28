@@ -1,25 +1,25 @@
 """
-Tests for DPCL prompt utility functions.
+Tests for LangTree DSL prompt utility functions.
 
 Focus Areas:
-1. Naming convention validation for PromptTreeNode classes
+1. Naming convention validation for TreeNode classes
 2. Command extraction and text processing
 """
 
 import pytest
 
-from langtree.prompt import PromptTreeNode
+from langtree.prompt import TreeNode
 from langtree.prompt.utils import extract_commands, get_root_tag
 
 
 class TestNamingConventionValidation:
-    """Test that PromptTreeNode classes follow strict CamelCase and Task prefix naming conventions."""
+    """Test that TreeNode classes follow strict CamelCase and Task prefix naming conventions."""
 
     def test_non_camelcase_nodes_should_fail(self):
         """Non-CamelCase class names should be rejected."""
 
         # Snake case should fail
-        class task_early(PromptTreeNode):  # noqa: N801
+        class task_early(TreeNode):  # noqa: N801
             """Task with snake_case name - should be rejected."""
 
             pass
@@ -37,7 +37,7 @@ class TestNamingConventionValidation:
     def test_camelcase_without_capital_first_letter_should_fail(self):
         """camelCase (lowercase first letter) should be rejected."""
 
-        class taskEarly(PromptTreeNode):  # noqa: N801
+        class taskEarly(TreeNode):  # noqa: N801
             """Task with camelCase name - should be rejected."""
 
             pass
@@ -55,7 +55,7 @@ class TestNamingConventionValidation:
     def test_mixed_case_with_underscores_should_fail(self):
         """Mixed case with underscores should be rejected."""
 
-        class Task_early(PromptTreeNode):  # noqa: N801
+        class Task_early(TreeNode):  # noqa: N801
             """Task with mixed case - should be rejected."""
 
             pass
@@ -73,7 +73,7 @@ class TestNamingConventionValidation:
     def test_invalid_task_prefix_tasks_should_fail(self):
         """Task prefix ending with 's' should be rejected."""
 
-        class Tasks(PromptTreeNode):
+        class Tasks(TreeNode):
             """Task class with invalid 'Tasks' prefix - should be rejected."""
 
             pass
@@ -87,7 +87,7 @@ class TestNamingConventionValidation:
     def test_invalid_task_prefix_lowercase_after_task_should_fail(self):
         """Task prefix with lowercase letter after 'Task' should be rejected."""
 
-        class Taskx(PromptTreeNode):
+        class Taskx(TreeNode):
             """Task class with lowercase 'x' after Task - should be rejected."""
 
             pass
@@ -103,7 +103,7 @@ class TestNamingConventionValidation:
     def test_lowercase_task_should_fail(self):
         """All lowercase 'task' should be rejected."""
 
-        class task(PromptTreeNode):  # noqa: N801
+        class task(TreeNode):  # noqa: N801
             """All lowercase task - should be rejected."""
 
             pass
@@ -121,17 +121,17 @@ class TestNamingConventionValidation:
     def test_valid_task_classes_should_pass(self):
         """Properly formatted Task classes should be accepted."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """Properly named Task class."""
 
             pass
 
-        class TaskDocumentProcessor(PromptTreeNode):
+        class TaskDocumentProcessor(TreeNode):
             """Another properly named Task class."""
 
             pass
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Third properly named Task class."""
 
             pass
@@ -149,7 +149,7 @@ class TestNamingConventionValidation:
     def test_edge_case_task_with_single_letter_should_pass(self):
         """Task with single capital letter after 'Task' should be accepted."""
 
-        class TaskA(PromptTreeNode):
+        class TaskA(TreeNode):
             """Task with single capital letter."""
 
             pass
@@ -160,7 +160,7 @@ class TestNamingConventionValidation:
     def test_edge_case_task_with_numbers_should_pass(self):
         """Task with numbers in CamelCase should be accepted."""
 
-        class Task2Analysis(PromptTreeNode):
+        class Task2Analysis(TreeNode):
             """Task with numbers in name."""
 
             pass

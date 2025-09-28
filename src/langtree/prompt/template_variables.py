@@ -1,8 +1,8 @@
 """
-Template variable processing for DPCL framework.
+Template variable processing for LangTree DSL framework.
 
 This module handles the detection, validation, and processing of template variables
-({PROMPT_SUBTREE} and {COLLECTED_CONTEXT}) in DPCL docstrings and field descriptions.
+({PROMPT_SUBTREE} and {COLLECTED_CONTEXT}) in LangTree DSL docstrings and field descriptions.
 """
 
 # Group 1: External direct imports (alphabetical)
@@ -156,7 +156,7 @@ def validate_template_variable_spacing(content: str) -> list[str]:
     Validate that template variables have proper spacing requirements.
 
     Ensures template variables are surrounded by empty lines according to
-    DPCL spacing rules. This maintains consistent formatting and readability
+    LangTree DSL spacing rules. This maintains consistent formatting and readability
     in prompt templates.
 
     Params:
@@ -437,11 +437,11 @@ def detect_heading_level(content: str, template_var_position: int) -> int:
     return min(6, last_level + 1)
 
 
-def strip_dpcl_commands(content: str) -> str:
+def strip_acl_commands(content: str) -> str:
     """
-    Strip DPCL command lines from content to avoid conflicts with template variable processing.
+    Strip LangTree DSL command lines from content to avoid conflicts with template variable processing.
 
-    DPCL commands are lines starting with '!' and should be processed separately from
+    LangTree DSL commands are lines starting with '!' and should be processed separately from
     template variables. This function removes them to create a clean prompt for
     template variable processing.
 
@@ -449,7 +449,7 @@ def strip_dpcl_commands(content: str) -> str:
         content: Raw docstring or field description content
 
     Returns:
-        Clean content with DPCL command lines removed
+        Clean content with LangTree DSL command lines removed
     """
     if not content:
         return content
@@ -459,7 +459,7 @@ def strip_dpcl_commands(content: str) -> str:
 
     for line in lines:
         stripped_line = line.lstrip()
-        # Skip lines that start with DPCL command prefix '!'
+        # Skip lines that start with LangTree DSL command prefix '!'
         if not stripped_line.startswith("!"):
             clean_lines.append(line)
 
@@ -472,7 +472,7 @@ def process_template_variables(
     """
     Process template variables in content, applying automatic addition and validation.
 
-    Strips DPCL commands first to avoid conflicts with template variable processing,
+    Strips LangTree DSL commands first to avoid conflicts with template variable processing,
     then processes template variables on the clean content.
 
     Args:
@@ -490,8 +490,8 @@ def process_template_variables(
     if not content:
         content = ""
 
-    # Strip DPCL commands first to avoid conflicts with template variable processing
-    clean_content = strip_dpcl_commands(content)
+    # Strip LangTree DSL commands first to avoid conflicts with template variable processing
+    clean_content = strip_acl_commands(content)
 
     # Add automatic PROMPT_SUBTREE if not present
     clean_content = add_automatic_prompt_subtree(clean_content)
@@ -521,7 +521,7 @@ def process_template_variables(
                 f"Template variable conflicts: {'; '.join(conflict_errors)}"
             )
 
-    # Return original content with PROMPT_SUBTREE added - DPCL commands preserved for later parsing
+    # Return original content with PROMPT_SUBTREE added - LangTree DSL commands preserved for later parsing
     return add_automatic_prompt_subtree(content)
 
 

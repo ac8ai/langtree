@@ -1,8 +1,8 @@
 """
-Field type validation for DPCL command parsing.
+Field type validation for LangTree DSL command parsing.
 
 This module contains validation functions for field types, ensuring proper type
-specifications and compliance with DPCL framework requirements.
+specifications and compliance with LangTree DSL framework requirements.
 """
 
 # Group 4: Internal from imports (alphabetical by source module)
@@ -11,9 +11,9 @@ from langtree.commands.parser import CommandParseError
 
 def validate_field_types(component: str, field_type) -> None:
     """
-    Validate field type specifications for DPCL compatibility.
+    Validate field type specifications for LangTree DSL compatibility.
 
-    Ensures that field types meet DPCL framework requirements including
+    Ensures that field types meet LangTree DSL framework requirements including
     proper collection type specifications. Bare collection types (list, dict,
     set, tuple) are rejected as underspecified.
 

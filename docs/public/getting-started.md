@@ -1,7 +1,7 @@
 # Getting Started
 
 !!! warning "Pre-Alpha Status"
-    LangTree is in pre-alpha development. The DPCL parser and validation work, but LangChain execution is not yet implemented. This guide shows the intended API once execution is functional.
+    LangTree is in pre-alpha development. The LangTree DSL parser and validation work, but LangChain execution is not yet implemented. This guide shows the intended API once execution is functional.
 
 ## Installation
 
@@ -26,24 +26,24 @@ uv run pytest  # Run test suite
 
 LangTree organizes prompts as **trees of data** they describe how to generate. Key concepts:
 
-- **PromptTreeNode**: Base class for all tree structures
-- **DPCL Commands**: Control data flow between trees (@each, @all, !llm, !repeat)
+- **TreeNode**: Base class for all tree structures
+- **LangTree DSL Commands**: Control data flow between trees (@each, @all, !llm, !repeat)
 - **Template Variables**: Assembly-time resolution ({PROMPT_SUBTREE}, {COLLECTED_CONTEXT})
 - **Field Context**: Commands execute within specific field scopes
 
 ## Your First Tree
 
 ```python
-from langtree.prompt import PromptTreeNode
+from langtree.prompt import TreeNode
 from pydantic import Field
 
-class TaskDocumentAnalyzer(PromptTreeNode):
+class TaskDocumentAnalyzer(TreeNode):
     """
     Analyze documents to extract key insights and summaries.
     Focus on identifying main themes and actionable information.
     """
 
-    class Document(PromptTreeNode):
+    class Document(TreeNode):
         """
         Process a single document thoroughly.
         Extract key points, themes, and relevant details.
@@ -54,12 +54,12 @@ class TaskDocumentAnalyzer(PromptTreeNode):
     summary: str = Field(description="Overall analysis summary")
 ```
 
-## Adding DPCL Commands
+## Adding LangTree DSL Commands
 
 Commands control execution flow and data forwarding:
 
 ```python
-class TaskAdvancedAnalyzer(PromptTreeNode):
+class TaskAdvancedAnalyzer(TreeNode):
     """
     ! llm("gpt-4")
     ! repeat(2)
@@ -92,7 +92,7 @@ Template variables resolve at assembly time:
 - `{COLLECTED_CONTEXT}`: Aggregated context from previous processing
 
 ```python
-class TaskWithTemplates(PromptTreeNode):
+class TaskWithTemplates(TreeNode):
     """
     Process data with context from previous stages.
 
@@ -109,11 +109,11 @@ class TaskWithTemplates(PromptTreeNode):
 Reference data between different tree structures:
 
 ```python
-class TaskDataProcessor(PromptTreeNode):
+class TaskDataProcessor(TreeNode):
     """Process raw data into structured format."""
     raw_data: list[str] = Field(description="Raw input data")
 
-class TaskInsightGenerator(PromptTreeNode):
+class TaskInsightGenerator(TreeNode):
     """Generate insights from processed data."""
 
     insights: list[str] = Field(description="""
@@ -160,14 +160,14 @@ except ValidationError as e:
 
 ## Next Steps
 
-- [DPCL Reference](dpcl-reference.md) - Complete command syntax
+- [LangTree DSL Reference](LangTree DSL-reference.md) - Complete command syntax
 - [Examples](examples.md) - Real-world patterns
 - [API Reference](api.md) - Python API details
 
 ## Development Status
 
 Currently working:
-- ✅ DPCL parsing and validation
+- ✅ LangTree DSL parsing and validation
 - ✅ Tree structure management
 - ✅ Semantic validation
 

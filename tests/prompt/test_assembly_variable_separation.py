@@ -13,7 +13,7 @@ Expected Behavior:
 
 import pytest
 
-from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt import RunStructure, TreeNode
 from langtree.prompt.exceptions import RuntimeVariableError
 from langtree.prompt.resolution import resolve_runtime_variables
 
@@ -24,7 +24,7 @@ class TestAssemblyVariableSeparation:
     def test_assembly_variable_in_runtime_template_should_fail(self):
         """Assembly variables used in runtime templates should raise errors."""
 
-        class TaskWithAssemblyVar(PromptTreeNode):
+        class TaskWithAssemblyVar(TreeNode):
             """! count=5
             ! threshold=10.5
 
@@ -51,7 +51,7 @@ class TestAssemblyVariableSeparation:
     def test_assembly_variable_in_runtime_template_should_fail_threshold(self):
         """Second assembly variable should also fail in runtime template."""
 
-        class TaskWithAssemblyVar(PromptTreeNode):
+        class TaskWithAssemblyVar(TreeNode):
             """! count=5
             ! threshold=10.5
 
@@ -78,7 +78,7 @@ class TestAssemblyVariableSeparation:
     def test_multiple_assembly_variables_in_runtime_template_should_fail(self):
         """Multiple assembly variables in single template should fail."""
 
-        class TaskWithAssemblyVars(PromptTreeNode):
+        class TaskWithAssemblyVars(TreeNode):
             """! iterations=3
             ! model_name="gpt-4"
             ! debug_mode=true
@@ -104,7 +104,7 @@ class TestAssemblyVariableSeparation:
     def test_field_variables_should_still_work(self):
         """Field variables should continue to work normally."""
 
-        class TaskWithMixedVars(PromptTreeNode):
+        class TaskWithMixedVars(TreeNode):
             """! assembly_var=42
 
             Template with field variable: {field_var}
@@ -123,7 +123,7 @@ class TestAssemblyVariableSeparation:
     def test_assembly_variable_error_message_clarity(self):
         """Assembly variable error should provide clear guidance."""
 
-        class TaskWithAssemblyVar(PromptTreeNode):
+        class TaskWithAssemblyVar(TreeNode):
             """! config_value=123
 
             Template: Configuration: {config_value}
@@ -149,7 +149,7 @@ class TestAssemblyVariableSeparation:
     def test_assembly_variables_in_commands_should_still_work(self):
         """Assembly variables should continue to work in command contexts."""
 
-        class TaskWithCommandUsage(PromptTreeNode):
+        class TaskWithCommandUsage(TreeNode):
             """! iterations=5
             ! resample(iterations)
 
@@ -172,7 +172,7 @@ class TestAssemblyVariableSeparation:
     def test_nonexistent_variable_still_gives_appropriate_error(self):
         """Non-existent variables should still give the usual error."""
 
-        class TaskWithoutVariables(PromptTreeNode):
+        class TaskWithoutVariables(TreeNode):
             """Simple template."""
 
             field_var: str = "default"
@@ -196,7 +196,7 @@ class TestAssemblyVariableValidUsage:
     def test_assembly_variables_available_for_commands(self):
         """Assembly variables should be accessible for command validation."""
 
-        class TaskWithAssemblyVars(PromptTreeNode):
+        class TaskWithAssemblyVars(TreeNode):
             """! batch_size=10
             ! timeout=30
             ! resample(batch_size)
@@ -216,7 +216,7 @@ class TestAssemblyVariableValidUsage:
     def test_assembly_variable_registry_integration(self):
         """Assembly variables should be properly tracked in registry."""
 
-        class TaskWithAssemblyVar(PromptTreeNode):
+        class TaskWithAssemblyVar(TreeNode):
             """! setting="value"
 
             Template content.

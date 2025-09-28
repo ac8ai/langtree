@@ -4,17 +4,17 @@
 [![CI](https://github.com/ac8ai/langtree/workflows/CI/badge.svg)](https://github.com/ac8ai/langtree/actions)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
 
-> ⚠️ **Pre-Alpha Software** - Core functionality not yet implemented. DPCL parsing works, but LangChain execution is not functional.
+> ⚠️ **Pre-Alpha Software** - Core functionality not yet implemented. LangTree DSL parsing works, but LangChain execution is not functional.
 
-**Dynamic Prompt Connecting Language (DPCL)** - A framework for orchestrating hierarchical prompt structures into executable LangChain pipelines through tag-based data forwarding.
+**LangTree DSL** - A framework for orchestrating hierarchical prompt structures into executable LangChain pipelines through tag-based data forwarding.
 
 ## What is LangTree?
 
-LangTree enables **hierarchical prompt orchestration** where prompts are organized as trees of data they describe how to generate. Data flows between tree structures and persists across processing stages. Define your data structures as PromptTreeNode classes, then use DPCL (Dynamic Prompt Connecting Language) to control data flow:
+LangTree enables **hierarchical prompt orchestration** where prompts are organized as trees of data they describe how to generate. Data flows between tree structures and persists across processing stages. Define your data structures as TreeNode classes, then use LangTree DSL to control data flow:
 
 ### Vision: Advanced Tree Orchestration
 ```python
-class TaskCustomerAnalysis(PromptTreeNode):
+class TaskCustomerAnalysis(TreeNode):
     """
     You are analyzing customer data to improve business operations.
     Focus on extracting actionable insights from customer interactions.
@@ -32,7 +32,7 @@ class TaskOrderProcessor(TaskCustomerAnalysis):
     {PROMPT_SUBTREE}
     """
 
-    class Order(PromptTreeNode):
+    class Order(TreeNode):
         """
         For each order, analyze the customer feedback thoroughly.
         Extract sentiment, key issues, and satisfaction indicators.
@@ -57,13 +57,13 @@ class TaskInsightGenerator(TaskCustomerAnalysis):
     {COLLECTED_CONTEXT}
     """
 
-    class Category(PromptTreeNode):
+    class Category(TreeNode):
         """
         Group related insights into logical business categories.
         Each category should address a specific operational area.
         """
 
-        class Insight(PromptTreeNode):
+        class Insight(TreeNode):
             """
             Generate one specific, actionable business recommendation.
             Include implementation steps and expected outcomes.
@@ -98,12 +98,12 @@ class TaskInsightGenerator(TaskCustomerAnalysis):
 - **Mixed Hierarchies**: Iterable and non-iterable nodes in same structure
 - **Semantic Validation**: Comprehensive validation ensures correctness
 
-The framework validates tree structures, parses DPCL commands, and generates deterministic execution pipelines.
+The framework validates tree structures, parses LangTree DSL commands, and generates deterministic execution pipelines.
 
 ## Current Status
 
 **✅ Working:**
-- Core DPCL command parsing and syntax validation
+- Core LangTree DSL command parsing and syntax validation
 - Prompt tree structure management and registration
 - Comprehensive semantic validation framework
 - Template variable system with conflict resolution
@@ -121,7 +121,7 @@ Enable parallel execution and chaining of structured generation workflows, allow
 
 ### Advanced Tree Orchestration
 ```python
-class TaskCustomerAnalysis(PromptTreeNode):
+class TaskCustomerAnalysis(TreeNode):
     """
     You are analyzing customer data to improve business operations.
     Focus on extracting actionable insights from customer interactions.
@@ -139,7 +139,7 @@ class TaskOrderProcessor(TaskCustomerAnalysis):
     {PROMPT_SUBTREE}
     """
 
-    class Order(PromptTreeNode):
+    class Order(TreeNode):
         """
         For each order, analyze the customer feedback thoroughly.
         Extract sentiment, key issues, and satisfaction indicators.
@@ -164,13 +164,13 @@ class TaskInsightGenerator(TaskCustomerAnalysis):
     {COLLECTED_CONTEXT}
     """
 
-    class Category(PromptTreeNode):
+    class Category(TreeNode):
         """
         Group related insights into logical business categories.
         Each category should address a specific operational area.
         """
 
-        class Insight(PromptTreeNode):
+        class Insight(TreeNode):
             """
             Generate one specific, actionable business recommendation.
             Include implementation steps and expected outcomes.

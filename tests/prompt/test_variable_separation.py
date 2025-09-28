@@ -8,7 +8,7 @@ assembly-time and runtime variables is strictly enforced.
 Variable Types Tested:
 1. Assembly Variables (! var=value) - Chain construction time
 2. Runtime Variables ({var}) - Prompt execution time
-3. DPCL Variable Targets (@each[var] / @all[var]) - Collection iteration
+3. LangTree DSL Variable Targets (@each[var] / @all[var]) - Collection iteration
 4. Scope Context Variables (scope.field) - Context-specific resolution
 5. Field References ([field]) - Resampling and aggregation operations
 
@@ -20,7 +20,7 @@ According to LANGUAGE_SPECIFICATION.md:
 
 import pytest
 
-from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt import RunStructure, TreeNode
 from langtree.prompt.exceptions import RuntimeVariableError
 from langtree.prompt.resolution import resolve_runtime_variables
 
@@ -31,7 +31,7 @@ class TestAssemblyRuntimeSeparation:
     def test_assembly_variables_not_available_at_runtime(self):
         """Test that assembly variables cannot be used in runtime contexts."""
 
-        class TaskWithAssemblyVar(PromptTreeNode):
+        class TaskWithAssemblyVar(TreeNode):
             """
             ! count=5
             ! threshold="high"
@@ -62,7 +62,7 @@ class TestAssemblyRuntimeSeparation:
     def test_assembly_variable_priority_syntax_rejected(self):
         """Test that assembly variables are rejected in runtime contexts."""
 
-        class TaskWithBridgingAttempt(PromptTreeNode):
+        class TaskWithBridgingAttempt(TreeNode):
             """
             ! priority_var="high"
             Task that uses assembly variables.
@@ -91,7 +91,7 @@ class TestAssemblyRuntimeSeparation:
     def test_runtime_variables_work_correctly(self):
         """Test that runtime variables expand correctly to double underscore format."""
 
-        class TaskWithRuntimeContext(PromptTreeNode):
+        class TaskWithRuntimeContext(TreeNode):
             """Task that provides runtime context."""
 
             title: str = "Test Title"
@@ -116,7 +116,7 @@ class TestAssemblyRuntimeSeparation:
     def test_assembly_variables_available_for_commands(self):
         """Test that assembly variables are available for command arguments."""
 
-        class TaskWithCommandUsingAssemblyVar(PromptTreeNode):
+        class TaskWithCommandUsingAssemblyVar(TreeNode):
             """
             ! iterations=3
             ! resample(iterations)
@@ -142,7 +142,7 @@ class TestAssemblyRuntimeSeparation:
         in runtime template resolution.
         """
 
-        class TaskForErrorTesting(PromptTreeNode):
+        class TaskForErrorTesting(TreeNode):
             """
             ! config_value="test"
             Task for testing variable expansion.
@@ -175,7 +175,7 @@ class TestRuntimeVariableResolutionPriority:
     def test_current_node_context_priority(self):
         """Test that runtime variables expand to double underscore format."""
 
-        class TaskWithContext(PromptTreeNode):
+        class TaskWithContext(TreeNode):
             """Task with field context."""
 
             title: str = "Current Node Title"
@@ -204,7 +204,7 @@ class TestRuntimeVariableResolutionPriority:
         This matches the current implementation approach.
         """
 
-        class TaskWithLimitedContext(PromptTreeNode):
+        class TaskWithLimitedContext(TreeNode):
             """Task with limited context."""
 
             known_field: str = "known"
@@ -236,7 +236,7 @@ class TestArchitecturalIntegrity:
         from langtree.prompt.exceptions import RuntimeVariableError
         from langtree.prompt.resolution import resolve_runtime_variables
 
-        class TaskForBridgingTest(PromptTreeNode):
+        class TaskForBridgingTest(TreeNode):
             """
             ! assembly_var="assembly_value"
             Task for testing bridging prevention.
@@ -273,7 +273,7 @@ class TestArchitecturalIntegrity:
     def test_variable_registry_separation(self):
         """Test that variable registries maintain separation."""
 
-        class TaskWithBothVariableTypes(PromptTreeNode):
+        class TaskWithBothVariableTypes(TreeNode):
             """
             ! assembly_var="assembly_value"
             Task with both assembly and runtime variables.
@@ -310,7 +310,7 @@ class TestArchitecturalIntegrity:
     def test_documentation_compliance(self):
         """Test that implementation matches documentation specifications."""
 
-        class TaskDocumentationExample(PromptTreeNode):
+        class TaskDocumentationExample(TreeNode):
             """
             ! iterations=5
             ! threshold=2.5
@@ -356,7 +356,7 @@ class TestErrorMessageQuality:
     def test_helpful_assembly_variable_error_message(self):
         """Test that errors suggest correct usage patterns."""
 
-        class TaskForMessageTesting(PromptTreeNode):
+        class TaskForMessageTesting(TreeNode):
             """
             ! config="value"
             Task for error message testing.
@@ -391,7 +391,7 @@ class TestErrorMessageQuality:
         valid single-brace syntax, not error messages.
         """
 
-        class TaskForBridgingTest(PromptTreeNode):
+        class TaskForBridgingTest(TreeNode):
             """
             Task for testing variable expansion.
             """
@@ -421,7 +421,7 @@ class TestCompleteVariableTypeCoverage:
     def test_assembly_variables_command_integration(self):
         """Test that assembly variables work properly in command arguments."""
 
-        class TaskWithCommandIntegration(PromptTreeNode):
+        class TaskWithCommandIntegration(TreeNode):
             """
             ! iterations=3
             ! model_name="gpt-4"
@@ -452,10 +452,10 @@ class TestCompleteVariableTypeCoverage:
         assert "assembly variable" in error_msg.lower()
         assert "iterations" in error_msg or "model_name" in error_msg
 
-    def test_dpcl_variable_targets_in_commands(self):
-        """Test DPCL Variable Targets in @each/@all commands."""
+    def test_acl_variable_targets_in_commands(self):
+        """Test LangTree DSL Variable Targets in @each/@all commands."""
 
-        class TaskSourceNode(PromptTreeNode):
+        class TaskSourceNode(TreeNode):
             """Source node with data.
 
             ! @each[items]->task.processor@{{value.item=items}}*
@@ -464,12 +464,12 @@ class TestCompleteVariableTypeCoverage:
 
             items: list[str] = ["item1", "item2", "item3"]
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Processor node referenced by @each command."""
 
             item: str  # Field to receive value.item
 
-        class TaskAggregator(PromptTreeNode):
+        class TaskAggregator(TreeNode):
             """Aggregator node referenced by @all command.
 
             Uses forwarded context: {context}
@@ -477,8 +477,8 @@ class TestCompleteVariableTypeCoverage:
 
             context: str = "default"
 
-        class TaskTargetNode(PromptTreeNode):
-            """Node using DPCL Variable Targets."""
+        class TaskTargetNode(TreeNode):
+            """Node using LangTree DSL Variable Targets."""
 
             result: str = "processed"
 
@@ -488,7 +488,7 @@ class TestCompleteVariableTypeCoverage:
         structure.add(TaskProcessor)
         structure.add(TaskAggregator)
 
-        # Should successfully process DPCL commands
+        # Should successfully process LangTree DSL commands
         source_node = structure.get_node("task.source_node")
         target_node = structure.get_node("task.target_node")
         assert source_node is not None
@@ -509,7 +509,7 @@ class TestCompleteVariableTypeCoverage:
     def test_scope_context_variables_separation(self):
         """Test that scope context variables are separate from runtime variables."""
 
-        class TaskWithScopeUsage(PromptTreeNode):
+        class TaskWithScopeUsage(TreeNode):
             """
             ! @all->task.process@{{prompt.item=*, outputs.result=*}}
 
@@ -543,7 +543,7 @@ class TestCompleteVariableTypeCoverage:
             MEDIUM = 2
             HIGH = 3
 
-        class TaskWithFieldReferences(PromptTreeNode):
+        class TaskWithFieldReferences(TreeNode):
             """
             ! @resampled[priority]->mean
             ! @resampled[status]->mode
@@ -574,7 +574,7 @@ class TestCompleteVariableTypeCoverage:
     def test_template_variables_cannot_be_used_as_assembly_or_runtime(self):
         """Test that template variables are reserved and cannot be used as Assembly or Runtime variables."""
 
-        class TaskWithTemplateConflict(PromptTreeNode):
+        class TaskWithTemplateConflict(TreeNode):
             """
             ! PROMPT_SUBTREE="invalid"  # Should not be allowed as assembly variable
             ! COLLECTED_CONTEXT="invalid"  # Should not be allowed as assembly variable
@@ -603,7 +603,7 @@ class TestRuntimeVariableResolutionPriorityComplete:
     def test_resolution_priority_chain(self):
         """Test the complete priority chain: Current Node → Task → Outputs → Value → Prompt."""
 
-        class TaskForPriorityTesting(PromptTreeNode):
+        class TaskForPriorityTesting(TreeNode):
             """Task for testing resolution priority."""
 
             current_field: str = (
@@ -633,10 +633,10 @@ class TestRuntimeVariableResolutionPriorityComplete:
     def test_context_type_separation(self):
         """Test that different context types don't interfere."""
 
-        class Metadata(PromptTreeNode):
+        class Metadata(TreeNode):
             type: str = "test"
 
-        class TaskWithMultipleContexts(PromptTreeNode):
+        class TaskWithMultipleContexts(TreeNode):
             """Task with various field types."""
 
             title: str = "Test Title"
@@ -665,7 +665,7 @@ class TestRuntimeVariableResolutionPriorityComplete:
         variables expand to namespaced form - validation happens at runtime.
         """
 
-        class TaskForUndefinedTesting(PromptTreeNode):
+        class TaskForUndefinedTesting(TreeNode):
             """Task with limited context."""
 
             known: str = "known_value"
@@ -693,7 +693,7 @@ class TestSpecificationCompliance:
     def test_assembly_vs_runtime_separation_specification(self):
         """Test the specification requirement: 'Assembly Variables are NOT available during runtime resolution'."""
 
-        class TaskSpecificationExample(PromptTreeNode):
+        class TaskSpecificationExample(TreeNode):
             """
             ! config_value="assembly_time_value"
             ! threshold=2.5
@@ -748,7 +748,7 @@ class TestSpecificationCompliance:
     def test_variable_type_taxonomy_compliance(self):
         """Test compliance with the 5-type Variable Type Taxonomy from specification."""
 
-        class TaskTaxonomyExample(PromptTreeNode):
+        class TaskTaxonomyExample(TreeNode):
             """
             ! assembly_var="assembly_value"  # Type 1: Assembly Variables
             ! resample(3)  # Using assembly variable in command
@@ -809,7 +809,7 @@ class TestSpecificationCompliance:
         )
 
         # Test 1: Variable name conflicts with field names should raise error
-        class TaskConflictingVariableField(PromptTreeNode):
+        class TaskConflictingVariableField(TreeNode):
             """
             ! field_name="conflict_value"  # Assembly variable conflicts with field name
             Task with conflicting variable and field names.
@@ -834,7 +834,7 @@ class TestSpecificationCompliance:
         )
 
         # Test 2: Duplicate variable assignment should be prohibited
-        class TaskDuplicateVariable(PromptTreeNode):
+        class TaskDuplicateVariable(TreeNode):
             """
             ! duplicate_var="first_value"
             ! duplicate_var="second_value"  # Reassignment should be prohibited
@@ -862,7 +862,7 @@ class TestSpecificationCompliance:
     def test_documentation_example_patterns(self):
         """Test patterns directly from the specification documentation."""
 
-        class TaskDocumentationPattern(PromptTreeNode):
+        class TaskDocumentationPattern(TreeNode):
             """
             ! count=5              # Define assembly variable
             ! resample(count)      # Use in command argument

@@ -4,7 +4,7 @@ This package contains tests aligned with the modular layout of
 `langtree.prompt`.
 
 Implemented test modules:
- - test_structure.py: Tree construction (PromptTreeNode, RunStructure) + pending target tracking.
+ - test_structure.py: Tree construction (TreeNode, RunStructure) + pending target tracking.
  - test_registry.py: Variable & pending target registries (registration, satisfaction, resolution semantics).
  - test_resolution.py: Core context & scope resolution (current/value/outputs/task/global/prompt) + error handling.
  - test_context_resolution.py: Extended Phase 2 scenarios (cross‑tree, deep nesting, forward refs, circular patterns).

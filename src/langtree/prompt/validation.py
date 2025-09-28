@@ -1,5 +1,5 @@
 """
-Validation module for DPCL prompt tree structure.
+Validation module for LangTree DSL prompt tree structure.
 
 This module contains comprehensive validation methods that check for
 configuration errors, circular dependencies, unresolved references,
@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from langtree.prompt.structure import RunStructure, StructureTreeNode
 
+from langtree.commands.parser import CommandType
 from langtree.prompt.resolution import _resolve_in_current_node_context
 
 
@@ -51,23 +52,41 @@ def validate_tree(run_structure: "RunStructure") -> dict[str, list[str]]:
             if scope_name
             else var_info.variable_path
         )
+        # Get the first source node tag if available
+        first_source_tag = (
+            var_info.sources[0].source_node_tag if var_info.sources else "unknown"
+        )
         validation_results["unsatisfied_variables"].append(
-            f"{full_name} (from {var_info.source_node_tag})"
+            f"{full_name} (from {first_source_tag})"
         )
 
     # Check for multiply satisfied variables that might need attention
+    # Note: prompt and outputs scopes support multiple sources via numbered variables
     multiply_satisfied = (
         run_structure._variable_registry.get_multiply_satisfied_variables()
     )
     for var_info in multiply_satisfied:
         scope_name = var_info.get_scope_name()
+
+        # Skip prompt and outputs scopes - they support multiple sources with numbered variables
+        if scope_name in ["prompt", "outputs"]:
+            continue
+
         full_name = (
             f"{scope_name}.{var_info.variable_path}"
             if scope_name
             else var_info.variable_path
         )
+        source_descriptions = []
+        for source in var_info.sources:
+            cmd_desc = source.command_type.value if source.command_type else "direct"
+            mult_desc = "*" if source.has_multiplicity else ""
+            source_descriptions.append(
+                f"{source.source_node_tag}.{source.source_field_path}{mult_desc}({cmd_desc})"
+            )
+
         validation_results["multiply_satisfied"].append(
-            f"{full_name} (sources: {', '.join(var_info.satisfaction_sources)})"
+            f"{full_name} (sources: {', '.join(source_descriptions)})"
         )
 
     return validation_results
@@ -273,7 +292,7 @@ def _find_variable_cycle(
     current_path.add(var_name)
 
     # Check each satisfaction source for potential cycles
-    for source in var_info.satisfaction_sources:
+    for source in var_info.sources:
         # Look for variables that depend on this source
         for (
             other_var_name,
@@ -281,9 +300,12 @@ def _find_variable_cycle(
         ) in run_structure._variable_registry.variables.items():
             if other_var_name != var_name:  # Don't check self
                 # If the other variable's path matches our source or vice versa
+                other_source_field_paths = [
+                    s.source_field_path for s in other_var_info.sources
+                ]
                 if (
-                    source == other_var_info.variable_path
-                    or var_info.variable_path in other_var_info.satisfaction_sources
+                    source.source_field_path == other_var_info.variable_path
+                    or var_info.variable_path in other_source_field_paths
                 ):
                     cycle = _find_variable_cycle(
                         run_structure,
@@ -387,10 +409,14 @@ def _detect_unsatisfied_variables(run_structure: "RunStructure", result: dict) -
             if scope_name
             else var_info.variable_path
         )
+        # Get the first source node tag if available
+        first_source_tag = (
+            var_info.sources[0].source_node_tag if var_info.sources else "unknown"
+        )
         result["unsatisfied_variables"].append(
             {
                 "variable": full_name,
-                "source_node": var_info.source_node_tag,
+                "source_node": first_source_tag,
                 "scope": scope_name,
                 "path": var_info.variable_path,
                 "description": f"Variable '{full_name}' has no satisfaction source",
@@ -496,7 +522,7 @@ def _check_impossible_mappings_recursive(
             # Check @each commands for non-iterable inclusion paths
             if (
                 hasattr(command, "command_type")
-                and command.command_type.value == "each"
+                and command.command_type == CommandType.EACH
             ):
                 if hasattr(command, "inclusion_path") and command.inclusion_path:
                     try:
@@ -507,7 +533,7 @@ def _check_impossible_mappings_recursive(
 
                         # Check if the resolved value is iterable
                         if not hasattr(resolved_value, "__iter__") or isinstance(
-                            resolved_value, (str, dict)
+                            resolved_value, str | dict
                         ):
                             result["impossible_mappings"].append(
                                 {

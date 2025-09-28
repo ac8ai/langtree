@@ -13,7 +13,7 @@ Focus Areas:
 
 import pytest
 
-from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt import RunStructure, TreeNode
 from langtree.prompt.exceptions import RuntimeVariableError
 from langtree.prompt.resolution import resolve_runtime_variables
 
@@ -24,7 +24,7 @@ class TestRuntimeVariableValidationBehavior:
     def test_undefined_field_variable_should_raise_error(self):
         """Undefined field variables should raise RuntimeVariableError with helpful message."""
 
-        class TaskWithFields(PromptTreeNode):
+        class TaskWithFields(TreeNode):
             """Task with specific fields defined."""
 
             valid_field: str = "value"
@@ -51,7 +51,7 @@ class TestRuntimeVariableValidationBehavior:
     def test_assembly_variable_should_be_rejected_in_runtime_validation(self):
         """Assembly variables should be rejected in runtime contexts per assembly variable separation principle."""
 
-        class TaskWithAssemblyVar(PromptTreeNode):
+        class TaskWithAssemblyVar(TreeNode):
             """! assembly_var="test_value" """
 
             field_var: str = "field_value"
@@ -77,7 +77,7 @@ class TestRuntimeVariableValidationBehavior:
     def test_reserved_template_variables_should_be_excluded_from_validation(self):
         """Reserved template variables should not trigger validation errors."""
 
-        class TaskWithReserved(PromptTreeNode):
+        class TaskWithReserved(TreeNode):
             """
             Template with reserved variables:
 
@@ -105,7 +105,7 @@ class TestRuntimeVariableValidationBehavior:
     def test_malformed_variable_syntax_should_raise_error(self):
         """Malformed variable syntax should raise RuntimeVariableError."""
 
-        class TaskForSyntaxTest(PromptTreeNode):
+        class TaskForSyntaxTest(TreeNode):
             field_var: str = "value"
 
         structure = RunStructure()
@@ -129,7 +129,7 @@ class TestRuntimeVariableValidationBehavior:
     def test_mixed_valid_and_invalid_variables(self):
         """Test content with both valid and invalid variables - should fail on first invalid."""
 
-        class TaskMixed(PromptTreeNode):
+        class TaskMixed(TreeNode):
             valid_field: str = "value"
 
         structure = RunStructure()
@@ -151,7 +151,7 @@ class TestRuntimeVariableValidationBehavior:
     def test_deferred_validation_expands_without_checking_existence(self):
         """By default, undefined variables should expand to namespaced form without validation."""
 
-        class TaskWithLimitedContext(PromptTreeNode):
+        class TaskWithLimitedContext(TreeNode):
             known_field: str = "value"
 
         structure = RunStructure()

@@ -19,7 +19,7 @@ from pydantic import Field
 from langtree.commands.parser import CommandParseError, ParsedCommand
 
 # Group 4: Internal from imports (alphabetical by source module)
-from langtree.prompt import PromptTreeNode, RunStructure, get_scope
+from langtree.prompt import RunStructure, TreeNode, get_scope
 from langtree.prompt.exceptions import (
     FieldValidationError,
     VariableSourceValidationError,
@@ -28,37 +28,37 @@ from langtree.prompt.exceptions import (
 
 
 # Common task classes referenced by integration tests
-class TaskDocumentProcessor(PromptTreeNode):
+class TaskDocumentProcessor(TreeNode):
     """Generic analyzer task."""
 
     pass
 
 
-class TaskProcess(PromptTreeNode):
+class TaskProcess(TreeNode):
     """Process task."""
 
     pass
 
 
-class TaskProcessor(PromptTreeNode):
+class TaskProcessor(TreeNode):
     """Process task."""
 
     pass
 
 
-class TaskOutputAggregator(PromptTreeNode):
+class TaskOutputAggregator(TreeNode):
     """Generate summary report task."""
 
     pass
 
 
-class TaskMissingTarget(PromptTreeNode):
+class TaskMissingTarget(TreeNode):
     """Missing target task (for error testing)."""
 
     pass
 
 
-class TaskAnotherMissing(PromptTreeNode):
+class TaskAnotherMissing(TreeNode):
     """Another missing task (for error testing)."""
 
     pass
@@ -67,7 +67,7 @@ class TaskAnotherMissing(PromptTreeNode):
 # TaskProcessor already defined above
 
 
-class TaskHandler(PromptTreeNode):
+class TaskHandler(TreeNode):
     """Handler task."""
 
     pass
@@ -76,7 +76,7 @@ class TaskHandler(PromptTreeNode):
 # TaskDocumentProcessor already defined above
 
 
-class TaskContentAnalyzer(PromptTreeNode):
+class TaskContentAnalyzer(TreeNode):
     """Content analyzer task."""
 
     pass
@@ -220,7 +220,7 @@ class TestErrorHandling:
     def test_parse_errors_propagate(self):
         """Test that parse errors are properly propagated instead of silently ignored."""
 
-        class TaskWithBadCommand(PromptTreeNode):
+        class TaskWithBadCommand(TreeNode):
             """
             ! @invalid[syntax->broken@{{bad=mapping}}
             Task with malformed command.
@@ -242,7 +242,7 @@ class TestErrorHandling:
     def test_validation_methods(self):
         """Test validation methods for tree consistency."""
 
-        class TaskWithIssues(PromptTreeNode):
+        class TaskWithIssues(TreeNode):
             """
             ! @->task.missing_target@{{prompt.data=*}}
             ! @->task.another_missing@{{value.unsatisfied=*}}
@@ -283,7 +283,7 @@ class TestErrorHandling:
         # Register another with satisfaction
         registry.register_variable("satisfied_var", get_scope("value"), "task.test")
         registry.add_satisfaction_source(
-            "satisfied_var", get_scope("value"), "some_source"
+            "satisfied_var", get_scope("value"), "task.test", "some_source"
         )
 
         unsatisfied = registry.get_unsatisfied_variables()
@@ -295,7 +295,7 @@ class TestErrorHandling:
     def test_execution_summary(self):
         """Test execution summary provides useful metrics."""
 
-        class TaskSimple(PromptTreeNode):
+        class TaskSimple(TreeNode):
             """
             Simple task for testing.
             """
@@ -327,12 +327,12 @@ class TestStructuralValidationEdgeCases:
     def test_missing_inclusion_field_validation(self):
         """Test that commands referencing non-existent inclusion fields are caught."""
 
-        class TaskDocumentProcessor(PromptTreeNode):
+        class TaskDocumentProcessor(TreeNode):
             """
             Command references books.chapters but chapters field doesn't exist.
             """
 
-            class BookStructure(PromptTreeNode):
+            class BookStructure(TreeNode):
                 title: str
                 author: str
                 # NOTE: chapters field is missing!
@@ -354,7 +354,7 @@ class TestStructuralValidationEdgeCases:
     def test_missing_variable_target_structure_validation(self):
         """Test that commands referencing non-existent variable target structures are caught."""
 
-        class TaskContentAnalyzer(PromptTreeNode):
+        class TaskContentAnalyzer(TreeNode):
             """
             ! @->task.content_analyzer@{{value.processing_result.summary=*}}*
 
@@ -376,12 +376,12 @@ class TestStructuralValidationEdgeCases:
     def test_missing_variable_source_field_validation(self):
         """Test that commands referencing non-existent source fields are caught."""
 
-        class TaskOutputAggregator(PromptTreeNode):
+        class TaskOutputAggregator(TreeNode):
             """
             Variable source items.missing_field doesn't exist in ItemStructure.
             """
 
-            class ItemStructure(PromptTreeNode):
+            class ItemStructure(TreeNode):
                 name: str
                 elements: list[str] = []
                 # NOTE: missing_field doesn't exist!
@@ -403,7 +403,7 @@ class TestStructuralValidationEdgeCases:
     def test_complex_missing_structure_validation(self):
         """Test complex command with missing structural components."""
 
-        class TaskWorkflowProcessor(PromptTreeNode):
+        class TaskWorkflowProcessor(TreeNode):
             """
             Multiple structural issues:
             - missing_phases inclusion field doesn't exist (will be caught first)
@@ -412,7 +412,7 @@ class TestStructuralValidationEdgeCases:
             - missing_output source field doesn't exist
             """
 
-            class ProjectStructure(PromptTreeNode):
+            class ProjectStructure(TreeNode):
                 name: str  # Only has name, none of the referenced fields exist
 
             projects: list[ProjectStructure] = Field(
@@ -437,7 +437,7 @@ class TestCommandProcessingIntegration:
     def test_simple_tree_with_commands(self):
         """Test building a tree with embedded commands."""
 
-        class TaskSimple(PromptTreeNode):
+        class TaskSimple(TreeNode):
             """
             ! @->task.other@{{prompt.data=*}}
 
@@ -467,22 +467,22 @@ class TestCommandProcessingIntegration:
 
 
 # Real world test data based on complex nested structures
-class TaskLibraryProcessing(PromptTreeNode):
+class TaskLibraryProcessing(TreeNode):
     """
     A library processing task that handles chapters with nested paragraph structures.
     Demonstrates complex variable mappings across nested data structures.
     """
 
-    class ParagraphInfo(PromptTreeNode):
+    class ParagraphInfo(TreeNode):
         text: str
         word_count: int = 0
 
-    class ChapterStructure(PromptTreeNode):
+    class ChapterStructure(TreeNode):
         title: str
         paragraphs: list["TaskLibraryProcessing.ParagraphInfo"] = []
         summary: str = ""
 
-    class ProcessingResult(PromptTreeNode):
+    class ProcessingResult(TreeNode):
         topic: str = "default"
         content_summary: str = "default"
 
@@ -493,13 +493,13 @@ class TaskLibraryProcessing(PromptTreeNode):
     processing_result: ProcessingResult = ProcessingResult()
 
 
-class TaskMissingSourceFields(PromptTreeNode):
+class TaskMissingSourceFields(TreeNode):
     """
     Task with commands that reference non-existent source fields to test error handling.
     Tests what happens when commands reference fields that don't exist in the source structure.
     """
 
-    class ArticleStructure(PromptTreeNode):
+    class ArticleStructure(TreeNode):
         title: str
         # Note: sections exists but missing_field and nonexistent_list do not
         sections: list[str] = []
@@ -511,13 +511,13 @@ class TaskMissingSourceFields(PromptTreeNode):
     # Note: missing_root_field does not exist
 
 
-class TaskPartiallyMissingStructure(PromptTreeNode):
+class TaskPartiallyMissingStructure(TreeNode):
     """
     Task where inclusion path exists but variable mapping source is partially missing.
     Tests scenario where the iteration path is valid but mapped fields don't exist.
     """
 
-    class DocumentStructure(PromptTreeNode):
+    class DocumentStructure(TreeNode):
         # Note: title field is missing even though it's referenced in the command
         subsections: list[str] = []
 
@@ -527,13 +527,13 @@ class TaskPartiallyMissingStructure(PromptTreeNode):
     )
 
 
-class TaskCompletelyMissingIteration(PromptTreeNode):
+class TaskCompletelyMissingIteration(TreeNode):
     """
     Task where the iteration path itself doesn't exist in the source structure.
     Tests what happens when @each references a completely non-existent field path.
     """
 
-    class ReportStructure(PromptTreeNode):
+    class ReportStructure(TreeNode):
         title: str
         # Note: missing_sections field doesn't exist
         existing_sections: list[str] = []
@@ -574,7 +574,11 @@ class TestRealWorldComplexity:
 
         # Should register variables with multiplicity relationship
         variables = structure._variable_registry.variables
-        n_n_vars = [v for v in variables.values() if v.get_relationship_type() == "n:n"]
+        n_n_vars = [
+            v
+            for v in variables.values()
+            if any(source.get_relationship_type() == "n:n" for source in v.sources)
+        ]
         assert len(n_n_vars) == 2  # Both variable mappings should be n:n from @each
 
     def test_missing_source_fields_edge_case(self):
@@ -625,12 +629,12 @@ class TestDeferredContextResolution:
     def test_context_resolution_after_tree_building(self):
         """Test that context resolution can be performed after tree building."""
 
-        class TaskWithContext(PromptTreeNode):
+        class TaskWithContext(TreeNode):
             """
             Task with context that can be resolved after tree building.
             """
 
-            class Section(PromptTreeNode):
+            class Section(TreeNode):
                 title: str
 
             sections: list[Section] = Field(
@@ -666,16 +670,16 @@ class TestDeferredContextResolution:
     def test_complex_path_resolution(self):
         """Test resolution of complex nested paths."""
 
-        class DataItem(PromptTreeNode):
+        class DataItem(TreeNode):
             content: str = "Item"
 
-        class TaskComplexPaths(PromptTreeNode):
+        class TaskComplexPaths(TreeNode):
             """
             ! @all->task.process@{{value.items=*}}*
             Task with complex nested paths - providing data items to processing task.
             """
 
-            class DataStructure(PromptTreeNode):
+            class DataStructure(TreeNode):
                 items: list[DataItem] = [
                     DataItem(content="Item 1"),
                     DataItem(content="Item 2"),
@@ -694,7 +698,7 @@ class TestDeferredContextResolution:
     def test_wildcard_mapping_handling(self):
         """Test handling of wildcard (*) mappings."""
 
-        class TaskWithWildcard(PromptTreeNode):
+        class TaskWithWildcard(TreeNode):
             """
             ! @->task.receiver@{{prompt.all_data=*}}
             Task with wildcard mapping.
@@ -720,12 +724,12 @@ class TestDeferredContextResolution:
             (v for v in prompt_vars if "all_data" in v.variable_path), None
         )
         if wildcard_var:
-            assert len(wildcard_var.satisfaction_sources) >= 1
+            assert len(wildcard_var.sources) >= 1
 
     def test_list_navigation_in_paths(self):
         """Test navigation through list structures in paths."""
 
-        class TaskWithLists(PromptTreeNode):
+        class TaskWithLists(TreeNode):
             """
             Task that navigates through list items.
             """
@@ -760,7 +764,7 @@ class TestDeferredContextResolution:
     def test_scope_resolution_across_contexts(self):
         """Test scope resolution across different context types."""
 
-        class TaskScopeTest(PromptTreeNode):
+        class TaskScopeTest(TreeNode):
             """
             ! @->task.target@{{prompt.from_prompt=*}}
             ! @->task.target@{{value.from_value=*}}
@@ -793,7 +797,7 @@ class TestExecutionPlanGeneration:
     def test_basic_execution_plan(self):
         """Test basic execution plan generation."""
 
-        class TaskPlanTest(PromptTreeNode):
+        class TaskPlanTest(TreeNode):
             """
             ! @->task.processor@{{prompt.data=*}}
             Task for testing execution plan generation.
@@ -823,13 +827,13 @@ class TestExecutionPlanGeneration:
     def test_execution_plan_with_unresolved_targets(self):
         """Test execution plan identifies unresolved target issues correctly."""
 
-        class TaskWithUnresolvedReferences(PromptTreeNode):
+        class TaskWithUnresolvedReferences(TreeNode):
             """
             ! @->task.processor@{{value.external_var=*}}
             Task with references to non-existent target nodes.
             """
 
-            class TaskProcessor(PromptTreeNode):
+            class TaskProcessor(TreeNode):
                 """Processor task that can provide results internally."""
 
                 result: str = "internal summary"
@@ -871,7 +875,7 @@ class TestExecutionPlanGeneration:
     def test_execution_plan_variable_flows(self):
         """Test that execution plan captures variable flows correctly."""
 
-        class TaskVariableFlow(PromptTreeNode):
+        class TaskVariableFlow(TreeNode):
             """Task with satisfied variable flows."""
 
             # Field-level commands to avoid docstring @all RHS scoping violations
@@ -900,7 +904,7 @@ class TestExecutionPlanGeneration:
     def test_deferred_context_resolution(self):
         """Test deferred context resolution functionality."""
 
-        class TaskDeferredTest(PromptTreeNode):
+        class TaskDeferredTest(TreeNode):
             """
             Task for testing deferred context resolution.
             """
@@ -930,13 +934,13 @@ class TestExecutionPlanGeneration:
     def test_complex_execution_plan_analysis(self):
         """Test execution plan with complex variable relationships."""
 
-        class TaskComplexPlan(PromptTreeNode):
+        class TaskComplexPlan(TreeNode):
             """
             ! @->task.summarize@{{prompt.all_analyses=*}}
             Complex task with multiple relationship types.
             """
 
-            class Section(PromptTreeNode):
+            class Section(TreeNode):
                 title: str
                 content: str
 
@@ -971,12 +975,12 @@ class TestAdvancedPathResolution:
     def test_list_attribute_navigation(self):
         """Test navigation through list attributes (sections.subsections case)."""
 
-        class TaskListNavigation(PromptTreeNode):
+        class TaskListNavigation(TreeNode):
             """
             Task testing list attribute navigation.
             """
 
-            class Section(PromptTreeNode):
+            class Section(TreeNode):
                 title: str
                 subsections: list[str] = ["sub1", "sub2"]
 
@@ -1013,7 +1017,7 @@ class TestAdvancedPathResolution:
     def test_simple_list_navigation(self):
         """Test simple list navigation."""
 
-        class TaskSimpleList(PromptTreeNode):
+        class TaskSimpleList(TreeNode):
             """
             Task with simple list iteration.
             """
@@ -1048,13 +1052,13 @@ class TestAdvancedPathResolution:
     def test_nested_object_navigation(self):
         """Test navigation through nested object structures."""
 
-        class TaskNestedObjects(PromptTreeNode):
+        class TaskNestedObjects(TreeNode):
             """
             Task with nested object navigation.
             """
 
-            class DataStructure(PromptTreeNode):
-                class Item(PromptTreeNode):
+            class DataStructure(TreeNode):
+                class Item(TreeNode):
                     content: str
                     priority: int = 1
 
@@ -1081,7 +1085,7 @@ class TestAdvancedPathResolution:
     def test_missing_field_handling(self):
         """Test that missing fields are properly detected and raise errors."""
 
-        class TaskMissingField(PromptTreeNode):
+        class TaskMissingField(TreeNode):
             """
             ! @each[nonexistent_field]->task.process@{{value.data=nonexistent_field}}*
             Task referencing non-existent field.
@@ -1104,7 +1108,7 @@ class TestWildcardAndMissingFieldHandling:
     def test_wildcard_resolution(self):
         """Test that wildcard (*) paths resolve to entire node."""
 
-        class TaskWildcard(PromptTreeNode):
+        class TaskWildcard(TreeNode):
             """
             ! @->task.receiver@{{prompt.all_data=*}}
             Task with wildcard mapping.
@@ -1134,11 +1138,11 @@ class TestWildcardAndMissingFieldHandling:
     def test_missing_field_graceful_handling(self):
         """Test that missing fields are handled gracefully."""
 
-        class Something(PromptTreeNode):
+        class Something(TreeNode):
             existing_field: str = "exists"
             # missing_field intentionally not defined
 
-        class TaskMissingFields(PromptTreeNode):
+        class TaskMissingFields(TreeNode):
             """
             Task with missing field reference.
             """
@@ -1160,7 +1164,7 @@ class TestWildcardAndMissingFieldHandling:
     def test_optional_field_handling(self):
         """Test handling of optional/nullable fields."""
 
-        class TaskOptionalFields(PromptTreeNode):
+        class TaskOptionalFields(TreeNode):
             """Task with optional field."""
 
             required_field: str = "required"
@@ -1186,13 +1190,13 @@ class TestWildcardAndMissingFieldHandling:
     def test_nested_missing_field_handling(self):
         """Test that missing nested fields produce informative errors for users to fix."""
 
-        class TaskNestedMissing(PromptTreeNode):
+        class TaskNestedMissing(TreeNode):
             """
             ! @each[data.missing_subfield]->task.process@{{value.content=data.missing_subfield}}*
             Task with missing nested field.
             """
 
-            class DataStructure(PromptTreeNode):
+            class DataStructure(TreeNode):
                 existing_field: str = "exists"
                 # missing_subfield is not defined
 
@@ -1217,7 +1221,7 @@ class TestWildcardAndMissingFieldHandling:
     def test_mixed_wildcard_and_regular_mappings(self):
         """Test commands with both wildcard and regular field mappings."""
 
-        class TaskMixedMappings(PromptTreeNode):
+        class TaskMixedMappings(TreeNode):
             """
             ! @->task.processor@{{prompt.all_data=*}}
             ! @->task.analyzer@{{value.specific=*}}
@@ -1243,11 +1247,11 @@ class TestWildcardAndMissingFieldHandling:
         # Check satisfaction sources
         for var in prompt_vars:
             if "all_data" in var.variable_path:
-                assert "*" in var.satisfaction_sources
+                assert any("*" in source.source_field_path for source in var.sources)
 
         for var in value_vars:
             if "specific" in var.variable_path:
-                assert "*" in var.satisfaction_sources
+                assert any("*" in source.source_field_path for source in var.sources)
 
 
 class TestListNavigationIssues:
@@ -1256,16 +1260,16 @@ class TestListNavigationIssues:
     def test_sections_subsections_navigation(self):
         """Test the specific sections.subsections navigation pattern from real world example."""
 
-        class TaskSectionsSubsections(PromptTreeNode):
+        class TaskSectionsSubsections(TreeNode):
             """
             Document structure is defined as a list of sections, where each section has a title.
             """
 
-            class DocumentSection(PromptTreeNode):
+            class DocumentSection(TreeNode):
                 title: str
                 subsections: list[str] = []
 
-            class MainAnalysisStructure(PromptTreeNode):
+            class MainAnalysisStructure(TreeNode):
                 title: str = ""
 
             sections: list[DocumentSection] = Field(
@@ -1312,12 +1316,12 @@ class TestListNavigationIssues:
     def test_list_attribute_flattening(self):
         """Test flattening of attributes from list elements."""
 
-        class TaskListFlattening(PromptTreeNode):
+        class TaskListFlattening(TreeNode):
             """
             Task requiring flattening of list element attributes.
             """
 
-            class Item(PromptTreeNode):
+            class Item(TreeNode):
                 name: str
                 values: list[str]
 
@@ -1351,7 +1355,7 @@ class TestWildcardImplementationNeeds:
     def test_wildcard_entire_node_satisfaction(self):
         """Test that wildcard (*) should provide entire node as satisfaction."""
 
-        class TaskWildcardEntireNode(PromptTreeNode):
+        class TaskWildcardEntireNode(TreeNode):
             """
             ! @->task.receiver@{{prompt.all_data=*}}
             Task where wildcard should provide entire current node.
@@ -1366,7 +1370,11 @@ class TestWildcardImplementationNeeds:
 
         # Check that wildcard was properly registered
         variables = structure._variable_registry.variables
-        wildcard_vars = [v for v in variables.values() if "*" in v.satisfaction_sources]
+        wildcard_vars = [
+            v
+            for v in variables.values()
+            if any("*" in source.source_field_path for source in v.sources)
+        ]
 
         assert len(wildcard_vars) == 1
         wildcard_var = wildcard_vars[0]
@@ -1377,7 +1385,7 @@ class TestWildcardImplementationNeeds:
     def test_multiple_wildcard_sources(self):
         """Test multiple commands with wildcard sources."""
 
-        class TaskMultipleWildcards(PromptTreeNode):
+        class TaskMultipleWildcards(TreeNode):
             """
             ! @->task.receiver1@{{prompt.data1=*}}
             ! @->task.receiver2@{{value.data2=*}}
@@ -1393,7 +1401,11 @@ class TestWildcardImplementationNeeds:
         # All wildcard variables should be satisfied
         variables = structure._variable_registry.variables
 
-        wildcard_vars = [v for v in variables.values() if "*" in v.satisfaction_sources]
+        wildcard_vars = [
+            v
+            for v in variables.values()
+            if any("*" in source.source_field_path for source in v.sources)
+        ]
         assert len(wildcard_vars) == 3
 
         # All should be satisfied
@@ -1403,7 +1415,7 @@ class TestWildcardImplementationNeeds:
     def test_wildcard_vs_specific_field_priority_5a(self):
         """Test single source wildcard mapping (5a - adjusted expectation)."""
 
-        class TaskWildcardPriority(PromptTreeNode):
+        class TaskWildcardPriority(TreeNode):
             """
             ! @->task.receiver@{{prompt.data=*}}
             ! @->task.receiver@{{prompt.data=*}}
@@ -1427,13 +1439,13 @@ class TestWildcardImplementationNeeds:
         assert len(data_vars) == 1
         data_var = data_vars[0]
         assert not data_var.has_multiple_sources()  # Only one unique source
-        assert "*" in data_var.satisfaction_sources
-        assert len(data_var.satisfaction_sources) == 1
+        assert any("*" in source.source_field_path for source in data_var.sources)
+        assert len(data_var.sources) == 1
 
     def test_wildcard_vs_specific_field_priority_5b(self):
         """Test multiple sources to same target (5b - two different classes)."""
 
-        class TaskWildcardPriority(PromptTreeNode):
+        class TaskWildcardPriority(TreeNode):
             """
             ! @->task.receiver@{{prompt.data=*}}
             Task sending wildcard data to receiver.
@@ -1442,7 +1454,7 @@ class TestWildcardImplementationNeeds:
             specific_field: str = "specific_data"
             other_field: str = "other_data"
 
-        class TaskSpecificPriority(PromptTreeNode):
+        class TaskSpecificPriority(TreeNode):
             """
             Task sending specific field data to receiver.
             """
@@ -1467,8 +1479,10 @@ class TestWildcardImplementationNeeds:
         assert len(data_vars) == 1
         data_var = data_vars[0]
         assert data_var.has_multiple_sources()  # Two different sources
-        assert "*" in data_var.satisfaction_sources
-        assert "specific_value" in data_var.satisfaction_sources
+        assert any("*" in source.source_field_path for source in data_var.sources)
+        assert any(
+            "specific_value" in source.source_field_path for source in data_var.sources
+        )
 
 
 class TestComprehensiveValidation:
@@ -1477,7 +1491,7 @@ class TestComprehensiveValidation:
     def test_circular_dependency_detection(self):
         """Test detection of circular dependencies in target reference chains."""
 
-        class TaskCircularA(PromptTreeNode):
+        class TaskCircularA(TreeNode):
             """
             ! @->task.circular_b@{{prompt.data_a=*}}
             Task A depends on B's data.
@@ -1486,7 +1500,7 @@ class TestComprehensiveValidation:
             data_a: str = "value_a"
             data_b: str = "value_b_from_a"
 
-        class TaskCircularB(PromptTreeNode):
+        class TaskCircularB(TreeNode):
             """
             ! @->task.circular_c@{{prompt.data_b=*}}
             Task B depends on C's data.
@@ -1495,7 +1509,7 @@ class TestComprehensiveValidation:
             data_b: str = "value_b"
             data_c: str = "value_c_from_b"
 
-        class TaskCircularC(PromptTreeNode):
+        class TaskCircularC(TreeNode):
             """
             ! @->task.circular_a@{{prompt.data_c=*}}
             Task C depends on A's data - creates circular dependency.
@@ -1545,7 +1559,7 @@ class TestComprehensiveValidation:
     def test_unresolved_target_validation(self):
         """Test validation of unresolved target references."""
 
-        class TaskWithUnresolvedTarget(PromptTreeNode):
+        class TaskWithUnresolvedTarget(TreeNode):
             """
             ! @->task.nonexistent_target@{{prompt.data=*}}
             Task referencing non-existent target.
@@ -1570,7 +1584,7 @@ class TestComprehensiveValidation:
     def test_unsatisfied_variable_validation(self):
         """Test validation of unsatisfied variables that cannot be resolved."""
 
-        class TaskWithUnsatisfiedVar(PromptTreeNode):
+        class TaskWithUnsatisfiedVar(TreeNode):
             """
             Task referencing target node that doesn't exist.
             """
@@ -1597,7 +1611,7 @@ class TestComprehensiveValidation:
     def test_invalid_scope_reference_validation(self):
         """Test validation of invalid scope references in commands."""
 
-        class TaskWithInvalidScope(PromptTreeNode):
+        class TaskWithInvalidScope(TreeNode):
             """
             ! @->task.receiver@{{invalid_scope.data=*}}
             Task with invalid scope reference.
@@ -1622,7 +1636,7 @@ class TestComprehensiveValidation:
     def test_malformed_command_validation(self):
         """Test validation of malformed command syntax."""
 
-        class TaskWithMalformedCommand(PromptTreeNode):
+        class TaskWithMalformedCommand(TreeNode):
             """
             ! @->task.receiver@{{prompt.data=*
             Malformed command - missing closing braces.
@@ -1654,7 +1668,7 @@ class TestComprehensiveValidation:
     def test_impossible_variable_mapping_validation(self):
         """Test validation of impossible variable mappings."""
 
-        class TaskWithImpossibleMapping(PromptTreeNode):
+        class TaskWithImpossibleMapping(TreeNode):
             """
             Impossible mapping - trying to iterate over string field.
             """
@@ -1682,7 +1696,7 @@ class TestComprehensiveValidation:
     def test_self_reference_validation(self):
         """Test validation of self-referencing nodes."""
 
-        class TaskSelfReference(PromptTreeNode):
+        class TaskSelfReference(TreeNode):
             """
             ! @->task.self_reference@{{prompt.data=*}}
             Task that references itself.
@@ -1707,7 +1721,7 @@ class TestComprehensiveValidation:
     def test_detailed_error_reporting(self):
         """Test that validation provides detailed, actionable error messages."""
 
-        class TaskWithMultipleIssues(PromptTreeNode):
+        class TaskWithMultipleIssues(TreeNode):
             """
             ! @->task.nonexistent@{{invalid_scope.data=*}}
             Task with multiple validation issues.
@@ -1735,7 +1749,7 @@ class TestComprehensiveValidation:
     def test_valid_configuration_passes_validation(self):
         """Test that valid configurations pass comprehensive validation."""
 
-        class TaskValid(PromptTreeNode):
+        class TaskValid(TreeNode):
             """
             ! @->task.valid_receiver@{{prompt.data=*}}
             Valid task configuration.
@@ -1743,7 +1757,7 @@ class TestComprehensiveValidation:
 
             field1: str = "value1"
 
-        class TaskValidReceiver(PromptTreeNode):
+        class TaskValidReceiver(TreeNode):
             """
             Receiver task for valid configuration.
             """
@@ -1781,7 +1795,7 @@ class TestLangTreeIntegrationLayerBasics:
         assert ContextPropagator is not None
         assert ExecutionOrchestrator is not None
 
-    def test_dpcl_chain_builder_initialization(self):
+    def test_acl_chain_builder_initialization(self):
         """Test LangTreeChainBuilder initializes correctly with all components."""
         from langtree.prompt.integration import LangTreeChainBuilder
 
@@ -1837,7 +1851,7 @@ class TestLangTreeChainBuilderAdversarial:
         run_structure = RunStructure()
 
         # Build circular dependency classes with proper variable mappings
-        class TaskA(PromptTreeNode):
+        class TaskA(TreeNode):
             """
             ! @->task.task_b@{{value.data_for_b=*}}
             Class A depends on B
@@ -1846,7 +1860,7 @@ class TestLangTreeChainBuilderAdversarial:
             source_data_a: str = "data_from_a"
             result_a: str = "result_from_a"
 
-        class TaskB(PromptTreeNode):
+        class TaskB(TreeNode):
             """
             ! @->task.task_c@{{value.data_for_c=*}}
             Class B depends on C
@@ -1855,7 +1869,7 @@ class TestLangTreeChainBuilderAdversarial:
             source_data_b: str = "data_from_b"
             result_b: str = "result_from_b"
 
-        class TaskC(PromptTreeNode):
+        class TaskC(TreeNode):
             """
             ! @->task.task_a@{{value.data_for_a=*}}
             Class C depends on A - creates circular dependency
@@ -1990,7 +2004,7 @@ class TestLangTreeChainIntrospection:
         # Arrange: Create a simple linear dependency chain
         run_structure = RunStructure()
 
-        class TaskSource(PromptTreeNode):
+        class TaskSource(TreeNode):
             """
             ! @->task.processor@{{value.input_data=*}}
             Source task that provides data.
@@ -1998,7 +2012,7 @@ class TestLangTreeChainIntrospection:
 
             source_field: str = "source_value"
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """
             ! @->task.sink@{{value.processed_data=*}}
             Processor task that transforms data.
@@ -2006,7 +2020,7 @@ class TestLangTreeChainIntrospection:
 
             processor_field: str = "processed_value"
 
-        class TaskSink(PromptTreeNode):
+        class TaskSink(TreeNode):
             """
             Final sink task that consumes data.
             """
@@ -2155,7 +2169,7 @@ class TestLangTreeChainIntrospection:
         #    Aggregator
         run_structure = RunStructure()
 
-        class TaskDataSource(PromptTreeNode):
+        class TaskDataSource(TreeNode):
             """
             ! @->task.processor_a@{{value.data_a=*}}
             ! @->task.processor_b@{{value.data_b=*}}
@@ -2165,7 +2179,7 @@ class TestLangTreeChainIntrospection:
             shared_data: str = "source_data"
             metadata: str = "source_metadata"
 
-        class TaskProcessorA(PromptTreeNode):
+        class TaskProcessorA(TreeNode):
             """
             ! @->task.aggregator@{{value.result_a=*}}
             Processor A that transforms data.
@@ -2173,7 +2187,7 @@ class TestLangTreeChainIntrospection:
 
             processed_a: str = "processed_by_a"
 
-        class TaskProcessorB(PromptTreeNode):
+        class TaskProcessorB(TreeNode):
             """
             ! @->task.aggregator@{{value.result_b=*}}
             Processor B that transforms data.
@@ -2181,7 +2195,7 @@ class TestLangTreeChainIntrospection:
 
             processed_b: str = "processed_by_b"
 
-        class TaskAggregator(PromptTreeNode):
+        class TaskAggregator(TreeNode):
             """
             Final aggregator that combines results.
             """
@@ -2268,7 +2282,7 @@ class TestLangTreeChainIntrospection:
         run_structure = RunStructure()
 
         # Root node
-        class TaskRoot(PromptTreeNode):
+        class TaskRoot(TreeNode):
             """
             ! @->task.level1_a@{{value.data=*}}
             ! @->task.level1_b@{{value.data=*}}
@@ -2290,7 +2304,7 @@ class TestLangTreeChainIntrospection:
                 "__annotations__": {f"level1_{letter.lower()}_data": str},
                 f"level1_{letter.lower()}_data": f"processed_by_1{letter}",
             }
-            level1_class = type(f"TaskLevel1{letter}", (PromptTreeNode,), class_dict)
+            level1_class = type(f"TaskLevel1{letter}", (TreeNode,), class_dict)
             level1_classes.append(level1_class)
 
         # Level 2 nodes (6 nodes, 2 per level 1 node)
@@ -2306,9 +2320,7 @@ class TestLangTreeChainIntrospection:
                     "__annotations__": {f"level2_{letter.lower()}{j}_data": str},
                     f"level2_{letter.lower()}{j}_data": f"processed_by_2{letter}{j}",
                 }
-                level2_class = type(
-                    f"TaskLevel2{letter}{j}", (PromptTreeNode,), class_dict
-                )
+                level2_class = type(f"TaskLevel2{letter}{j}", (TreeNode,), class_dict)
                 level2_classes.append(level2_class)
 
         # Level 3 nodes (12 nodes, 2 per level 2 node) - leaf nodes
@@ -2324,7 +2336,7 @@ class TestLangTreeChainIntrospection:
                         f"level3_{letter.lower()}{j}{k.lower()}_data": f"final_result_{letter}{j}{k}",
                     }
                     level3_class = type(
-                        f"TaskLevel3{letter}{j}{k}", (PromptTreeNode,), class_dict
+                        f"TaskLevel3{letter}{j}{k}", (TreeNode,), class_dict
                     )
                     level3_classes.append(level3_class)
 
@@ -2386,7 +2398,7 @@ class TestLangTreeChainIntrospection:
         # Arrange: Create a simple chain that we can trace execution through
         run_structure = RunStructure()
 
-        class TaskCollector(PromptTreeNode):
+        class TaskCollector(TreeNode):
             """
             ! @->task.transformer@{{value.raw_data=*}}
             Collects initial data.
@@ -2394,19 +2406,19 @@ class TestLangTreeChainIntrospection:
 
             collected_items: list[str] = ["item1", "item2", "item3"]
 
-        class TaskTransformer(PromptTreeNode):
+        class TaskTransformer(TreeNode):
             """
             ! @->task.outputter@{{value.transformed=*}}
             Transforms the collected data.
             """
 
-            class TransformationResult(PromptTreeNode):
+            class TransformationResult(TreeNode):
                 status: str = "transformed"
                 count: int = 3
 
             transformation_result: TransformationResult = TransformationResult()
 
-        class TaskOutputter(PromptTreeNode):
+        class TaskOutputter(TreeNode):
             """
             Final output stage.
             """
@@ -2482,7 +2494,7 @@ class TestLangTreeChainIntrospection:
         # Arrange: Create a structure with nodes that ACTUALLY participate in execution
         run_structure = RunStructure()
 
-        class TaskSource(PromptTreeNode):
+        class TaskSource(TreeNode):
             """
             Source task with rich prompt content and template variables.
 
@@ -2498,7 +2510,7 @@ class TestLangTreeChainIntrospection:
                 description="Rich input data for processing\n\n! @->task.analyzer@{{value.source_data=rich_input}}*",
             )
 
-        class TaskDocumentProcessor(PromptTreeNode):
+        class TaskDocumentProcessor(TreeNode):
             """
             ! @->task.output@{{value.analysis_result=*}}
             Analyzer task that processes the rich prompt data.
@@ -2513,7 +2525,7 @@ class TestLangTreeChainIntrospection:
                 description="Results of the analysis processing",
             )
 
-        class TaskOutput(PromptTreeNode):
+        class TaskOutput(TreeNode):
             """
             Final output task.
             """
@@ -2707,7 +2719,7 @@ class TestLangTreeChainIntrospection:
         # Arrange: Create a simple structure to build actual chains from
         run_structure = RunStructure()
 
-        class TaskSource(PromptTreeNode):
+        class TaskSource(TreeNode):
             """
             Source provides data to sink.
             """
@@ -2717,7 +2729,7 @@ class TestLangTreeChainIntrospection:
                 description="! @->task.sink@{{value.data=source_data}}",
             )
 
-        class TaskSink(PromptTreeNode):
+        class TaskSink(TreeNode):
             """
             Final destination for data.
             """
@@ -2734,7 +2746,7 @@ class TestLangTreeChainIntrospection:
         # Arrange: Create a structure that will generate known chain patterns
         run_structure = RunStructure()
 
-        class TaskLinearStart(PromptTreeNode):
+        class TaskLinearStart(TreeNode):
             """
             Linear chain start node.
             """
@@ -2744,7 +2756,7 @@ class TestLangTreeChainIntrospection:
                 description="! @->task.linearmiddle@{{value.start_data=linear_source}}",
             )
 
-        class TaskLinearMiddle(PromptTreeNode):
+        class TaskLinearMiddle(TreeNode):
             """
             Linear chain middle node.
             """
@@ -2754,7 +2766,7 @@ class TestLangTreeChainIntrospection:
                 description="! @->task.linearend@{{value.middle_data=linear_processed}}",
             )
 
-        class TaskLinearEnd(PromptTreeNode):
+        class TaskLinearEnd(TreeNode):
             """
             Linear chain end node.
             """
@@ -3045,7 +3057,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # Arrange: Create execution step that references non-existent node
         malicious_step = {
             "node_tag": "task.nonexistent_node",
-            "node_type": "PromptTreeNode",
+            "node_type": "TreeNode",
             "execution_mode": "single",
             "has_commands": False,
         }
@@ -3066,7 +3078,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # Test 1: Missing node with complex execution step
         complex_malicious_step = {
             "node_tag": "task.complex_missing_node",
-            "node_type": "PromptTreeNode",
+            "node_type": "TreeNode",
             "execution_mode": "multiple",
             "has_commands": True,
             "multiplicity": "n:n",
@@ -3082,7 +3094,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         )
 
         # Test 2: Verify that valid nodes still work correctly
-        class TaskValid(PromptTreeNode):
+        class TaskValid(TreeNode):
             """Valid task for comparison."""
 
             test_field: str = "test_value"
@@ -3111,7 +3123,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 )
 
         # Test 3: Test full chain building with missing references
-        class TaskWithMissingRef(PromptTreeNode):
+        class TaskWithMissingRef(TreeNode):
             """
             Task that references non-existent target.
             """
@@ -3160,7 +3172,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # AGGRESSIVE TEST: Multiple types of invalid structures
 
         # Invalid Structure 1: Self-referencing node
-        class TaskSelfReference(PromptTreeNode):
+        class TaskSelfReference(TreeNode):
             """
             Task that references itself - should cause validation failure.
             """
@@ -3171,7 +3183,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             )
 
         # Invalid Structure 2: Circular dependency chain
-        class TaskCircularA(PromptTreeNode):
+        class TaskCircularA(TreeNode):
             """
             Part of circular dependency A->B->A.
             """
@@ -3181,7 +3193,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 description="! @->task.circular_b@{{value.data_for_b=field_a}}",
             )
 
-        class TaskCircularB(PromptTreeNode):
+        class TaskCircularB(TreeNode):
             """
             Part of circular dependency B->A->B.
             """
@@ -3192,7 +3204,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             )
 
         # Invalid Structure 3: Missing field references
-        class TaskMissingFields(PromptTreeNode):
+        class TaskMissingFields(TreeNode):
             """
             Task with multiple invalid field and scope references.
             """
@@ -3206,7 +3218,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 description="! @->task.target@{{invalid_scope.data=existing_field}}",
             )
 
-        class TaskTarget(PromptTreeNode):
+        class TaskTarget(TreeNode):
             """Target for invalid references."""
 
             target_field: str = "target_data"
@@ -3216,7 +3228,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         run_structure.add(TaskCircularA)
         run_structure.add(TaskCircularB)
 
-        # TaskMissingFields should fail during add() due to DPCL validation
+        # TaskMissingFields should fail during add() due to LangTree DSL validation
         from langtree.prompt.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError, match="nonexistent_field"):
@@ -3361,7 +3373,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         run_structure = RunStructure()
 
         # Add node with malformed structure that will cause validation to fail
-        class TaskBadSyntax(PromptTreeNode):
+        class TaskBadSyntax(TreeNode):
             """
             ! @->task.nonexistent_target@{{value.missing_field=outputs.also_missing}}
             This should break structure validation
@@ -3369,7 +3381,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
             pass
 
-        # TaskBadSyntax should fail during add() due to DPCL validation
+        # TaskBadSyntax should fail during add() due to LangTree DSL validation
         from langtree.prompt.exceptions import FieldValidationError
 
         with pytest.raises(FieldValidationError, match="outputs.also_missing"):
@@ -3575,7 +3587,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         )
 
     def test_build_step_chain_with_malformed_syntax(self):
-        """Test step chain building with syntactically malformed DPCL commands."""
+        """Test step chain building with syntactically malformed LangTree DSL commands."""
         from langtree.prompt.integration import LangTreeChainBuilder
 
         run_structure = RunStructure()
@@ -3626,7 +3638,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             # Create node class with malformed syntax
             node_class = type(
                 f"Task{test_name}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"""
                 {malformed_command}
@@ -3698,7 +3710,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
             node_class = type(
                 f"TaskBoundary{test_name}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"""
                 {boundary_command}
@@ -3742,13 +3754,13 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # Test 3: Complex but valid dependency patterns that stress the parser
 
         # Create target nodes first
-        class TaskComplexTarget1(PromptTreeNode):
+        class TaskComplexTarget1(TreeNode):
             """Target for complex dependencies."""
 
             complex_data_1: str = "target1_data"
             nested_info: str = "nested"
 
-        class TaskComplexTarget2(PromptTreeNode):
+        class TaskComplexTarget2(TreeNode):
             """Another target for complex dependencies."""
 
             complex_data_2: str = "target2_data"
@@ -3758,7 +3770,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         run_structure.add(TaskComplexTarget2)
 
         # Complex dependency pattern node
-        class TaskComplexDependencies(PromptTreeNode):
+        class TaskComplexDependencies(TreeNode):
             """
             ! @->task.complexTarget1@{{value.input1=complex_data_1}}
             ! @->task.complexTarget1@{{value.nested_input=nested_info}}
@@ -3802,7 +3814,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 "__annotations__": {"result": str},
             }
 
-            # Use field description instead of docstring for @all command to comply with DPCL
+            # Use field description instead of docstring for @all command to comply with LangTree DSL
             if i > 0:
                 field_attrs["outputs"] = Field(
                     default="placeholder",
@@ -3812,14 +3824,14 @@ class TestLangTreeChainBuilderAdversarialContinued:
 
             node_class = type(
                 f"TaskLinearNode{i}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {"__doc__": docstring, **field_attrs},
             )
             run_structure.add(node_class)
 
         # Scenario 2: Fan-out then fan-in pattern (1 -> N -> 1)
         # Root node
-        class TaskFanRoot(PromptTreeNode):
+        class TaskFanRoot(TreeNode):
             """Root node for fan-out pattern."""
 
             root_data: str = "fan_root"
@@ -3834,7 +3846,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             """
             node_class = type(
                 f"TaskFanMiddle{i}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": docstring,
                     "middle_result": f"fan_middle_{i}",
@@ -3844,10 +3856,10 @@ class TestLangTreeChainBuilderAdversarialContinued:
             run_structure.add(node_class)
 
         # Fan-in: Final node depending on all middle nodes
-        class TaskFanFinal(PromptTreeNode):
+        class TaskFanFinal(TreeNode):
             """Final fan-in processing"""
 
-            # Use field descriptions for @all commands to comply with DPCL
+            # Use field descriptions for @all commands to comply with LangTree DSL
             final_result: str = "fan_final"
 
         run_structure.add(TaskFanFinal)
@@ -3858,7 +3870,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             # Diamond root
             diamond_root_class = type(
                 f"TaskDiamondRoot{diamond}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"Diamond {diamond} root processing",
                     "diamond_data": f"diamond_{diamond}",
@@ -3871,7 +3883,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             for branch in range(2):
                 branch_class = type(
                     f"TaskDiamondBranch{diamond}Branch{branch}",
-                    (PromptTreeNode,),
+                    (TreeNode,),
                     {
                         "__doc__": f"Diamond {diamond} branch {branch} processing",
                         "branch_result": f"diamond_{diamond}_branch_{branch}",
@@ -3887,7 +3899,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             # Diamond merger (depends on both branches)
             merger_class = type(
                 f"TaskDiamondMerger{diamond}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"Diamond {diamond} merger processing",
                     "merged_result": f"diamond_{diamond}_merged",
@@ -3976,7 +3988,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # Test 3: Cycle detection performance with complex graph
         try:
             # Create potential cycle by adding backwards dependency
-            class TaskCycleCreator(PromptTreeNode):
+            class TaskCycleCreator(TreeNode):
                 """
                 ! @->task.linearnode0@{{value.cycle_data=*}}
                 Node that creates potential cycle back to linear chain start
@@ -4063,7 +4075,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # AGGRESSIVE SYNTAX TESTS: Variable scope edge cases developers encounter
 
         # Test 1: Valid scope combinations that stress the parser
-        class TaskValidScopes(PromptTreeNode):
+        class TaskValidScopes(TreeNode):
             """
             ! @->task.target@{{prompt.metadata=*}}
             Task testing all valid scope combinations.
@@ -4084,7 +4096,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             prompt_data: str = "prompt_info"
 
         # Test 2: Edge cases in scope/field name combinations
-        class TaskScopeEdgeCases(PromptTreeNode):
+        class TaskScopeEdgeCases(TreeNode):
             """
             ! @->task.target@{{prompt.very_long_field_name_that_tests_boundaries=*}}
             Edge cases in field naming.
@@ -4115,7 +4127,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         for test_name, invalid_command in invalid_scope_cases:
             node_class = type(
                 f"TaskInvalidScope{test_name}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"""
                 {invalid_command}
@@ -4152,7 +4164,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 )
 
         # Test 4: Complex nested field references
-        class TaskComplexFields(PromptTreeNode):
+        class TaskComplexFields(TreeNode):
             """
             ! @->task.complex_target@{{value.nested_data=source.subfield}}
             ! @->task.complex_target@{{outputs.processed=results.final}}
@@ -4173,7 +4185,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         for test_name, invalid_assignment in assignment_edge_cases:
             node_class = type(
                 f"TaskAssignment{test_name}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"""
                 {invalid_assignment}
@@ -4224,7 +4236,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 )
 
         # Test 6: Add valid test nodes and build successfully
-        class TaskValidTarget(PromptTreeNode):
+        class TaskValidTarget(TreeNode):
             """Target for valid scope tests."""
 
             target_field: str = "target_data"
@@ -4268,7 +4280,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         # AGGRESSIVE SYNTAX TESTS: Template variable edge cases
 
         # Test 1: Valid template variable combinations
-        class TaskValidTemplates(PromptTreeNode):
+        class TaskValidTemplates(TreeNode):
             """
             Task with template variables.
 
@@ -4284,7 +4296,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             template_data: str = "template_test"
 
         # Test 2: Template variables in different positions
-        class TaskTemplatePositions(PromptTreeNode):
+        class TaskTemplatePositions(TreeNode):
             """
             Start content.
 
@@ -4312,7 +4324,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         for test_name, invalid_template in invalid_template_cases:
             node_class = type(
                 f"TaskInvalidTemplate{test_name}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"""
                 Task with invalid template: {invalid_template}
@@ -4362,8 +4374,8 @@ class TestLangTreeChainBuilderAdversarialContinued:
                     # If it's not a template error, that's unexpected
                     pytest.fail(f"Unexpected error for template test {test_name}: {e}")
 
-        # Test 4: Complex DPCL command syntax edge cases
-        class TaskComplexCommands(PromptTreeNode):
+        # Test 4: Complex LangTree DSL command syntax edge cases
+        class TaskComplexCommands(TreeNode):
             """
             ! @sequential
             ! @parallel
@@ -4395,7 +4407,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
         for test_name, edge_command in command_edge_cases:
             node_class = type(
                 f"TaskCommand{test_name}",
-                (PromptTreeNode,),
+                (TreeNode,),
                 {
                     "__doc__": f"""
                 {edge_command}
@@ -4450,12 +4462,12 @@ class TestLangTreeChainBuilderAdversarialContinued:
                     )
 
         # Test 6: Add valid nodes and test successful building
-        class TaskValidTarget1(PromptTreeNode):
+        class TaskValidTarget1(TreeNode):
             """Target 1 for edge case testing."""
 
             target_data1: str = "target1"
 
-        class TaskValidTarget2(PromptTreeNode):
+        class TaskValidTarget2(TreeNode):
             """Target 2 for edge case testing."""
 
             target_data2: str = "target2"
@@ -4519,18 +4531,18 @@ class TestAssemblyValidation:
         from langtree.prompt.integration import LangTreeChainBuilder
 
         # Test case: destination field with 0 nesting, iteration with 2 levels
-        class SubItem(PromptTreeNode):
+        class SubItem(TreeNode):
             data: str = "test"
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             subitems: list[SubItem] = []
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Target task for the command"""
 
             pass
 
-        class TaskDestinationFieldMismatch(PromptTreeNode):
+        class TaskDestinationFieldMismatch(TreeNode):
             """
             Task with destination field nesting mismatch.
             """
@@ -4564,21 +4576,21 @@ class TestAssemblyValidation:
         """Test that assembly validation allows source fields (validated during semantic phase)."""
         from langtree.prompt.integration import LangTreeChainBuilder
 
-        class SubItem(PromptTreeNode):
+        class SubItem(TreeNode):
             data: str = "test"
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             subitems: list[SubItem] = []
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Target task for the command"""
 
             pass
 
-        class FieldGroup(PromptTreeNode):
+        class FieldGroup(TreeNode):
             items: list[str]
 
-        class TaskSourceField(PromptTreeNode):
+        class TaskSourceField(TreeNode):
             """
             Source task with field validation.
             """
@@ -4608,18 +4620,18 @@ class TestAssemblyValidation:
         """Test that assembly validation passes when there's no iteration."""
         from langtree.prompt.integration import LangTreeChainBuilder
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             data: str = Field(
                 default="test",
                 description="! @->task.processor@{{value.simple_field=data}}*",
             )
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Target task for the command"""
 
             pass
 
-        class TaskNoIteration(PromptTreeNode):
+        class TaskNoIteration(TreeNode):
             """
             Task with no iteration.
             """
@@ -4643,18 +4655,18 @@ class TestAssemblyValidation:
     def test_assembly_validation_mixed_mappings(self):
         """Test assembly validation with mix of source and destination fields."""
 
-        class SubItem(PromptTreeNode):
+        class SubItem(TreeNode):
             data: str = "test"
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             subitems: list[SubItem] = []
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             """Target task for the command"""
 
             pass
 
-        class TaskMixedMappings(PromptTreeNode):
+        class TaskMixedMappings(TreeNode):
             """
             Task with mixed field mappings.
             """
@@ -4703,14 +4715,14 @@ class TestAssemblyValidation:
         # 1. Semantic validation: Validates source fields, defers destination fields
         # 2. Assembly validation: Validates deferred destination fields
 
-        class SubItem(PromptTreeNode):
+        class SubItem(TreeNode):
             data: str = "test"
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             subitems: list[SubItem] = []
 
         # Case 1: All destination fields → semantic validation passes, assembly validation catches issues
-        class TaskAllDestination(PromptTreeNode):
+        class TaskAllDestination(TreeNode):
             """
             Task with all destination fields.
             """
@@ -4722,7 +4734,7 @@ class TestAssemblyValidation:
             # dest_field doesn't exist → all destination → deferred to assembly
 
         # Case 2: Mixed fields → semantic validation catches issues with source fields
-        class TaskMixedFields(PromptTreeNode):
+        class TaskMixedFields(TreeNode):
             """
             Task with mixed source and destination fields.
             """
@@ -4735,7 +4747,7 @@ class TestAssemblyValidation:
                 ""  # EXISTS → source field with 0 levels → semantic validation fails
             )
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             pass
 
         # Test Case 1: All destination fields

@@ -35,7 +35,7 @@ _type_mapping = {
 def get_type(name: str, custom_types: dict[str, type] = {}) -> UnionType | type | None:
     """Resolve a primitive or custom type name (supports simple union syntax).
 
-    Supports a mini DSL where unions are expressed with the first '|' delimiting
+    Supports a mini LangTree DSL where unions are expressed with the first '|' delimiting
     the remainder (recursively parsed). Mapping uses `_type_mapping` for schema
     aliases (e.g. 'integer' -> 'int').
 

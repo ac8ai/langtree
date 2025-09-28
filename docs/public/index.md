@@ -1,14 +1,14 @@
 # LangTree
 
 !!! warning "Pre-Alpha Software"
-    Core functionality not yet implemented. DPCL parsing works, but LangChain execution is not functional.
+    Core functionality not yet implemented. LangTree DSL parsing works, but LangChain execution is not functional.
 
-**Dynamic Prompt Connecting Language (DPCL)** - A framework for orchestrating hierarchical prompt structures into executable LangChain pipelines through tag-based data forwarding.
+**LangTree DSL** - A framework for orchestrating hierarchical prompt structures into executable LangChain pipelines through tag-based data forwarding.
 
 LangTree enables **hierarchical prompt orchestration** where prompts are organized as trees of data they describe how to generate. Data flows between tree structures and persists across processing stages.
 
 ```python
-class TaskCustomerAnalysis(PromptTreeNode):
+class TaskCustomerAnalysis(TreeNode):
     """
     ! llm("opus4.1")
 
@@ -16,7 +16,7 @@ class TaskCustomerAnalysis(PromptTreeNode):
     {PROMPT_SUBTREE}
     """
 
-    class Order(PromptTreeNode):
+    class Order(TreeNode):
         """Extract sentiment and key issues from feedback."""
         feedback: str = Field(description="Raw customer feedback")
 
@@ -43,7 +43,7 @@ class TaskCustomerAnalysis(PromptTreeNode):
 ## Quick Links
 
 - [Getting Started](getting-started.md) - Installation and basic usage
-- [DPCL Reference](dpcl-reference.md) - Complete command syntax
+- [LangTree DSL Reference](LangTree DSL-reference.md) - Complete command syntax
 
 ```bash
 # Install from GitHub

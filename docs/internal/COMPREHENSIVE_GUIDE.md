@@ -1,4 +1,4 @@
-# DPCL Framework - Comprehensive Guide
+# LangTree DSL Framework - Comprehensive Guide
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -12,7 +12,7 @@
 
 ## Overview
 
-The **Dynamic Prompt Connecting Language (DPCL)** framework transforms hierarchical prompt structures into executable LangChain pipelines through tag-based data forwarding and deterministic chain assembly.
+The **Action Chaining Language (LangTree DSL)** framework transforms hierarchical prompt structures into executable LangChain pipelines through tag-based data forwarding and deterministic chain assembly.
 
 ### Key Principles
 
@@ -33,13 +33,13 @@ The **Dynamic Prompt Connecting Language (DPCL)** framework transforms hierarchi
 
 ### ✅ Actually Working (483 Passing Tests)
 - **Core Structure Management**: Node creation, registration, and tree building
-- **Command Processing Core**: DPCL command parsing with comprehensive syntax validation
+- **Command Processing Core**: LangTree DSL command parsing with comprehensive syntax validation
 - **Semantic Validation Framework**: Field existence, task target completeness, inheritance validation
-- **Field Context Scoping Validation**: Complete DPCL field context scoping and subchain validation
+- **Field Context Scoping Validation**: Complete LangTree DSL field context scoping and subchain validation
 - **Variable Registry**: Assembly variable tracking and processing
 - **Template Variable System**: Template variable resolution and conflict detection
-- **Command Extraction**: ✅ **FIXED** - Template variable vs DPCL syntax conflict resolved with 2-step processing
-- **Template Variable Processing**: Clean separation from DPCL commands prevents parsing conflicts
+- **Command Extraction**: ✅ **FIXED** - Template variable vs LangTree DSL syntax conflict resolved with 2-step processing
+- **Template Variable Processing**: Clean separation from LangTree DSL commands prevents parsing conflicts
 - **Runtime Variable Architecture**: Integrated `{var}` → `{prompt__path__var}` expansion with proper validation pipeline
 - **Architectural Validation**: Comprehensive TDD test suite for bare collection rejection and structural validation
 - **Modular Validation System**: Single Responsibility Principle compliance with dedicated validation modules
@@ -62,7 +62,7 @@ The **Dynamic Prompt Connecting Language (DPCL)** framework transforms hierarchi
 
 ### ✅ Completed: Field Context Scoping Validation
 
-**Current State**: Complete DPCL field context scoping validation implemented
+**Current State**: Complete LangTree DSL field context scoping validation implemented
 **Features**: `@each[sections.paragraphs]` validates that:
 1. `sections` field exists and is iterable in the correct context
 2. Commands respect field context scoping rules (inclusion_path must start with field where command is defined)
@@ -72,17 +72,17 @@ The **Dynamic Prompt Connecting Language (DPCL)** framework transforms hierarchi
 **Impact**: High - ensures correctness of all iteration-based commands
 **Tests**: 27 semantic validation tests passing with excellent performance
 
-### ✅ Completed: DPCL Validation Architecture Compliance
+### ✅ Completed: LangTree DSL Validation Architecture Compliance
 
-**Current State**: All DPCL validation errors resolved with specification compliance
+**Current State**: All LangTree DSL validation errors resolved with specification compliance
 **Features**: Fixed 10 critical validation violations:
 1. @each commands moved from docstrings to Field descriptions (architectural requirement)
 2. @all commands in docstrings updated to use wildcard (*) syntax for data locality
-3. Pydantic Field integration ensures proper DPCL command placement
+3. Pydantic Field integration ensures proper LangTree DSL command placement
 4. Architectural validation test suite (10/10 tests passing)
 
-**Impact**: Critical - ensures framework follows DPCL specification requirements exactly
-**Tests**: All DPCL validation errors eliminated, test suite shows 12% improvement in passing rate
+**Impact**: Critical - ensures framework follows LangTree DSL specification requirements exactly
+**Tests**: All LangTree DSL validation errors eliminated, test suite shows 12% improvement in passing rate
 
 ### 🚧 V2.0 Implementation Status (Honest Assessment)
 - **Assembly Variable Commands**: ❌ **NOT IMPLEMENTED** - Only basic parsing exists
@@ -98,7 +98,7 @@ The **Dynamic Prompt Connecting Language (DPCL)** framework transforms hierarchi
 - **85 Tests Skipped**: Missing implementations requiring development
 - **1 xFailed**: Expected failure for complex features
 - **Total Test Coverage**: 622 tests written (82.6% pass, 3.5% fail, 13.7% skipped, 0.2% xfail)
-- **Recent Progress**: DPCL validation improvements reduced failures from 25 to 22 tests (12% improvement)
+- **Recent Progress**: LangTree DSL validation improvements reduced failures from 25 to 22 tests (12% improvement)
 
 ### 📋 V2.0 Implementation Plan
 
@@ -119,7 +119,7 @@ Following Test-Driven Development (TDD) principles from CODING_STANDARDS.md:
 - ✅ Fixed command/prompt separation to handle mixed content correctly
 - ✅ Created comprehensive TDD test suite for architectural validation (10/10 tests passing)
 - ✅ Integrated with existing template variable processing and variable registry systems
-- ✅ Fixed all 10 DPCL validation errors (3 @each + 7 @all docstring violations)
+- ✅ Fixed all 10 LangTree DSL validation errors (3 @each + 7 @all docstring violations)
 - ✅ Improved semantic validation compliance and architectural adherence
 
 **Phase 2: Runtime Variable System Completion** (Current Priority - Based on architectural foundation)
@@ -150,7 +150,7 @@ Following Test-Driven Development (TDD) principles from CODING_STANDARDS.md:
 - Implement proper scope modifier semantics (prompt, value, outputs, task)
 
 **Phase 6: LangChain Integration** (Future)
-- Build actual chain assembly from DPCL structures
+- Build actual chain assembly from LangTree DSL structures
 - Implement runtime execution orchestration
 - Add outputs context storage layer
 - Support topological ordering for execution
@@ -165,11 +165,11 @@ Following Test-Driven Development (TDD) principles from CODING_STANDARDS.md:
 
 ## Variable System
 
-DPCL implements a sophisticated variable system with five distinct types as documented in the Language Specification Variable System section:
+LangTree DSL implements a sophisticated variable system with five distinct types as documented in the Language Specification Variable System section:
 
 - **Assembly Variables** (`! var=value`) - Parse-time configuration values (assembly-time only)
 - **Runtime Variables** (`{var}`) - Dynamic content interpolation during execution (runtime-only)
-- **DPCL Variable Targets** (`@each[var]`) - Collection iteration and variable tracking
+- **LangTree DSL Variable Targets** (`@each[var]`) - Collection iteration and variable tracking
 - **Scope Context Variables** (`scope.field`) - Structured data access from specific execution contexts
 - **Field References** (`[field]`) - Target fields for resampling and aggregation
 
@@ -182,11 +182,11 @@ DPCL implements a sophisticated variable system with five distinct types as docu
 **Mechanism**: When @each processes collections, the RHS expressions in variable mappings become runtime variables available at the target node (TODO: adjust for different scopes of variables!):
 
 ```python
-class SourceNode(PromptTreeNode):
+class SourceNode(TreeNode):
     """! @each[items]->target.processor@{{value.processed_items=items}}*"""
     items: list[str] = ["item1", "item2", "item3"]
 
-class TargetProcessor(PromptTreeNode):
+class TargetProcessor(TreeNode):
     processed_items: list[str]  # This field gets populated by @each RHS
 ```
 
@@ -211,7 +211,7 @@ class TargetProcessor(PromptTreeNode):
 
 ### Template Variables
 
-DPCL provides special template variables for automatic prompt assembly:
+LangTree DSL provides special template variables for automatic prompt assembly:
 
 - **`{PROMPT_SUBTREE}`**: Placeholder for child field content in parent docstrings
   - Automatically appended if not present in docstring
@@ -325,7 +325,7 @@ class DocumentWithSections:
 "value.title" -> LLM_generates_title_content
 # → LLM execution populates target field
 
-# task scope - reference other DPCL nodes
+# task scope - reference other LangTree DSL nodes
 "task.summarize" -> reference_to_summarization_node
 # → Creates dependency links in execution graph
 ```
@@ -340,7 +340,7 @@ class DocumentWithSections:
 - `outputs` = Data flows directly without LLM processing → Goes to "Outputs" section of target prompt
 - `value` = LLM generates content that becomes the variable → LLM execution result
 - `prompt` = Data flows TO LLM as context → Goes to "Context" section of target prompt  
-- `task` = References to other nodes in DPCL tree → Builds execution dependencies
+- `task` = References to other nodes in LangTree DSL tree → Builds execution dependencies
 
 ---
 
@@ -386,7 +386,7 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 ### Command Types
 
 #### Variable Assignment Commands
-```dpcl
+```LangTree DSL
 ! k = 6                    # Integer assignment
 ! temperature = 0.7        # Float assignment  
 ! model = "gpt-4"          # String assignment
@@ -400,7 +400,7 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 - Comments supported with `#` syntax
 
 #### Command Execution
-```dpcl
+```LangTree DSL
 ! resample(5)              # Execute resample command with 5 iterations
 ! llm("gpt-4")             # Select LLM model for subtree  
 ! llm("claude-3", override=true) # Override model for entire subtree
@@ -411,7 +411,7 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 - Fail-fast validation for unknown commands
 
 #### Resampling Commands
-```dpcl
+```LangTree DSL
 ! @resampled[quality]->mean      # Aggregate quality enum field using mean
 ! @resampled[rating]->max        # Get maximum rating value
 ! @resampled[category]->mode     # Most frequent category
@@ -423,7 +423,7 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 - Results stored in `<field_name>_resampled_value` for numerical functions
 
 #### @each Commands (Many-to-Many)
-```dpcl
+```LangTree DSL
 ! @each[sections]->task.analyze@{{value.title=sections.title}}*
 ```
 - Iterate over collections
@@ -431,7 +431,7 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 - Required `*` multiplicity
 
 #### @all Commands (One-to-One and One-to-Many)
-```dpcl
+```LangTree DSL
 ! @->task.summarize@{{prompt.content=*}}      # 1:1
 ! @all->task.generate@{{prompt.seed=topic}}*  # 1:n
 ```
@@ -439,7 +439,7 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 - Optional `*` for multiple outputs
 
 #### Node Modifiers
-```dpcl
+```LangTree DSL
 ! @sequential  # Fields generate in order (RECOMMENDED DEFAULT)
 ! @parallel    # Fields generate simultaneously (performance optimization)
 ! together     # Shorthand for @parallel
@@ -448,19 +448,19 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 ### Variable Mappings
 
 #### Explicit Assignment
-```dpcl
+```LangTree DSL
 prompt.title = sections.title
 value.content = document.body
 outputs.result = analysis.summary
 ```
 
 #### Implicit Assignment
-```dpcl
+```LangTree DSL
 prompt.target_data    # Equivalent to: prompt.target_data = target_data
 ```
 
 #### Wildcard Assignment
-```dpcl
+```LangTree DSL
 prompt.context = *   # Forward entire current subtree
 ```
 
@@ -480,10 +480,10 @@ prompt.context = *   # Forward entire current subtree
 
 ## Framework Architecture
 
-### Core DPCL Modules (`langtree/prompt/`)
+### Core LangTree DSL Modules (`langtree/prompt/`)
 
 #### `structure.py` - Main Framework Classes
-- `PromptTreeNode`: Base class for all prompt nodes with tag parsing
+- `TreeNode`: Base class for all prompt nodes with tag parsing
 - `RunStructure`: Main orchestration class for building and analyzing chains
 - Core validation and execution planning logic
 
@@ -525,7 +525,7 @@ prompt.context = *   # Forward entire current subtree
 
 #### `chains.py` - Chain Infrastructure  
 - `prepare_chain()`: LangChain pipeline preparation utilities
-- Chain building components for DPCL-generated structures
+- Chain building components for LangTree DSL-generated structures
 - Integration points for existing chain infrastructure
 
 #### `commands/` - Tag Parsing System
@@ -537,21 +537,21 @@ prompt.context = *   # Forward entire current subtree
 
 ### Core Components
 
-The DPCL framework consists of three main components that work together to transform prompt trees into executable chains:
+The LangTree DSL framework consists of three main components that work together to transform prompt trees into executable chains:
 
 #### 1. RunStructure
 **Purpose**: Main orchestrator for building prompt trees and compiling to LangChain chains
-- Coordinates tree building from PromptTreeNode classes
+- Coordinates tree building from TreeNode classes
 - Manages variable registries and pending target resolution
 - Provides the interface for chain assembly and execution planning
 
-#### 2. PromptTreeNode  
-**Purpose**: Base class for hierarchical prompt structures with DPCL annotations
+#### 2. TreeNode  
+**Purpose**: Base class for hierarchical prompt structures with LangTree DSL annotations
 - Enables declarative definition of prompt components
-- Supports DPCL command annotations in docstrings
+- Supports LangTree DSL command annotations in docstrings
 - Provides structural foundation for tree building
 
-#### 3. DPCL Parser
+#### 3. LangTree DSL Parser
 **Purpose**: Transforms command strings into structured objects for chain assembly
 - Extracts scope modifiers from all path components
 - Handles complex variable mappings and multiplicity indicators
@@ -578,9 +578,9 @@ The system is designed to maximize LLM provider cache efficiency (e.g., OpenAI c
 ### Integration Patterns
 
 #### Composite Chain Architecture
-DPCL-generated chains integrate seamlessly with existing LangChain infrastructure through composite patterns that combine:
+LangTree DSL-generated chains integrate seamlessly with existing LangChain infrastructure through composite patterns that combine:
 - External preprocessing chains
-- DPCL tree-generated chains  
+- LangTree DSL tree-generated chains  
 - Post-processing and validation chains
 
 #### External Chain Integration
@@ -596,11 +596,11 @@ The framework supports integration with existing chain infrastructure through:
 Current approach for external data:
 - Manual integration via external inputs to RunStructure
 - Direct variable assignment through scope resolution
-- Custom preprocessing before DPCL chain assembly
+- Custom preprocessing before LangTree DSL chain assembly
 
 **Note**: Automated integration patterns for external extraction pipelines (e.g., title extraction, document preprocessing) need architectural design and implementation.**Current Chain Infrastructure Compatibility**:
 - Existing `chains.py` infrastructure remains fully compatible
-- `prepare_chain()` function can be used as building blocks for DPCL-generated chains
+- `prepare_chain()` function can be used as building blocks for LangTree DSL-generated chains
 - Standard prompt template, LLM binding, and output parsing patterns are preserved
 - Sampling chains and structured output support integrate seamlessly
 
@@ -620,7 +620,7 @@ Current approach for external data:
 **❌ Missing for Complete Integration**:
 - Tag-based forwarding implementation
 - @sequential/@parallel node modifier support
-- Automatic chain generation from DPCL structures
+- Automatic chain generation from LangTree DSL structures
 - Multiplicity expansion (@each commands)
 - Hierarchical prompt assembly from cleaned docstrings
 - Full topological ordering for execution
@@ -650,7 +650,7 @@ The system validates that all variables can be resolved during chain assembly th
 
 1. **Dependency Ordering**: Must know which nodes depend on which others to build correct LangChain pipeline order
 2. **Input Validation**: Must identify all external inputs required before chain execution begins
-3. **Reference Resolution**: Must validate all DPCL references can be resolved to valid LangChain variables
+3. **Reference Resolution**: Must validate all LangTree DSL references can be resolved to valid LangChain variables
 4. **Error Prevention**: Must catch unresolved references before LangChain chain assembly to prevent runtime failures
 5. **Execution Planning**: Must generate valid execution graphs that LangChain can process
 
@@ -661,7 +661,7 @@ The framework serves as a **validation and planning layer** that ensures the Lan
 - **Simplified Status Model**: Focus on assembly validation rather than complex runtime state machines
 
 #### DAG Execution Planning
-Dependency graphs are extracted from DPCL commands to enable:
+Dependency graphs are extracted from LangTree DSL commands to enable:
 - Topological ordering for execution
 - Parallel execution identification
 - Dependency validation and optimization
@@ -708,34 +708,34 @@ The system assembles hierarchical prompts through a deterministic process:
 
 The framework categorizes errors into distinct types for effective debugging:
 
-- **Syntax Errors**: DPCL command parsing failures
+- **Syntax Errors**: LangTree DSL command parsing failures
 - **Semantic Errors**: Invalid variable references or scope violations  
 - **Assembly Errors**: Chain building failures during compilation
 - **Validation Errors**: Circular dependencies or unresolved references
 
 ## Testing Framework
 
-The DPCL framework includes comprehensive testing infrastructure to ensure reliability and maintainability.
+The LangTree DSL framework includes comprehensive testing infrastructure to ensure reliability and maintainability.
 
 ### Core Test Philosophy
 Testing follows a multi-layered approach that validates both individual components and their integration:
 
-- **Unit Tests**: Validate DPCL parsing, variable resolution, and template assembly
-- **Integration Tests**: Ensure DPCL trees compile correctly to LangChain chains
+- **Unit Tests**: Validate LangTree DSL parsing, variable resolution, and template assembly
+- **Integration Tests**: Ensure LangTree DSL trees compile correctly to LangChain chains
 - **Chain Tests**: Validate external chain integration and composite pipeline behavior
 - **Performance Tests**: Ensure template caching and execution efficiency
 
 ### Testing Patterns
 
 #### Component Testing
-Individual DPCL components are tested with realistic prompt tree structures to validate:
+Individual LangTree DSL components are tested with realistic prompt tree structures to validate:
 - Command parsing accuracy and error handling
 - Variable resolution completeness and closure validation
 - Template assembly correctness and cache efficiency
 
 #### Integration Testing
 Chain compilation and integration testing ensures:
-- DPCL trees compile to valid LangChain chains
+- LangTree DSL trees compile to valid LangChain chains
 - External preprocessing chains integrate correctly
 - Composite pipelines maintain data flow integrity
 - Variable mappings resolve correctly across chain boundaries
@@ -763,7 +763,7 @@ Performance testing validates:
 #### ✅ Complete & Validated (52% Working)
 - **Core Structure Management** (Node creation, registration, tree building)
 - **Context Resolution Foundation** (Basic path resolution in all scopes)
-- **Command Processing Core** (DPCL parsing and validation)
+- **Command Processing Core** (LangTree DSL parsing and validation)
 - **Error Handling** (Validation error detection and reporting)
 - **Template Variable Detection** (Basic spacing validation working)
 
@@ -879,7 +879,7 @@ For very complex chain assemblies, consider these optimization approaches:
 
 #### Variable Assignment and Command Execution
 ```python
-class ConfiguredAnalysisNode(PromptTreeNode):
+class ConfiguredAnalysisNode(TreeNode):
     """
     Research analysis with configurable parameters.
     
@@ -894,7 +894,7 @@ class ConfiguredAnalysisNode(PromptTreeNode):
     key_findings: str = Field(description="Top <k> most important findings")
     confidence_score: int = Field(description="Confidence 1-10", ge=1, le=10)
 
-class QualityAssessmentNode(PromptTreeNode):
+class QualityAssessmentNode(TreeNode):
     """
     Quality assessment with resampling aggregation.
     
@@ -925,7 +925,7 @@ class QualityEnum(Enum):
     GOOD = 3
     EXCELLENT = 4
 
-class ContentQualityNode(PromptTreeNode):
+class ContentQualityNode(TreeNode):
     """
     Content quality evaluation with statistical aggregation.
     
@@ -946,7 +946,7 @@ class ContentQualityNode(PromptTreeNode):
 ### Basic Document Processing
 
 ```python
-class DocumentNode(PromptTreeNode):
+class DocumentNode(TreeNode):
     """
     ! @sequential
     ! @->summary.node@{{prompt.content=content}}
@@ -955,7 +955,7 @@ class DocumentNode(PromptTreeNode):
     content: str  # This will be satisfied by external input
     summary: str
 
-class SummaryNode(PromptTreeNode):
+class SummaryNode(TreeNode):
     """
     ! @parallel  
     """
@@ -984,14 +984,14 @@ summary = structure.get_execution_summary()
 ### Complex Data Flow
 
 ```python
-class ResearchNode(PromptTreeNode):
+class ResearchNode(TreeNode):
     """
     ! @each[sections]->analysis.node@{{value.section_title=sections.title, prompt.context=*}}*
     """
     sections: List[Section]
     overall_theme: str
 
-class AnalysisNode(PromptTreeNode):
+class AnalysisNode(TreeNode):
     """
     ! @sequential
     ! @->conclusions.node@{{prompt.analysis_results=results}}
@@ -1000,7 +1000,7 @@ class AnalysisNode(PromptTreeNode):
     analysis: str  
     results: str
 
-class ConclusionsNode(PromptTreeNode):
+class ConclusionsNode(TreeNode):
     """
     ! @parallel
     """
@@ -1041,7 +1041,7 @@ try:
     structure = RunStructure()
     structure.add(InvalidNode)  # Missing required commands
 except CommandParseError as e:
-    print(f"DPCL Syntax Error: {e}")
+    print(f"LangTree DSL Syntax Error: {e}")
 except VariableResolutionError as e:
     print(f"Variable Resolution Failed: {e}")
 except ChainAssemblyError as e:
@@ -1091,7 +1091,7 @@ except ChainAssemblyError as e:
 
 ### Test Update Guidance
 
-When making changes to the DPCL framework, follow these testing guidelines:
+When making changes to the LangTree DSL framework, follow these testing guidelines:
 
 #### Test Structure
 - Unit tests are organized by module in the `tests/` directory
@@ -1128,4 +1128,4 @@ The current test suite includes 149 passing tests with 12 skipped tests for plan
 
 ---
 
-This comprehensive guide replaces the need for 9 separate documentation files and provides everything needed to understand, implement, and extend the DPCL framework.
+This comprehensive guide replaces the need for 9 separate documentation files and provides everything needed to understand, implement, and extend the LangTree DSL framework.

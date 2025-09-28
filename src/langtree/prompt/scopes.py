@@ -1,8 +1,8 @@
 """
-Scope classes for DPCL context resolution and variable management.
+Scope classes for LangTree DSL context resolution and variable management.
 
 This module contains all scope classes that define how variables and contexts
-are resolved within the DPCL prompt tree execution system.
+are resolved within the LangTree DSL prompt tree execution system.
 """
 
 from abc import ABC, abstractmethod

@@ -1,8 +1,8 @@
-# DPCL Coding Standards
+# LangTree DSL Coding Standards
 
 ## Overview
 
-This document defines the coding standards, conventions, and architectural principles for the DPCL framework. These guidelines ensure consistency, maintainability, and scalability across the codebase.
+This document defines the coding standards, conventions, and architectural principles for the LangTree DSL framework. These guidelines ensure consistency, maintainability, and scalability across the codebase.
 
 ## Development Practices
 
@@ -173,7 +173,7 @@ import langtree.models
 # Group 4: Internal from imports (alphabetical by source module)
 from langtree.commands.parser import parse_command
 from langtree.prompt.registry import VariableRegistry
-from langtree.prompt.structure import PromptTreeNode, RunStructure
+from langtree.prompt.structure import TreeNode, RunStructure
 ```
 
 #### Blank Line Separation
@@ -362,4 +362,4 @@ ProcessingResult = tuple[bool, Optional[str], dict[str, Any]]
 - **Fail fast**: Don't continue processing with invalid data
 - **Clear messages**: Explain what was expected vs. what was received
 
-These standards ensure consistent, maintainable, and scalable code across the DPCL framework while supporting both current development and future evolution.
+These standards ensure consistent, maintainable, and scalable code across the LangTree DSL framework while supporting both current development and future evolution.

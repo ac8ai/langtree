@@ -6,10 +6,11 @@ relationships and handle forward references in the prompt tree structure.
 """
 
 # Group 2: External from imports (alphabetical by source module)
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 # Group 4: Internal from imports (alphabetical by source module)
+from langtree.commands.parser import CommandType
 from langtree.prompt.exceptions import (
     FieldTypeError,
     NodeInstantiationError,
@@ -21,9 +22,9 @@ from langtree.prompt.scopes import Scope
 if TYPE_CHECKING:
     from langtree.commands.parser import ParsedCommand
     from langtree.prompt.structure import (
-        PromptTreeNode,
         RunStructure,
         StructureTreeNode,
+        TreeNode,
     )
 
 
@@ -191,34 +192,57 @@ class AssemblyVariableRegistry:
 
 
 @dataclass
+class SourceInfo:
+    """Information about a single source that satisfies a variable."""
+
+    source_node_tag: str
+    source_field_path: str
+    command_type: (
+        CommandType | None
+    )  # CommandType.EACH, CommandType.ALL, or None for direct assignment
+    has_multiplicity: bool = False
+
+    def get_relationship_type(self) -> str:
+        """Determine the relationship type for this specific source."""
+        if self.command_type == CommandType.EACH and self.has_multiplicity:
+            return "n:n"
+        elif self.command_type == CommandType.ALL and self.has_multiplicity:
+            return "1:n"
+        elif self.command_type == CommandType.ALL and not self.has_multiplicity:
+            return "1:1"
+        elif self.command_type == CommandType.EACH and not self.has_multiplicity:
+            return "1:1"
+        else:
+            return "1:1"  # Direct assignment (None command_type)
+
+
+@dataclass
 class VariableInfo:
     """Information about a variable and its satisfaction sources."""
 
     variable_path: str
     scope: Scope
-    source_node_tag: str
-    satisfaction_sources: list[str]
-    command_type: str = ""  # "each", "all", or ""
-    has_multiplicity: bool = False
+    sources: list[SourceInfo] = field(default_factory=list)
 
-    def get_relationship_type(self) -> str:
-        """Determine the relationship type based on command and multiplicity."""
-        if self.command_type == "each" and self.has_multiplicity:
-            return "n:n"
-        elif self.command_type == "all" and self.has_multiplicity:
-            return "1:n"
-        elif self.command_type == "all" and not self.has_multiplicity:
-            return "1:1"
-        else:
-            return "unknown"
+    def get_relationship_types(self) -> list[str]:
+        """Get all relationship types from all sources."""
+        return [source.get_relationship_type() for source in self.sources]
+
+    def get_source_node_tags(self) -> list[str]:
+        """Get all source node tags."""
+        return [source.source_node_tag for source in self.sources]
+
+    def get_satisfaction_sources(self) -> list[str]:
+        """Get all source field paths."""
+        return [source.source_field_path for source in self.sources]
 
     def is_satisfied(self) -> bool:
         """Check if this variable has any satisfaction sources."""
-        return len(self.satisfaction_sources) > 0
+        return len(self.sources) > 0
 
     def has_multiple_sources(self) -> bool:
         """Check if this variable has multiple satisfaction sources."""
-        return len(self.satisfaction_sources) > 1
+        return len(self.sources) > 1
 
     def get_scope_name(self) -> str:
         """Get the scope name for display purposes only."""
@@ -272,33 +296,54 @@ class VariableRegistry:
             self.variables[full_var_name] = VariableInfo(
                 variable_path=variable_path,
                 scope=scope,
-                source_node_tag=source_node_tag,
-                satisfaction_sources=[],
-                command_type=command_type,
-                has_multiplicity=has_multiplicity,
             )
 
     def add_satisfaction_source(
-        self, variable_path: str, scope: Scope, source_path: str
+        self,
+        variable_path: str,
+        scope: Scope,
+        source_node_tag: str,
+        source_path: str,
+        command_type: CommandType | None = None,
+        has_multiplicity: bool = False,
     ):
         """
-        Associate a satisfaction source path with an existing variable.
+        Associate a satisfaction source with an existing variable.
 
-        Links a source path to a previously registered variable target,
-        building the mapping that will be used during resolution to determine
-        where variable values come from.
+        Links a rich source object to a previously registered variable target,
+        preserving complete command context for each source.
 
         Params:
             variable_path: Target variable path in scope-relative format
             scope: Scope object that must match the registered variable
+            source_node_tag: Tag of the node providing this source
             source_path: Raw source path string, may include wildcard "*"
+            command_type: Command type that created this source ("each", "all", etc.)
+            has_multiplicity: Whether the source command has multiplicity flag
         """
         scope_name = scope.get_name()
         full_var_name = f"{scope_name}.{variable_path}"
 
         if full_var_name in self.variables:
-            if source_path not in self.variables[full_var_name].satisfaction_sources:
-                self.variables[full_var_name].satisfaction_sources.append(source_path)
+            # Check if this exact source already exists
+            existing_source = None
+            for source in self.variables[full_var_name].sources:
+                if (
+                    source.source_node_tag == source_node_tag
+                    and source.source_field_path == source_path
+                ):
+                    existing_source = source
+                    break
+
+            # Only add if this exact source doesn't already exist
+            if existing_source is None:
+                new_source = SourceInfo(
+                    source_node_tag=source_node_tag,
+                    source_field_path=source_path,
+                    command_type=command_type,
+                    has_multiplicity=has_multiplicity,
+                )
+                self.variables[full_var_name].sources.append(new_source)
 
     def is_source_satisfied(
         self,
@@ -357,13 +402,13 @@ class VariableRegistry:
         """
         truly_unsatisfied = []
         for var_info in self.variables.values():
-            if not var_info.satisfaction_sources:
+            if not var_info.sources:
                 truly_unsatisfied.append(var_info)
             else:
                 has_valid_source = False
-                for source in var_info.satisfaction_sources:
+                for source in var_info.sources:
                     if self.is_source_satisfied(
-                        source, run_structure, var_info.source_node_tag
+                        source.source_field_path, run_structure, source.source_node_tag
                     ):
                         has_valid_source = True
                         break
@@ -509,11 +554,11 @@ def _validate_path_and_node_tag(path: str, node_tag: str) -> None:
         raise NodeTagValidationError(node_tag, "must be a non-empty string")
 
 
-def _get_node_instance(node: "StructureTreeNode", node_tag: str) -> "PromptTreeNode":
+def _get_node_instance(node: "StructureTreeNode", node_tag: str) -> "TreeNode":
     """
     Get an instance of a node's field type for data access.
 
-    Creates an instance of the PromptTreeNode class associated with
+    Creates an instance of the TreeNode class associated with
     a structure tree node, enabling access to node data and attributes
     for resolution and validation purposes.
 
@@ -522,7 +567,7 @@ def _get_node_instance(node: "StructureTreeNode", node_tag: str) -> "PromptTreeN
         node_tag: The node tag used for error reporting and debugging
 
     Returns:
-        An instance of the node's field_type (PromptTreeNode subclass)
+        An instance of the node's field_type (TreeNode subclass)
 
     Raises:
         FieldTypeError: When node has no field_type defined

@@ -1,15 +1,15 @@
-# Dynamic Prompt Connecting Language Specification
+# LangTree DSL Specification
 
 ## Overview
 
-Prompt Chaining Language (PCL) is a domain-specific language for controlling data flow between PromptTreeNode instances in hierarchical prompt execution systems. It enables precise specification of how data moves between different levels and components of a prompt tree structure.
+LangTree DSL is a domain-specific language for controlling data flow between TreeNode instancesTreeNodeal prompt execution systems. It enables precise specification of how data moves between different levels and components of a prompt tree structure.
 
 ## Node Naming Conventions
 
 ### Base Class Requirement
-- **Required Inheritance**: All node classes must inherit from `PromptTreeNode`
+- **Required Inheritance**: All node classes must inherit from `TreeNode`
 - **Validation**: System validates inheritance at parse-time for proper field detection and validation
-- **Example**: `class TaskProcessor(PromptTreeNode):`
+- **Example**: `class TaskProcessor(TreeNode):`
 
 ### Root Task Nodes
 - **Required Pattern**: `TaskCamelCaseName` (must start with `Task`)
@@ -23,7 +23,7 @@ Prompt Chaining Language (PCL) is a domain-specific language for controlling dat
 - **Pattern**: Regular `CamelCase` naming (no `Task` prefix)
 - **Context**: Defined as nested classes within task or other nodes
 - **Path Resolution**: Accessed through parent path (e.g., `parent.nested_field`)
-- **Inheritance**: Must also inherit from `PromptTreeNode`
+- **Inheritance**: Must also inherit from `TreeNode`
 
 ### Field Type Detection
 - **Iterable Fields**: Automatically detected from type annotations
@@ -36,7 +36,7 @@ Prompt Chaining Language (PCL) is a domain-specific language for controlling dat
 - **Leaf List Limitations**:
   - Limitation: `list[primitive]` fields (e.g., `list[str]`, `list[int]`) are leaf nodes with no traversable subfields
   - Field Access: Cannot access individual elements or subfields within primitive lists
-  - Valid: `sections.paragraphs` where `paragraphs: list[Paragraph]` (list of PromptTreeNode)
+  - Valid: `sections.paragraphs` where `paragraphs: list[Paragraph]` (list of TreeNode)
   - Invalid: `sections.titles[0]` where `titles: list[str]` (list of primitives)
 - **Iteration Inference**: System uses field types to determine iteration structure on left side of mappings
 
@@ -182,7 +182,7 @@ Commands must respect strict field context scoping for proper data flow:
 
 **Field Context Examples**:
 ```python
-class TaskExample(PromptTreeNode):
+class TaskExample(TreeNode):
     # ✅ VALID: inclusion_path starts with field 'sections'
     sections: list[Section] = Field(description="! @each[sections.paragraphs]->other.analyzer@{{other.results=sections.paragraphs}}*")
 
@@ -237,7 +237,7 @@ class TaskExample(PromptTreeNode):
 
 **Examples with Field Context Scoping**:
 ```python
-class DocumentProcessor(PromptTreeNode):
+class DocumentProcessor(TreeNode):
     # ✅ Command in 'documents' field can use inclusion_path starting with 'documents'
     documents: list[Document] = Field(description="! @each[documents]->task.summarize@{{value.summary=documents.content}}*")
 
@@ -299,7 +299,7 @@ This shorthand requires:
 
 **Examples**:
 ```python
-class TaskExample(PromptTreeNode):
+class TaskExample(TreeNode):
     # ✅ Valid - RHS matches containing field
     summary: str = Field(description="! @->task.analyzer@{{prompt.source_data=summary}}")
 
@@ -504,17 +504,17 @@ class TaskExample(PromptTreeNode):
 
 **Examples**:
 ```
-class AnalysisNode(PromptTreeNode):
+class AnalysisNode(TreeNode):
     """! @sequential"""
     overview: str = Field(description="High-level overview")
     details: str = Field(description="Detailed analysis - has access to overview")
     
-class ReportNode(PromptTreeNode):  
+class ReportNode(TreeNode):  
     """! @parallel"""
     summary: str = Field(description="Executive summary")
     technical: str = Field(description="Technical details")
     
-class QuickNode(PromptTreeNode):
+class QuickNode(TreeNode):
     """! together"""  # Same as @parallel
     intro: str
     body: str
@@ -574,7 +574,7 @@ class QuickNode(PromptTreeNode):
 
 ## Variable System
 
-DPCL implements a sophisticated variable system with five distinct types, each serving different purposes with different scopes, resolution times, and syntax:
+LangTree DSL implements a sophisticated variable system with five distinct types, each serving different purposes with different scopes, resolution times, and syntax:
 
 ### Variable Type Taxonomy
 
@@ -590,7 +590,7 @@ DPCL implements a sophisticated variable system with five distinct types, each s
 **Purpose:** Dynamic content interpolation in prompts during execution
 **Conflict Policy:** N/A (resolution-based, not assignment)  
 
-#### 3. DPCL Variable Targets (`@each[var]` / `@all[var]`)
+#### 3. LangTree DSL Variable Targets (`@each[var]` / `@all[var]`)
 **Scope:** Collection iteration during execution  
 **Storage:** Variable tracking in registry for dependency analysis  
 **Purpose:** Iterate over collections and track variable usage patterns  
@@ -693,7 +693,7 @@ DPCL implements a sophisticated variable system with five distinct types, each s
 
 **Registry Separation:**
 - Assembly Variables: Simple key-value storage with conflict detection
-- DPCL Variable Targets: Complex dependency tracking with satisfaction sources
+- LangTree DSL Variable Targets: Complex dependency tracking with satisfaction sources
 - Each type has dedicated storage and resolution logic
 
 ### Implementation Guidelines
@@ -719,6 +719,8 @@ Scope modifiers control how data flows in @each/@all commands. They appear as pr
 - **Example**: `prompt.source_data=summary` → `{source_data}` available in target
 - **Scope override**: `prompt` overrides `task` - they are mutually exclusive
 - **Internal**: Expands to `{prompt__<target_path>__variable_name}` for LangChain
+- **Multiple Sources**: When multiple sources target same `prompt.variable_name`, they are automatically numbered as `{variable_name_1}`, `{variable_name_2}`, etc. in the target prompt
+- **Collection behavior**: Unlike `value` scope (which should have single source), `prompt` scope is designed for data accumulation from multiple sources
 
 #### `value` Scope
 - **Purpose**: Direct value assignment - sets field value without LLM generation
@@ -727,6 +729,7 @@ Scope modifiers control how data flows in @each/@all commands. They appear as pr
 - **Example**: `value.title=sections.title` → title field set to sections.title value
 - **Scope override**: `value` overrides other scopes - mutually exclusive
 - **Use case**: Pre-populate fields with known values
+- **Multiple Sources**: Multiple sources targeting same `value.field_name` indicate a conflict (field can only have one value) and should be flagged as a validation warning
 
 #### `outputs` Scope
 - **Purpose**: Override calculated values during prompt assembly
@@ -752,6 +755,15 @@ Scope modifiers control how data flows in @each/@all commands. They appear as pr
 - **Example**: `@all->prompt.external@{{context_data=*}}`
 - **Resolution**: External prompts use `{variable_name}` → `{prompt__external__variable_name}`
 
+### Multiple Source Handling
+
+Different scopes handle multiple sources targeting the same variable differently:
+
+- **`prompt` scope**: ✅ **Expected** - Creates numbered variables (`{var_1}`, `{var_2}`, etc.) for data accumulation
+- **`value` scope**: ⚠️ **Conflict** - Field can only have one value; multiple sources flagged as validation warning
+- **`outputs` scope**: ✅ **Expected** - Collects all sources for context assembly
+- **`task` scope**: N/A - References existing data, doesn't receive forwarded data
+
 ### Scope Resolution
 
 Scope modifiers are extracted from all path components:
@@ -770,7 +782,7 @@ Scope modifiers are extracted from all path components:
 
 ### Field Type Resolution
 
-DPCL processes different field types during content assembly to generate appropriate headings and structure:
+LangTree DSL processes different field types during content assembly to generate appropriate headings and structure:
 
 **Collection vs Single Types**:
 ```python
@@ -802,7 +814,7 @@ var_name: NodeName = Field(description="...")
 
 ### Parse-Time Validation
 
-DPCL enforces strict validation during parsing to catch errors early and ensure predictable behavior:
+LangTree DSL enforces strict validation during parsing to catch errors early and ensure predictable behavior:
 
 #### Variable Assignment Validation
 - **Name format**: Variable names must match `[a-zA-Z_][a-zA-Z0-9_]*` (Python identifier rules)
@@ -846,7 +858,7 @@ DPCL enforces strict validation during parsing to catch errors early and ensure 
 
 ## Template Variables
 
-DPCL provides two special template variables for automatic prompt assembly and context injection. These variables use the same `{var}` syntax as Runtime Variables but have reserved names and are automatically resolved by the system. They cannot be used as Assembly Variables or user-defined Runtime Variables.
+LangTree DSL provides two special template variables for automatic prompt assembly and context injection. These variables use the same `{var}` syntax as Runtime Variables but have reserved names and are automatically resolved by the system. They cannot be used as Assembly Variables or user-defined Runtime Variables.
 
 ### {PROMPT_SUBTREE}
 
@@ -941,7 +953,7 @@ The **Outputs section** (planned feature) will provide the LLM with all relevant
 
 #### Sequential Processing (Automatic Forwarding)
 ```python
-class DocumentAnalysis(PromptTreeNode):
+class DocumentAnalysis(TreeNode):
     """! @sequential"""
     overview: str = Field(description="First field - gets only external context")
     methodology: str = Field(description="Gets overview in context automatically")
@@ -951,14 +963,14 @@ class DocumentAnalysis(PromptTreeNode):
 
 #### Manual Forwarding (Cross-Node)
 ```python
-class SummaryTask(PromptTreeNode):
+class SummaryTask(TreeNode):
     analysis: str = Field(description="! @each[sections]->summary@{{outputs.section_data=sections}}")
     # summary prompt will include "Outputs" section with all section_data
 ```
 
 #### Context Assembly with Forward References
 ```python
-class ReportGeneration(PromptTreeNode):
+class ReportGeneration(TreeNode):
     """! @sequential"""
     # If conclusion is already generated by another chain, it appears BEFORE title
     title: str = Field(description="Gets conclusion in context if available")  
@@ -1100,7 +1112,7 @@ mapping1, mapping2, mapping3
 
 ### Strict Whitespace Rules
 
-DPCL enforces strict whitespace rules to ensure consistent, unambiguous command syntax:
+LangTree DSL enforces strict whitespace rules to ensure consistent, unambiguous command syntax:
 
 #### Prohibited Whitespace (Zero Tolerance)
 - **Around dots (`.`)**: `document.sections` not `document . sections`
@@ -1119,7 +1131,7 @@ DPCL enforces strict whitespace rules to ensure consistent, unambiguous command 
 
 ### Multiline Command Support
 
-DPCL supports multiline commands within bracket/brace/parenthesis contexts following Python-inspired syntax:
+LangTree DSL supports multiline commands within bracket/brace/parenthesis contexts following Python-inspired syntax:
 
 #### Multiline Contexts
 Multiline continuation is **only** allowed within:
@@ -1229,7 +1241,7 @@ CommandParseError: Wildcard (*) cannot be used with multiple variable mappings
 ## Tag-Based Data Forwarding
 
 ### Overview
-DPCL uses tag-based forwarding for data flow between nodes during chain assembly. Variables are mapped to arbitrarily long dotted keys that LangChain passes between chain components.
+LangTree DSL uses tag-based forwarding for data flow between nodes during chain assembly. Variables are mapped to arbitrarily long dotted keys that LangChain passes between chain components.
 
 ### Tag Generation
 - **Source format**: `node.field` or `scope.path.to.field`
@@ -1444,4 +1456,4 @@ scope.path{filter}.subpath
 ! @->task@{{}}                           # ❌ Empty mappings
 ```
 
-This specification provides the complete formal definition of the Dynamic Prompt Connecting Language, enabling consistent implementation and usage across different systems.
+This specification provides the complete formal definition of the Action Chaining Language, enabling consistent implementation and usage across different systems.

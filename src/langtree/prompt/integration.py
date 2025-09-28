@@ -648,7 +648,7 @@ class LangTreeChainBuilder:
         because the target node structure wasn't available.
 
         Args:
-            command: DPCL command with variable mappings to validate
+            command: LangTree DSL command with variable mappings to validate
             source_node_tag: Tag of the source node containing the command
 
         Raises:

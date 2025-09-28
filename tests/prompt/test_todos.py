@@ -22,11 +22,11 @@ def test_pending_target_completion_callback():
     variable/materialization steps)."""
     from pydantic import Field
 
-    from langtree.prompt.structure import PromptTreeNode, RunStructure
+    from langtree.prompt.structure import RunStructure, TreeNode
 
     run_structure = RunStructure()
 
-    class TaskEarly(PromptTreeNode):
+    class TaskEarly(TreeNode):
         """
         Early task referencing later target.
         """
@@ -35,7 +35,7 @@ def test_pending_target_completion_callback():
             default="test data", description="! @all->task.late@{{result=data}}"
         )
 
-    class TaskLate(PromptTreeNode):
+    class TaskLate(TreeNode):
         """Late task."""
 
         result: str = "default"
@@ -112,7 +112,7 @@ def test_current_prompt_context_variable_access():
 # === List Flattening / Complex List Navigation ===
 @pytest.mark.skip(reason="Advanced list navigation / flattening not yet implemented")
 def test_inclusion_list_attribute_flattening():
-    """Expect: Path like sections.subsections over list[Section{subsections:list[str]}] flattens to proper PromptTreeNode hierarchy with traversable field paths, not raw list[list[...]] structures."""
+    """Expect: Path like sections.subsections over list[Section{subsections:list[str]}] flattens to proper TreeNode hierarchy with traversable field paths, not raw list[list[...]] structures."""
     pass
 
 

@@ -1,8 +1,8 @@
 """
-Resolution module for DPCL context and path resolution.
+Resolution module for LangTree DSL context and path resolution.
 
 This module contains methods for resolving contexts, paths, and references
-within the DPCL prompt tree structure, including deferred context resolution,
+within the LangTree DSL prompt tree structure, including deferred context resolution,
 scope-based path navigation, and cross-tree references.
 """
 
@@ -106,7 +106,7 @@ def _resolve_command_context(
     target_node: "StructureTreeNode | None",
 ) -> None:
     """
-    Perform Phase 2 context resolution for a DPCL command.
+    Perform Phase 2 context resolution for a LangTree DSL command.
 
     Resolves inclusion paths, destination paths, and variable mappings within their
     proper context scopes. This is called after the tree structure is complete
@@ -114,7 +114,7 @@ def _resolve_command_context(
 
     Params:
         run_structure: The RunStructure instance containing the complete tree
-        command: The parsed DPCL command requiring context resolution
+        command: The parsed LangTree DSL command requiring context resolution
         source_node_tag: The tag of the node where this command originated
         target_node: The target node for the command, may be None for pending targets
 
@@ -768,11 +768,11 @@ def _resolve_in_global_tree_context(
         path: The global tree path to resolve (e.g., 'task.analysis.sections')
 
     Returns:
-        Either a complete PromptTreeNode instance or a field value from any node in the tree.
+        Either a complete TreeNode instance or a field value from any node in the tree.
         Type depends on whether path points to a node or a field within a node.
 
         # TODO: Could use overloads to distinguish node vs field access at compile time
-        # @overload def _resolve_in_global_tree_context(path: NodePath) -> PromptTreeNode
+        # @overload def _resolve_in_global_tree_context(path: NodePath) -> TreeNode
         # @overload def _resolve_in_global_tree_context(path: FieldPath) -> PromptValue        Raises:
         ValueError: When path is empty or invalid format
         KeyError: When path doesn't exist in global tree
@@ -1257,7 +1257,7 @@ def resolve_runtime_variables(
                             f"Runtime variable '{{{variable_path}}}' is undefined. "
                             f"Available fields: {available_fields}. "
                             f"{assembly_info}"
-                            f"Check variable name spelling, ensure the field is defined in the PromptTreeNode{', ' + assembly_suggestion if assembly_suggestion else '.'}"
+                            f"Check variable name spelling, ensure the field is defined in the TreeNode{', ' + assembly_suggestion if assembly_suggestion else '.'}"
                         )
                 except RuntimeVariableError:
                     # Always re-raise our specific validation errors
@@ -1461,7 +1461,7 @@ def resolve_runtime_variables_in_commands(
     current_node: "StructureTreeNode",
 ) -> "ParsedCommand":
     """
-    Resolve runtime variables in DPCL command arguments.
+    Resolve runtime variables in LangTree DSL command arguments.
 
     This processes command arguments that contain {{variable}} syntax
     and resolves them before command execution.

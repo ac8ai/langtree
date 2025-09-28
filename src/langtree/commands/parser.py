@@ -1,8 +1,8 @@
 """
-Parser for dynamic prompt connecting language commands.
+Parser for Action Chaining Language commands.
 
 This module provides parsing functionality for commands that control data flow
-between PromptTreeNode instances in hierarchical prompt execution.
+between TreeNode instances in hierarchical prompt execution.
 """
 
 import re
@@ -420,7 +420,7 @@ class CommandParseError(Exception):
 
 
 class CommandParser:
-    """Parser for dynamic prompt connecting language commands."""
+    """Parser for Action Chaining Language commands."""
 
     # Regex patterns for command parsing
     COMMAND_PATTERN = re.compile(
@@ -1475,11 +1475,11 @@ class CommandParser:
         """
         Calculate iterable depth for a path by counting iterable traversals.
 
-        Traverses the path through PromptTreeNode hierarchy and counts how many
+        Traverses the path through TreeNode hierarchy and counts how many
         list fields are encountered. Non-iterable fields don't affect depth count.
 
         Params:
-            node: Starting PromptTreeNode instance for path traversal
+            node: Starting TreeNode instance for path traversal
             path_components: List of field names forming the path
 
         Returns:
@@ -1525,12 +1525,12 @@ class CommandParser:
                 args = get_args(field_type)
                 if args:
                     element_type = args[0]
-                    # Only continue if element is PromptTreeNode
-                    from langtree.prompt.structure import PromptTreeNode
+                    # Only continue if element is TreeNode
+                    from langtree.prompt.structure import TreeNode
 
                     try:
                         if hasattr(element_type, "__mro__") and issubclass(
-                            element_type, PromptTreeNode
+                            element_type, TreeNode
                         ):
                             current_node_type = element_type
                         else:
@@ -1544,11 +1544,11 @@ class CommandParser:
                     break
 
             elif hasattr(field_type, "__mro__"):
-                # Check if it's a PromptTreeNode (non-iterable)
-                from langtree.prompt.structure import PromptTreeNode
+                # Check if it's a TreeNode (non-iterable)
+                from langtree.prompt.structure import TreeNode
 
                 try:
-                    if issubclass(field_type, PromptTreeNode):
+                    if issubclass(field_type, TreeNode):
                         current_node_type = field_type
                     else:
                         # Regular object - can't traverse further with structure
@@ -1607,7 +1607,7 @@ class CommandParser:
         from the previous tag in the actual node structure, tracking the complete chain.
 
         Params:
-            node: Starting PromptTreeNode
+            node: Starting TreeNode
             path: List of field names to traverse
 
         Returns:
@@ -1681,7 +1681,7 @@ class CommandParser:
         4. Depth constraint enforcement (no RHS exceeds inclusion iterable depth)
 
         Params:
-            node: Starting PromptTreeNode for path traversal
+            node: Starting TreeNode for path traversal
             inclusion_path: Components of the @each inclusion path
             rhs_paths: List of RHS path components from variable mappings
 
@@ -1691,12 +1691,14 @@ class CommandParser:
         Raises:
             CommandParseError: If path traversal fails due to structural issues
         """
-        # Empty paths should never occur - they violate DPCL syntax
+        # Empty paths should never occur - they violate LangTree DSL syntax
         # These would be caught during command parsing, but add defensive check
         if not inclusion_path:
-            raise CommandParseError("Empty inclusion path - violates DPCL syntax")
+            raise CommandParseError(
+                "Empty inclusion path - violates LangTree DSL syntax"
+            )
         if not rhs_paths:
-            raise CommandParseError("Empty RHS paths - violates DPCL syntax")
+            raise CommandParseError("Empty RHS paths - violates LangTree DSL syntax")
 
         # Step 1: Calculate iterable depths and validate field existence
         inclusion_depth = self.calculate_iterable_depth(node, inclusion_path)

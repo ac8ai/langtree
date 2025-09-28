@@ -1,8 +1,8 @@
 """
-DPCL Prompt Package
+LangTree DSL Prompt Package
 
 This package provides modular components for building and managing
-Dynamic Prompt Connecting Language (DPCL) prompt tree structures.
+Action Chaining Language (LangTree DSL) prompt tree structures.
 
 Public API exports maintain compatibility with the original prompt_structure.py module.
 """
@@ -38,12 +38,12 @@ from langtree.prompt.scopes import (
     get_scope,
 )
 from langtree.prompt.structure import (
-    PromptTreeNode,
     PromptValue,
     ResolutionResult,
     RunStructure,
     StructureTreeNode,
     StructureTreeRoot,
+    TreeNode,
 )
 
 # Utility functions
@@ -55,7 +55,7 @@ from langtree.prompt.validation import validate_comprehensive, validate_tree
 # Make the main classes available at package level
 __all__ = [
     # Core classes
-    "PromptTreeNode",
+    "TreeNode",
     "StructureTreeNode",
     "StructureTreeRoot",
     "RunStructure",

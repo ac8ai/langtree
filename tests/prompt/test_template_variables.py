@@ -7,9 +7,7 @@ validation to ensure the system properly handles every scenario.
 
 import pytest
 
-# Group 2: External from imports (alphabetical by source module)
-# Group 4: Internal from imports (alphabetical by source module)
-from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt import RunStructure, TreeNode
 from langtree.prompt.template_variables import (
     TemplateVariableSpacingError,
     add_automatic_prompt_subtree,
@@ -326,7 +324,7 @@ class TestTemplateVariableSpacingEdgeCases:
             )
 
     def test_spacing_validation_with_actual_nodes(self):
-        """Test spacing validation in actual PromptTreeNode processing."""
+        """Test spacing validation in actual TreeNode processing."""
         from langtree.prompt.template_variables import (
             TemplateVariableSpacingError,
             process_template_variables,
@@ -663,7 +661,7 @@ class TestTemplateVariableIntegration:
         from langtree.prompt.structure import StructureTreeNode
 
         # Create a real Pydantic model for testing
-        class TestTaskModel(PromptTreeNode):
+        class TestTaskModel(TreeNode):
             analysis: str = Field(description="Detailed analysis step")
             summary: str = Field(description="Brief summary of findings")
             conclusion: str = Field(description="Final conclusions")
@@ -713,7 +711,7 @@ class TestTemplateVariableIntegration:
         from langtree.prompt.template_variables import process_template_variables
 
         # Create test node
-        class TestModel(PromptTreeNode):
+        class TestModel(TreeNode):
             result: str = Field(description="Test result")
 
         node = StructureTreeNode(
@@ -744,11 +742,11 @@ class TestTemplateVariableIntegration:
         from langtree.prompt.template_variables import resolve_prompt_subtree
 
         # Create complex model with various field types
-        class MetadataInfo(PromptTreeNode):
+        class MetadataInfo(TreeNode):
             key: str = "default"
             value: str = "default"
 
-        class ComplexTaskModel(PromptTreeNode):
+        class ComplexTaskModel(TreeNode):
             main_analysis: str = Field(description="Primary analysis component")
             data_processing: list[str] = Field(description="Data processing steps")
             final_summary: str = Field(description="Summary of all findings")
@@ -876,7 +874,7 @@ class TestTemplateVariableResolution:
         """Test PROMPT_SUBTREE resolution with actual field data."""
         from pydantic import BaseModel, Field
 
-        # Create a mock PromptTreeNode class
+        # Create a mock TreeNode class
         class TestNode(BaseModel):
             analysis: str = Field(description="Main analysis content")
             summary: str = Field(description="Brief summary")
@@ -940,7 +938,7 @@ class TestTemplateVariableResolution:
         from langtree.prompt.structure import StructureTreeNode
 
         # Create a real Pydantic model for testing
-        class TestTaskModel(PromptTreeNode):
+        class TestTaskModel(TreeNode):
             analysis: str = Field(description="Detailed analysis step")
             summary: str = Field(description="Brief summary of findings")
             conclusion: str = Field(description="Final conclusions")
@@ -979,7 +977,7 @@ class TestTemplateVariableResolution:
         from langtree.prompt.structure import StructureTreeNode
 
         # Create test node
-        class TestModel(PromptTreeNode):
+        class TestModel(TreeNode):
             result: str = Field(description="Test result")
 
         node = StructureTreeNode(
@@ -1009,11 +1007,11 @@ class TestTemplateVariableResolution:
         from langtree.prompt.structure import StructureTreeNode
 
         # Create complex model with various field types
-        class MetadataInfo(PromptTreeNode):
+        class MetadataInfo(TreeNode):
             key: str = "default"
             value: str = "default"
 
-        class ComplexTaskModel(PromptTreeNode):
+        class ComplexTaskModel(TreeNode):
             main_analysis: str = Field(description="Primary analysis component")
             data_processing: list[str] = Field(description="Data processing steps")
             final_summary: str = Field(description="Summary of all findings")
@@ -1083,19 +1081,19 @@ class TestTemplateVariableResolution:
         )
 
 
-class TestDPCLCommandIntegration:
-    """Test template variables integrated with actual DPCL command parsing."""
+class TestLangTreeDSLCommandIntegration:
+    """Test template variables integrated with actual LangTree DSL command parsing."""
 
-    def test_template_variables_with_dpcl_syntax(self):
-        """Test template variables work correctly with DPCL command syntax in docstrings."""
+    def test_template_variables_with_acl_syntax(self):
+        """Test template variables work correctly with LangTree DSL command syntax in docstrings."""
         from pydantic import Field
 
         from langtree.prompt.structure import StructureTreeNode
 
-        # Create a model with DPCL commands in docstring
-        class DPCLTaskModel(PromptTreeNode):
+        # Create a model with LangTree DSL commands in docstring
+        class LangTreeDSLTaskModel(TreeNode):
             """
-            Analyze the data using DPCL commands.
+            Analyze the data using LangTree DSL commands.
 
             {{EXTRACT data_source}} from input files.
             {{FILTER data_source | quality > 0.8}} for high quality data.
@@ -1112,9 +1110,9 @@ class TestDPCLCommandIntegration:
             results: str = Field(description="Aggregated results")
 
         node = StructureTreeNode(
-            name="dpcl_task",
-            field_type=DPCLTaskModel,
-            clean_docstring=DPCLTaskModel.__doc__ or "",
+            name="langtree_dsl_task",
+            field_type=LangTreeDSLTaskModel,
+            clean_docstring=LangTreeDSLTaskModel.__doc__ or "",
             parent=None,
         )
 
@@ -1122,7 +1120,7 @@ class TestDPCLCommandIntegration:
         content = node.clean_docstring or ""
         result = resolve_template_variables_in_content(content, node)
 
-        # Verify DPCL commands are preserved
+        # Verify LangTree DSL commands are preserved
         assert "{{EXTRACT data_source}}" in result
         assert "{{FILTER data_source" in result
         assert "{{AGGREGATE filtered_data" in result
@@ -1138,10 +1136,10 @@ class TestDPCLCommandIntegration:
         assert "# Results" in result
         assert "Aggregated results" in result
 
-    def test_assembly_variable_conflict_detection_with_dpcl(self):
-        """Test that Assembly Variable conflicts are detected with DPCL commands."""
+    def test_assembly_variable_conflict_detection_with_acl(self):
+        """Test that Assembly Variable conflicts are detected with LangTree DSL commands."""
         content = """
-        Process data with DPCL:
+        Process data with LangTree DSL:
 
         {{EXTRACT PROMPT_SUBTREE}} from source
         {{FILTER COLLECTED_CONTEXT | valid == true}}
@@ -1205,8 +1203,8 @@ class TestDPCLCommandIntegration:
 class TestLanguageSpecificationCompliance:
     """Test template variables comply with LANGUAGE_SPECIFICATION.md requirements."""
 
-    def test_template_variables_in_dpcl_grammar_context(self):
-        """Test template variables work within DPCL syntax grammar rules."""
+    def test_template_variables_in_acl_grammar_context(self):
+        """Test template variables work within LangTree DSL syntax grammar rules."""
         content = """
 # Processing Pipeline
 
@@ -1229,12 +1227,12 @@ Step 4: Output generation
             f"Content should have valid template variable spacing: {errors}"
         )
 
-        # Detect template variables (should work with DPCL syntax)
+        # Detect template variables (should work with LangTree DSL syntax)
         template_vars = detect_template_variables(content)
         assert "PROMPT_SUBTREE" in template_vars
         assert "COLLECTED_CONTEXT" in template_vars
 
-        # DPCL commands (double braces) should not interfere
+        # LangTree DSL commands (double braces) should not interfere
         assert "EXTRACT" not in template_vars
         assert "OUTPUT" not in template_vars
         assert "source_data" not in template_vars
@@ -1244,7 +1242,7 @@ Step 4: Output generation
         from pydantic import Field
 
         # Model representing different variable scopes from specification
-        class ScopedVariableModel(PromptTreeNode):
+        class ScopedVariableModel(TreeNode):
             """
             Task with multiple variable scope examples:
 
@@ -1301,7 +1299,7 @@ Step 4: Output generation
         from langtree.prompt.structure import StructureTreeNode
 
         # Create hierarchical structure (parent-child relationship)
-        class ParentTaskModel(PromptTreeNode):
+        class ParentTaskModel(TreeNode):
             """
             Parent task coordination:
             {PROMPT_SUBTREE}
@@ -1312,7 +1310,7 @@ Step 4: Output generation
 
             coordination: str = Field(description="Task coordination logic")
 
-        class ChildTaskModel(PromptTreeNode):
+        class ChildTaskModel(TreeNode):
             """
             Child task execution:
             {PROMPT_SUBTREE}
@@ -1365,7 +1363,7 @@ class TestArchitecturalDesignCompliance:
 
         from langtree.prompt.structure import StructureTreeNode
 
-        class DeterministicModel(PromptTreeNode):
+        class DeterministicModel(TreeNode):
             """
             Deterministic processing test:
             {PROMPT_SUBTREE}
@@ -1469,7 +1467,7 @@ End of assembly phase.
 
         from langtree.prompt.structure import StructureTreeNode
 
-        class RuntimeModel(PromptTreeNode):
+        class RuntimeModel(TreeNode):
             runtime_field: str = Field(description="Runtime processing field")
 
         node = StructureTreeNode(
@@ -1612,24 +1610,24 @@ class TestErrorHandlingComprehensive:
         assert len(result_many["PROMPT_SUBTREE"]) == 100, "Should detect all instances"
 
 
-class TestDPCLCommandIntegrationNew:
+class TestLangTreeDSLCommandIntegrationNew:
     """Test compliance with LANGUAGE_SPECIFICATION.md requirements."""
 
-    def test_template_variables_in_dpcl_grammar_context(self):
-        """Test template variables work correctly with DPCL command syntax in docstrings."""
+    def test_template_variables_in_acl_grammar_context(self):
+        """Test template variables work correctly with LangTree DSL command syntax in docstrings."""
         from pydantic import Field
 
         from langtree.prompt.structure import RunStructure
         from langtree.prompt.template_variables import process_template_variables
 
-        # Create a model with DPCL commands in docstring
-        class TaskDPCLAnalysis(PromptTreeNode):
+        # Create a model with LangTree DSL commands in docstring
+        class TaskLangTreeDSLAnalysis(TreeNode):
             """
             ! @all->task.processor@{{value.data=*}}
             ! count=5
             ! resample(count)
 
-            Analyze the data using DPCL commands.
+            Analyze the data using LangTree DSL commands.
 
             {PROMPT_SUBTREE}
 
@@ -1643,10 +1641,10 @@ class TestDPCLCommandIntegrationNew:
 
         # Create RunStructure and add the model
         run_structure = RunStructure()
-        run_structure.add(TaskDPCLAnalysis)
+        run_structure.add(TaskLangTreeDSLAnalysis)
 
         # Get the node from the structure
-        node = run_structure.get_node("task.dpcl_analysis")
+        node = run_structure.get_node("task.lang_tree_dsl_analysis")
         assert node is not None, "Node should be created in RunStructure"
 
         # Process template variables with the real node
@@ -1655,22 +1653,22 @@ class TestDPCLCommandIntegrationNew:
         # Should process without errors and resolve template variables
         assert isinstance(result, str)
         assert (
-            "Analyze the data using DPCL commands" in result
+            "Analyze the data using LangTree DSL commands" in result
         )  # Original content preserved
 
-        # DPCL commands should be in extracted_commands, not clean_docstring
+        # LangTree DSL commands should be in extracted_commands, not clean_docstring
         command_strs = [str(cmd) for cmd in node.extracted_commands]
         assert any("@all->task.processor" in cmd_str for cmd_str in command_strs), (
-            "DPCL command should be extracted"
+            "LangTree DSL command should be extracted"
         )
         assert any("count=5" in cmd_str for cmd_str in command_strs), (
             "Assembly variable should be extracted"
         )
 
-        # Original docstring should have the DPCL commands
-        original_docstring = TaskDPCLAnalysis.__doc__ or ""
+        # Original docstring should have the LangTree DSL commands
+        original_docstring = TaskLangTreeDSLAnalysis.__doc__ or ""
         assert "@all->task.processor" in original_docstring, (
-            "Original docstring should contain DPCL commands"
+            "Original docstring should contain LangTree DSL commands"
         )
         assert "count=5" in original_docstring, (
             "Original docstring should contain assembly variables"
@@ -1693,7 +1691,7 @@ class TestDPCLCommandIntegrationNew:
         )
 
         # Create a model that tests conflict detection between template variables and assembly variables
-        class TaskConflictingVariables(PromptTreeNode):
+        class TaskConflictingVariables(TreeNode):
             """
             ! custom_var="test_value"
             ! data_source="another_value"
@@ -1743,11 +1741,11 @@ class TestDPCLCommandIntegrationNew:
             resolve_template_variables_in_content,
         )
 
-        class Metadata(PromptTreeNode):
+        class Metadata(TreeNode):
             key: str = "default"
             value: str = "default"
 
-        class TaskMixedVariables(PromptTreeNode):
+        class TaskMixedVariables(TreeNode):
             """
             Processing data with runtime variable: {field_data}
 
@@ -1799,15 +1797,15 @@ class TestDPCLCommandIntegrationNew:
 class TestSpecificationCompliance:
     """Test compliance with LANGUAGE_SPECIFICATION.md requirements."""
 
-    def test_template_variables_in_dpcl_grammar_context(self):
-        """Test template variables work within DPCL syntax grammar context."""
+    def test_template_variables_in_acl_grammar_context(self):
+        """Test template variables work within LangTree DSL syntax grammar context."""
         from langtree.prompt.template_variables import (
             detect_template_variables,
             validate_template_variable_spacing,
         )
 
-        # Test template variables in context of DPCL command syntax
-        dpcl_content = """! @each[items]->task.process@{{value.item=items}}*
+        # Test template variables in context of LangTree DSL command syntax
+        acl_content = """! @each[items]->task.process@{{value.item=items}}*
 ! count=10
 ! resample(count)
 
@@ -1824,14 +1822,14 @@ Additional context for processing:
 """
 
         # Should detect template variables correctly
-        detected = detect_template_variables(dpcl_content)
+        detected = detect_template_variables(acl_content)
         assert "PROMPT_SUBTREE" in detected
         assert "COLLECTED_CONTEXT" in detected
 
-        # Should validate spacing correctly in DPCL context
-        spacing_errors = validate_template_variable_spacing(dpcl_content)
+        # Should validate spacing correctly in LangTree DSL context
+        spacing_errors = validate_template_variable_spacing(acl_content)
         assert len(spacing_errors) == 0, (
-            f"Should have valid spacing in DPCL context: {spacing_errors}"
+            f"Should have valid spacing in LangTree DSL context: {spacing_errors}"
         )
 
     def test_template_variables_with_scope_system(self):
@@ -1843,11 +1841,11 @@ Additional context for processing:
             resolve_template_variables_in_content,
         )
 
-        class Metadata(PromptTreeNode):
+        class Metadata(TreeNode):
             key: str = "default"
             value: str = "default"
 
-        class TaskScopeAware(PromptTreeNode):
+        class TaskScopeAware(TreeNode):
             """
             Testing scope interaction with template variables.
 
@@ -1902,12 +1900,12 @@ Additional context for processing:
         )
 
         # Create a hierarchical structure
-        class TaskRoot(PromptTreeNode):
+        class TaskRoot(TreeNode):
             """Root level prompt with context."""
 
             root_field: str = Field(description="Root level field")
 
-        class TaskMiddle(PromptTreeNode):
+        class TaskMiddle(TreeNode):
             """
             Middle level processing.
 
@@ -1920,7 +1918,7 @@ Additional context for processing:
 
             middle_field: str = Field(description="Middle level field")
 
-        class TaskLeaf(PromptTreeNode):
+        class TaskLeaf(TreeNode):
             """Leaf level specific processing."""
 
             leaf_field: str = Field(description="Leaf level field")

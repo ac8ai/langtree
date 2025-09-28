@@ -14,7 +14,7 @@ import pytest
 from pydantic import Field
 
 from langtree.commands.parser import CommentCommand, parse_command
-from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt import RunStructure, TreeNode
 
 
 class TestComprehensiveCommentParsing:
@@ -54,9 +54,9 @@ class TestComprehensiveCommentParsing:
         assert cmd3.comment == "processing comment"
 
     def test_comprehensive_node_with_all_comment_patterns(self):
-        """Test a PromptTreeNode with all comment patterns from user requirements."""
+        """Test a TreeNode with all comment patterns from user requirements."""
 
-        class TaskInsightGenerator(PromptTreeNode):
+        class TaskInsightGenerator(TreeNode):
             """
             !# docstring comment solo
             ! llm("gpt-4") #    docstring comment after command
@@ -73,13 +73,13 @@ class TestComprehensiveCommentParsing:
             {COLLECTED_CONTEXT}
             """
 
-            class Category(PromptTreeNode):
+            class Category(TreeNode):
                 """
                 Group related insights into logical business categories.
                 Each category should address a specific operational area.
                 """
 
-                class Insight(PromptTreeNode):
+                class Insight(TreeNode):
                     """
                     Generate one specific, actionable business recommendation.
                     Include implementation steps and expected outcomes.
@@ -136,7 +136,7 @@ class TestComprehensiveCommentParsing:
     def test_multiline_command_with_comments(self):
         """Test multiline commands with embedded comments."""
 
-        class TaskWithMultilineComment(PromptTreeNode):
+        class TaskWithMultilineComment(TreeNode):
             """Task demonstrating multiline commands with comments."""
 
             items: list[str] = Field(

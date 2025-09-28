@@ -1,5 +1,5 @@
 """
-Comprehensive tests for the dynamic prompt connecting language command parser.
+Comprehensive tests for the Action Chaining Language command parser.
 
 This module tests all aspects of command parsing including:
 - Basic command syntax validation
@@ -2584,9 +2584,9 @@ class TestIterableDepthTracking:
 
     def test_simple_iterable_path_depth(self):
         """Test depth assignment for simple iterable path: iterable1."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class SimpleNode(PromptTreeNode):
+        class SimpleNode(TreeNode):
             items: list[str] = []
 
         # Mock node for path resolution
@@ -2600,13 +2600,13 @@ class TestIterableDepthTracking:
 
     def test_nested_iterable_path_depth(self):
         """Test depth assignment for nested iterable path: iterable1.noniterable.iterable2."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class Level2Node(PromptTreeNode):
+        class Level2Node(TreeNode):
             subitems: list[str] = []
             data: str = ""
 
-        class Level1Node(PromptTreeNode):
+        class Level1Node(TreeNode):
             items: list[Level2Node] = []
 
         # Mock node for path resolution
@@ -2620,17 +2620,17 @@ class TestIterableDepthTracking:
 
     def test_complex_iterable_path_depth(self):
         """Test depth for complex path: iterable1.noniterable.iterable2.noniterable.iterable3."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class Level3Node(PromptTreeNode):
+        class Level3Node(TreeNode):
             tags: list[str] = []
             name: str = ""
 
-        class Level2Node(PromptTreeNode):
+        class Level2Node(TreeNode):
             elements: list[Level3Node] = []
             title: str = ""
 
-        class Level1Node(PromptTreeNode):
+        class Level1Node(TreeNode):
             items: list[Level2Node] = []
 
         # Mock node for path resolution
@@ -2644,12 +2644,12 @@ class TestIterableDepthTracking:
 
     def test_noniterable_only_path_depth(self):
         """Test depth for path with only non-iterable fields."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class ConfigNode(PromptTreeNode):
+        class ConfigNode(TreeNode):
             data: str = ""
 
-        class RootNode(PromptTreeNode):
+        class RootNode(TreeNode):
             config: ConfigNode = ConfigNode()
 
         # Mock node for path resolution
@@ -2663,16 +2663,16 @@ class TestIterableDepthTracking:
 
     def test_mixed_spacing_same_depth(self):
         """Test that different non-iterable spacing gives same depth for same iterable count."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
         # Structure A: iterable1.iterable2.iterable3 (minimal spacing)
-        class NodeA3(PromptTreeNode):
+        class NodeA3(TreeNode):
             data: str = ""
 
-        class NodeA2(PromptTreeNode):
+        class NodeA2(TreeNode):
             level3: list[NodeA3] = []
 
-        class NodeA1(PromptTreeNode):
+        class NodeA1(TreeNode):
             level2: list[NodeA2] = []
 
         node_a = NodeA1()
@@ -2680,19 +2680,19 @@ class TestIterableDepthTracking:
         depth_a = self.parser.calculate_iterable_depth(node_a, path_a)
 
         # Structure B: iterable1.noniterable.noniterable.iterable2 (maximal spacing)
-        class NodeB4(PromptTreeNode):
+        class NodeB4(TreeNode):
             data: str = ""
 
-        class NodeB3(PromptTreeNode):
+        class NodeB3(TreeNode):
             level4: list[NodeB4] = []
 
-        class NodeB2(PromptTreeNode):
+        class NodeB2(TreeNode):
             level3: NodeB3 = NodeB3()  # non-iterable
 
-        class NodeB1(PromptTreeNode):
+        class NodeB1(TreeNode):
             level2: NodeB2 = NodeB2()  # non-iterable
 
-        class RootB(PromptTreeNode):
+        class RootB(TreeNode):
             level1: list[NodeB1] = []
 
         node_b = RootB()
@@ -2746,16 +2746,16 @@ class TestLastMatchingIterableValidation:
 
     def test_complete_coverage_valid(self):
         """Test case with complete coverage - at least one RHS reaches inclusion's last iterable."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class Sentence(PromptTreeNode):
+        class Sentence(TreeNode):
             text: str = ""
 
-        class Paragraph(PromptTreeNode):
+        class Paragraph(TreeNode):
             sentences: list[Sentence] = []
             title: str = ""
 
-        class Section(PromptTreeNode):
+        class Section(TreeNode):
             paragraphs: list[Paragraph] = []
             title: str = ""
 
@@ -2772,11 +2772,11 @@ class TestLastMatchingIterableValidation:
         assert result["valid"], f"Expected valid, got {result}"
 
     def test_empty_paths_illegal(self):
-        """Test that empty paths raise CommandParseError (violate DPCL syntax)."""
+        """Test that empty paths raise CommandParseError (violate LangTree DSL syntax)."""
         from langtree.commands.parser import CommandParseError
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class SimpleNode(PromptTreeNode):
+        class SimpleNode(TreeNode):
             items: list[str] = []
 
         node = SimpleNode()
@@ -2791,12 +2791,12 @@ class TestLastMatchingIterableValidation:
 
     def test_identical_paths_valid(self):
         """Test case where RHS exactly matches inclusion_path."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             text: str = ""
 
-        class Section(PromptTreeNode):
+        class Section(TreeNode):
             items: list[Item] = []
 
         node = Section()
@@ -2811,12 +2811,12 @@ class TestLastMatchingIterableValidation:
     def test_non_iterable_only_paths_invalid(self):
         """Test that paths with no iterables violate @each semantics."""
         from langtree.commands.parser import CommandParseError
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class Config(PromptTreeNode):
+        class Config(TreeNode):
             name: str = ""
 
-        class Root(PromptTreeNode):
+        class Root(TreeNode):
             config: Config = Config()
 
         node = Root()
@@ -2831,19 +2831,19 @@ class TestLastMatchingIterableValidation:
 
     def test_mixed_iterable_positions_complex(self):
         """Test complex case with iterables at different positions."""
-        from langtree.prompt.structure import PromptTreeNode
+        from langtree.prompt.structure import TreeNode
 
-        class Tag(PromptTreeNode):
+        class Tag(TreeNode):
             name: str = ""
 
-        class Item(PromptTreeNode):
+        class Item(TreeNode):
             tags: list[Tag] = []
             title: str = ""
 
-        class Config(PromptTreeNode):
+        class Config(TreeNode):
             items: list[Item] = []
 
-        class Root(PromptTreeNode):
+        class Root(TreeNode):
             configs: list[Config] = []
             title: str = ""
 

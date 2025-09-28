@@ -1,5 +1,5 @@
 """
-Utility functions for DPCL prompt processing.
+Utility functions for LangTree DSL prompt processing.
 
 This module contains utility functions for extracting commands from text,
 processing prompts, and handling naming conventions.
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from inflection import underscore
 
 if TYPE_CHECKING:
-    from langtree.prompt.structure import PromptTreeNode
+    from langtree.prompt.structure import TreeNode
 
 # Text processing utilities - matches commands that may span multiple lines within brackets/braces
 COMMAND_PATTERN = re.compile(r"^\s*!\s*[^!\n]*(?:\n(?!\s*!)[^\n]*)*", re.MULTILINE)
@@ -114,9 +114,9 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
     return commands, clean_content
 
 
-def get_root_tag(subtree: type["PromptTreeNode"], kind: str = "task") -> str:
+def get_root_tag(subtree: type["TreeNode"], kind: str = "task") -> str:
     """
-    Generate a root tag for a PromptTreeNode type based on naming conventions.
+    Generate a root tag for a TreeNode type based on naming conventions.
 
     Validates that the class name follows strict CamelCase and Task prefix conventions:
     - Must be CamelCase (no underscores, starts with capital letter)
@@ -124,7 +124,7 @@ def get_root_tag(subtree: type["PromptTreeNode"], kind: str = "task") -> str:
     - Invalid: task_early, taskEarly, Tasks, Taskx, task
 
     Params:
-        subtree: The PromptTreeNode type to generate a tag for
+        subtree: The TreeNode type to generate a tag for
         kind: The expected designation/kind (default: 'task')
 
     Returns:

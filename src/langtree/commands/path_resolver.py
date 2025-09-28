@@ -1,5 +1,5 @@
 """
-Enhanced path resolution for dynamic prompt connecting language.
+Enhanced path resolution for Action Chaining Language.
 
 This module provides proper scope resolution for all path components as specified
 in the documentation.

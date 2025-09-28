@@ -5,7 +5,7 @@
 > **For authoritative framework documentation, see COMPREHENSIVE_GUIDE.md**
 
 ## Purpose
-This document serves as a working sketchpad for brainstorming and exploring potential DPCL framework enhancements. Ideas here are:
+This document serves as a working sketchpad for brainstorming and exploring potential LangTree DSL framework enhancements. Ideas here are:
 - **Experimental** - may not be implemented
 - **Unvalidated** - may conflict with actual implementation
 - **Evolving** - subject to change or abandonment
@@ -17,7 +17,7 @@ For actual framework usage, implementation details, and authoritative specificat
 
 ## Exploratory Goal Statement
 
-Transform a declarative hierarchical prompt/command specification (DPCL annotated `PromptTreeNode` classes) into a deterministic, dependency-ordered DAG of LLM chains that: (a) automatically assembles contextual prompts from cleaned structural sources, (b) propagates and merges intermediate structured outputs via declared variable mappings, (c) expands multiplicity directives (`@each`, `*`) into parallel/iterative executions, (d) tracks provenance & dependency state for every declared variable, and (e) produces a final aggregated structured artifact plus a transparent execution + dataflow report.
+Transform a declarative hierarchical prompt/command specification (LangTree DSL annotated `TreeNode` classes) into a deterministic, dependency-ordered DAG of LLM chains that: (a) automatically assembles contextual prompts from cleaned structural sources, (b) propagates and merges intermediate structured outputs via declared variable mappings, (c) expands multiplicity directives (`@each`, `*`) into parallel/iterative executions, (d) tracks provenance & dependency state for every declared variable, and (e) produces a final aggregated structured artifact plus a transparent execution + dataflow report.
 
 **Note**: These are exploratory success criteria, not committed features.
 
@@ -29,14 +29,23 @@ Out-of-Scope (Current Phase): Token budgeting, streaming partial execution UI, a
 
 ### ✅ **Completed Core Implementation**
 
-#### 1. Command Parser System (86% Coverage)
+#### 1. Command Parser System (81% Coverage)
 - **Whitespace Validation**: Strict spacing rules enforced per LANGUAGE_SPECIFICATION.md
-- **Command Parsing**: Full DPCL command syntax support (`@each`, `@all`, variable mappings)
+- **Command Parsing**: Full LangTree DSL command syntax support (`@each`, `@all`, variable mappings)
 - **Error Handling**: Comprehensive parse-time validation with detailed error messages
 - **Unicode Support**: Proper handling of Unicode characters in quoted strings
 - **Test Coverage**: 367 passing parser tests with edge case validation
 
-#### 2. Runtime Variable System (ARCHITECTURALLY INTEGRATED)
+#### 2. **MAJOR ARCHITECTURE ENHANCEMENT: SourceInfo System (NEW)**
+- **Rich Command Context**: New `SourceInfo` dataclass preserves complete command metadata per source
+- **Enhanced Variable Registry**: `VariableInfo` now uses `list[SourceInfo]` instead of flattening to strings
+- **Type Safety**: `command_type` changed from `str` to `CommandType` enum for better type safety
+- **Multiple Source Support**: Variables can now track multiple sources with different command types
+- **Context Preservation**: Each source retains: `source_node_tag`, `source_field_path`, `command_type`, `has_multiplicity`
+- **Relationship Mapping**: Support for 1:1, 1:n, and n:n command relationships per source
+- **Backward Compatibility Removed**: Moved to newest version, eliminated legacy properties
+
+#### 3. Runtime Variable System (ARCHITECTURALLY INTEGRATED)
 - **Correct Syntax**: Runtime variables use `{var}` syntax (not `{{var}}`)
 - **Template Variables**: `{PROMPT_SUBTREE}` and `{COLLECTED_CONTEXT}` reserved and functional
 - **Scope Resolution**: Multi-level context resolution (node → parent → root)
@@ -45,24 +54,24 @@ Out-of-Scope (Current Phase): Token budgeting, streaming partial execution UI, a
 - **Proper Content Processing**: Uses node.clean_docstring and clean_field_descriptions (already processed)
 - **Documentation Updated**: LANGUAGE_SPECIFICATION.md and VARIABLE_TAXONOMY.md corrected
 
-#### 3. Template Variable Integration (92% Coverage)
-- **DPCL Integration**: Template variables work with extracted commands
+#### 4. Template Variable Integration (95% Coverage)
+- **LangTree DSL Integration**: Template variables work with extracted commands
 - **String Representation**: Command objects properly serializable for tests
 - **Field Resolution**: Field names converted to proper titles (rich_input → "Rich Input")
 - **Error Boundaries**: Template processing failures don't break command extraction
 
-#### 4. LangChain Integration Layer (77% Coverage)
-- **Chain Building**: Most integration tests passing (56 passed, 8 failed)
+#### 5. LangChain Integration Layer (78% Coverage)
+- **Chain Building**: Most integration tests passing
 - **Prompt Assembly**: Multi-section prompt generation (system, context, task, output, input)
 - **Execution Planning**: Topological dependency ordering functional
 - **Field Descriptions**: Output section generation with proper field documentation
 
 ### 📊 **Test Results Progress**
-- **Current Status**: 483 passing, 33 failing, 83 skipped (September 2025 update)
-- **Key Achievement**: Fixed template variable vs DPCL syntax conflicts with 2-step processing
-- **Recent Progress**: Command extraction fixes reduced failures from 37 to 33 tests
-- **Architecture Clarification**: Separated assembly-time vs runtime variable systems
-- **Critical Gap**: Context resolution and integration remain primary blockers
+- **Current Status**: 590+ passing, 29 failing, 31 skipped (Latest update)
+- **Key Achievement**: Fixed critical data loss issue in variable registry architecture
+- **Recent Progress**: SourceInfo system eliminates command context flattening
+- **Architecture Enhancement**: Enhanced variable satisfaction tracking with rich source metadata
+- **Type Safety**: CommandType enum provides better type checking and IDE support
 
 ### 🚧 **Remaining Work**
 - **Edge Case Refinement**: Some integration test edge cases need adjustment
@@ -98,7 +107,7 @@ There is no direct consumption of `RunStructure` / command graph here:
 - No variable dependency tracking feeding structured outputs into downstream chain inputs.
 - No expansion logic for multiplicity (`@each`, `*`).
 
-Result: Present chains are flat, manually orchestrated, not yet reflective of the DPCL execution graph.
+Result: Present chains are flat, manually orchestrated, not yet reflective of the LangTree DSL execution graph.
 
 ---
 ## 2. ✅ Template Variable System - IMPLEMENTED
@@ -109,7 +118,7 @@ Result: Present chains are flat, manually orchestrated, not yet reflective of th
 - **Template Variables**: `{PROMPT_SUBTREE}` and `{COLLECTED_CONTEXT}` fully functional
 - **Spacing Validation**: Strict empty line requirements with detailed error reporting
 - **Variable Detection**: Robust parsing and position tracking
-- **Integration**: Works with DPCL command syntax and StructureTreeNode hierarchy
+- **Integration**: Works with LangTree DSL command syntax and StructureTreeNode hierarchy
 - **Error Handling**: Comprehensive malformed syntax and spacing violation detection
 
 ### 2.2 Template Variable Resolution
@@ -131,7 +140,7 @@ Result: Present chains are flat, manually orchestrated, not yet reflective of th
 **Comprehensive Testing** (94% coverage):
 - **Unit Tests**: All core functions (`detect_template_variables`, `process_template_variables`, etc.)
 - **Edge Cases**: Empty content, malformed syntax, spacing violations, multiple variables
-- **Integration**: DPCL command integration, StructureTreeNode hierarchy, error handling
+- **Integration**: LangTree DSL command integration, StructureTreeNode hierarchy, error handling
 - **Architecture**: Variable separation, fail-fast validation, specification compliance
 
 ### 2.5 Testing Strategy Implemented
@@ -153,7 +162,7 @@ Goal: Convert a node path (e.g., `task.analyze_comparison.main_analysis`) into a
 - Variable substitution environment (resolved runtime variables from scope resolvers).
 
 ### 3.2 Assembly Algorithm
-1. Ascend to root collecting (top→down): for each ancestor class (excluding `PromptTreeNode`): its cleaned docstring if non‑empty.
+1. Ascend to root collecting (top→down): for each ancestor class (excluding `TreeNode`): its cleaned docstring if non‑empty.
 2. For each edge (parent -> child) incorporate the child field description that leads toward target.
 3. Append target node’s own cleaned docstring (if used as a prompt boundary) and any directly addressed field description (if a field prompt).
 4. Resolve inline placeholders `{var}` via `string.Formatter` backed by a scoped resolver:
@@ -288,14 +297,14 @@ After each node execution:
    - 483 passing tests across the codebase (80% pass rate)
    - 83 skipped tests for planned features
    - Comprehensive error handling and edge case coverage
-   - **Recent Progress**: Template variable vs DPCL parsing conflicts resolved
+   - **Recent Progress**: Template variable vs LangTree DSL parsing conflicts resolved
 
 3. ✅ **Variable System Architecture**: Five-type variable system defined and partially implemented
-   - Assembly Variables, Runtime Variables, DPCL Variable Targets, Scope Context Variables, Field References
+   - Assembly Variables, Runtime Variables, LangTree DSL Variable Targets, Scope Context Variables, Field References
    - Clear separation between parse-time and runtime resolution
 
 ### 🚧 **In Progress**
-4. ✅ **Command Parser Integration**: Template variable vs DPCL syntax conflicts resolved
+4. ✅ **Command Parser Integration**: Template variable vs LangTree DSL syntax conflicts resolved
 5. **Context Resolution**: Address remaining 33 failing tests focusing on path resolution and integration
 6. ✅ **Documentation Updates**: COMPREHENSIVE_GUIDE.md and DESIGN_EXPLORATION.md updated with current status
 
@@ -313,7 +322,7 @@ After each node execution:
 ---
 ## 7. Current Implementation Risks & Considerations
 - **Test Quality vs Coverage**: High coverage achieved but integration depth needs improvement
-- **Specification Alignment**: Template variables implemented, but broader DPCL integration still developing
+- **Specification Alignment**: Template variables implemented, but broader LangTree DSL integration still developing
 - **Architecture Validation**: Variable separation enforced, but dependency DAG construction remains exploratory
 - **Documentation Sync**: Need to ensure all docs reflect current implementation status vs exploratory ideas
 

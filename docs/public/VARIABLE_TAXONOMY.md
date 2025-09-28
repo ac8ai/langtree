@@ -1,8 +1,8 @@
-# DPCL Variable Taxonomy
+# LangTree DSL Variable Taxonomy
 
 ## Overview
 
-DPCL contains several distinct types of variables and references that serve different purposes and have different scopes, resolution times, and syntax. This document provides a precise taxonomy to clarify their roles and prevent confusion during implementation.
+LangTree DSL contains several distinct types of variables and references that serve different purposes and have different scopes, resolution times, and syntax. This document provides a precise taxonomy to clarify their roles and prevent confusion during implementation.
 
 ## Variable Type Categories
 
@@ -46,7 +46,7 @@ DPCL contains several distinct types of variables and references that serve diff
 - **NO access to Assembly Variables** - complete separation between assembly and runtime
 - Support dynamic content from execution context sources only
 
-### 3. DPCL Variable Targets
+### 3. LangTree DSL Variable Targets
 **Syntax:** `@each[variable_name]` or `@all[variable_name]`
 **Scope:** Collection iteration during execution
 **Storage:** Variable tracking in registry for dependency analysis
@@ -125,7 +125,7 @@ class VariableRegistry:
     def store_assembly_variable(self, name: str, value: Any) -> None
     def get_assembly_variable(self, name: str) -> Any
     def check_assembly_conflict(self, name: str) -> bool
-    def track_dpcl_target(self, variable_name: str, scope: str) -> None
+    def track_LangTree DSL_target(self, variable_name: str, scope: str) -> None
     def resolve_runtime_variable(self, pattern: str, context: dict) -> Any
     def validate_field_reference(self, field_name: str, function: str) -> None
 ```
@@ -172,4 +172,4 @@ class VariableRegistry:
 - Runtime Variable resolution maintains backward compatibility
 - Field References only apply to new resampling commands
 
-This taxonomy provides the foundation for implementing a robust variable registry system that maintains clear separation between different variable types while supporting the full range of DPCL functionality.
+This taxonomy provides the foundation for implementing a robust variable registry system that maintains clear separation between different variable types while supporting the full range of LangTree DSL functionality.

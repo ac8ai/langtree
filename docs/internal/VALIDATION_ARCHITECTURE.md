@@ -1,8 +1,8 @@
-# DPCL Validation Architecture
+# LangTree DSL Validation Architecture
 
 ## Overview
 
-The DPCL framework implements a **two-phase validation architecture** that separates immediate structural validation from deferred reference resolution. This design ensures early error detection while supporting forward references and complex dependency chains.
+The LangTree DSL framework implements a **two-phase validation architecture** that separates immediate structural validation from deferred reference resolution. This design ensures early error detection while supporting forward references and complex dependency chains.
 
 ## Validation Categories
 
@@ -13,7 +13,7 @@ The DPCL framework implements a **two-phase validation architecture** that separ
 
 #### Syntax Validation (Parser Layer)
 - Command structure (`!`, `->`, `*`, brackets, braces)
-- Whitespace compliance with DPCL specification
+- Whitespace compliance with LangTree DSL specification
 - Basic path syntax and operator placement
 - Bracket/brace matching and nesting
 
@@ -76,7 +76,7 @@ class CommandParser:
 **File:** `langtree/prompt/structure.py`
 ```python
 class RunStructure:
-    def add(self, node_class: type[PromptTreeNode]) -> None:
+    def add(self, node_class: type[TreeNode]) -> None:
         # Process node and validate immediate semantics:
         # - Field existence in current context
         # - Task target completeness
@@ -327,8 +327,8 @@ class TestTaskTargetCompletenessValidation:
 
 ## Related Documentation
 
-- [LANGUAGE_SPECIFICATION.md](LANGUAGE_SPECIFICATION.md) - Complete DPCL syntax and semantics
+- [LANGUAGE_SPECIFICATION.md](LANGUAGE_SPECIFICATION.md) - Complete LangTree DSL syntax and semantics
 - [COMPREHENSIVE_GUIDE.md](COMPREHENSIVE_GUIDE.md) - Framework overview and usage
 - [CODING_STANDARDS.md](CODING_STANDARDS.md) - Implementation guidelines
 
-This validation architecture ensures robust error detection while maintaining the flexibility needed for complex prompt tree structures and forward references. All validation rules are now fully implemented and tested according to the DPCL specification.
+This validation architecture ensures robust error detection while maintaining the flexibility needed for complex prompt tree structures and forward references. All validation rules are now fully implemented and tested according to the LangTree DSL specification.

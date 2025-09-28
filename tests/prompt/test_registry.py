@@ -53,14 +53,19 @@ class TestVariableRegistry:
         registry.register_variable("title", get_scope("value"), "task.test")
 
         # Add satisfaction sources
-        registry.add_satisfaction_source("title", get_scope("value"), "sections.title")
-        registry.add_satisfaction_source("title", get_scope("value"), "document.title")
+        registry.add_satisfaction_source(
+            "title", get_scope("value"), "task.test", "sections.title"
+        )
+        registry.add_satisfaction_source(
+            "title", get_scope("value"), "task.test", "document.title"
+        )
 
         var_info = registry.variables["value.title"]
         assert var_info.is_satisfied()
         assert var_info.has_multiple_sources()
-        assert "sections.title" in var_info.satisfaction_sources
-        assert "document.title" in var_info.satisfaction_sources
+        satisfaction_sources = var_info.get_satisfaction_sources()
+        assert "sections.title" in satisfaction_sources
+        assert "document.title" in satisfaction_sources
 
     def test_unsatisfied_variables_detection(self):
         """Test detection of unsatisfied variables."""
@@ -69,7 +74,9 @@ class TestVariableRegistry:
         registry.register_variable("content", get_scope("prompt"), "task.test")
 
         # Only satisfy one variable
-        registry.add_satisfaction_source("title", get_scope("value"), "sections.title")
+        registry.add_satisfaction_source(
+            "title", get_scope("value"), "task.test", "sections.title"
+        )
 
         unsatisfied = registry.get_unsatisfied_variables()
         assert len(unsatisfied) == 1

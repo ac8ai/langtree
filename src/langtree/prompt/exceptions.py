@@ -1,18 +1,18 @@
 """
-Exception classes for DPCL prompt processing.
+Exception classes for LangTree DSL prompt processing.
 
 This module defines specific exception types for different error conditions
-that can occur during DPCL parsing, validation, and execution planning.
+that can occur during LangTree DSL parsing, validation, and execution planning.
 """
 
 
-class DPCLError(Exception):
-    """Base exception for all DPCL-related errors."""
+class LangTreeDSLError(Exception):
+    """Base exception for all LangTree DSL-related errors."""
 
     pass
 
 
-class NodeInstantiationError(DPCLError):
+class NodeInstantiationError(LangTreeDSLError):
     """Raised when a node cannot be instantiated from its field type."""
 
     def __init__(self, node_tag: str, reason: str):
@@ -28,7 +28,7 @@ class NodeInstantiationError(DPCLError):
         super().__init__(f"Cannot instantiate node '{node_tag}': {reason}")
 
 
-class FieldTypeError(DPCLError):
+class FieldTypeError(LangTreeDSLError):
     """Raised when a node has no field type or invalid field type."""
 
     def __init__(self, node_tag: str, message: str = "has no field type"):
@@ -43,7 +43,7 @@ class FieldTypeError(DPCLError):
         super().__init__(f"Node '{node_tag}' {message}")
 
 
-class PathValidationError(DPCLError):
+class PathValidationError(LangTreeDSLError):
     """Raised when path validation fails."""
 
     def __init__(self, path: str, reason: str):
@@ -59,7 +59,7 @@ class PathValidationError(DPCLError):
         super().__init__(f"Invalid path '{path}': {reason}")
 
 
-class NodeTagValidationError(DPCLError):
+class NodeTagValidationError(LangTreeDSLError):
     """Raised when node tag validation fails."""
 
     def __init__(self, node_tag: str, reason: str):
@@ -75,7 +75,7 @@ class NodeTagValidationError(DPCLError):
         super().__init__(f"Invalid node tag '{node_tag}': {reason}")
 
 
-class RuntimeVariableError(DPCLError):
+class RuntimeVariableError(LangTreeDSLError):
     """Raised when runtime variable resolution fails."""
 
     def __init__(self, message: str):
@@ -88,7 +88,7 @@ class RuntimeVariableError(DPCLError):
         super().__init__(message)
 
 
-class FieldValidationError(DPCLError):
+class FieldValidationError(LangTreeDSLError):
     """Raised when command references non-existent fields in source structure."""
 
     def __init__(
@@ -121,7 +121,7 @@ class FieldValidationError(DPCLError):
         super().__init__(full_message)
 
 
-class VariableTargetValidationError(DPCLError):
+class VariableTargetValidationError(LangTreeDSLError):
     """Raised when variable target structure cannot be satisfied."""
 
     def __init__(self, target_path: str, source_node: str, reason: str):
@@ -138,7 +138,7 @@ class VariableTargetValidationError(DPCLError):
         super().__init__(f"Variable target '{target_path}' in {source_node}: {reason}")
 
 
-class VariableSourceValidationError(DPCLError):
+class VariableSourceValidationError(LangTreeDSLError):
     """Raised when variable source field does not exist in referenced structure."""
 
     def __init__(self, source_path: str, structure_type: str, command_context: str):
@@ -157,7 +157,7 @@ class VariableSourceValidationError(DPCLError):
         )
 
 
-class TemplateVariableError(DPCLError):
+class TemplateVariableError(LangTreeDSLError):
     """Base exception for template variable processing errors."""
 
     def __init__(self, message: str):
@@ -188,7 +188,7 @@ class TemplateVariableNameError(TemplateVariableError):
     pass
 
 
-class ComprehensiveStructuralValidationError(DPCLError):
+class ComprehensiveStructuralValidationError(LangTreeDSLError):
     """Raised when multiple structural validation issues are detected."""
 
     def __init__(self, issues: list[str], node_context: str):

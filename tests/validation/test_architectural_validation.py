@@ -6,7 +6,7 @@ Tests should FAIL initially, then we implement code to make them PASS.
 
 Focus Areas:
 1. Bare collection type rejection
-2. DPCL structural validation at assembly time
+2. LangTree DSL structural validation at assembly time
 3. Runtime variable enumeration
 """
 
@@ -14,7 +14,7 @@ import pytest
 from pydantic import Field
 
 from langtree.commands.parser import CommandParseError
-from langtree.prompt import PromptTreeNode, RunStructure
+from langtree.prompt import RunStructure, TreeNode
 from langtree.prompt.exceptions import FieldValidationError
 
 
@@ -24,12 +24,12 @@ class TestBareCollectionTypeRejection:
     def test_bare_list_should_be_rejected(self):
         """Bare list type should be rejected as underspecified."""
 
-        class TaskWithBareList(PromptTreeNode):
+        class TaskWithBareList(TreeNode):
             """! @each[items]->task.processor@{{value.item=items}}*"""
 
             items: list  # ❌ Bare list - should be rejected
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             item: str
 
         structure = RunStructure()
@@ -45,12 +45,12 @@ class TestBareCollectionTypeRejection:
     def test_bare_dict_should_be_rejected(self):
         """Bare dict type should be rejected as underspecified."""
 
-        class TaskWithBareDict(PromptTreeNode):
+        class TaskWithBareDict(TreeNode):
             """! @each[metadata]->task.processor@{{value.key=metadata}}*"""
 
             metadata: dict  # ❌ Bare dict - should be rejected
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             key: str
 
         structure = RunStructure()
@@ -66,12 +66,12 @@ class TestBareCollectionTypeRejection:
     def test_bare_set_should_be_rejected(self):
         """Bare set type should be rejected as underspecified."""
 
-        class TaskWithBareSet(PromptTreeNode):
+        class TaskWithBareSet(TreeNode):
             """! @each[tags]->task.processor@{{value.tag=tags}}*"""
 
             tags: set  # ❌ Bare set - should be rejected
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             tag: str
 
         structure = RunStructure()
@@ -87,7 +87,7 @@ class TestBareCollectionTypeRejection:
     def test_properly_typed_collections_should_be_accepted(self):
         """Properly typed collections should be accepted."""
 
-        class TaskWithTypedCollections(PromptTreeNode):
+        class TaskWithTypedCollections(TreeNode):
             """
             Task with properly typed collections.
             """
@@ -99,7 +99,7 @@ class TestBareCollectionTypeRejection:
             metadata: dict[str, int] = {}  # ✅ Properly typed
             tags: set[str] = set()  # ✅ Properly typed
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             processed_items: list[str]  # ✅ Matching iteration level with source
 
         structure = RunStructure()
@@ -113,18 +113,18 @@ class TestBareCollectionTypeRejection:
         assert structure.get_node("task.processor") is not None
 
 
-class TestDPCLStructuralValidation:
-    """Test DPCL structural validation at assembly time."""
+class TestLangTreeDSLStructuralValidation:
+    """Test LangTree DSL structural validation at assembly time."""
 
     def test_nonexistent_field_in_inclusion_path_should_fail(self):
-        """DPCL commands referencing nonexistent fields should fail."""
+        """LangTree DSL commands referencing nonexistent fields should fail."""
 
-        class TaskWithBadInclusionPath(PromptTreeNode):
+        class TaskWithBadInclusionPath(TreeNode):
             """! @each[nonexistent_field]->task.processor@{{value.item=items}}*"""
 
             items: list[str]  # Field exists, but inclusion path wrong
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             item: str
 
         structure = RunStructure()
@@ -143,15 +143,15 @@ class TestDPCLStructuralValidation:
         )
 
     def test_nonexistent_rhs_field_should_fail(self):
-        """DPCL commands with nonexistent RHS fields should fail."""
+        """LangTree DSL commands with nonexistent RHS fields should fail."""
 
-        class TaskWithBadRHS(PromptTreeNode):
+        class TaskWithBadRHS(TreeNode):
             """! @each[items]->task.processor@{{value.processed_items=nonexistent_rhs}}*"""
 
             items: list[str]  # Inclusion path is correct
             # Missing: nonexistent_rhs field
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             processed_items: list[str]  # ✅ Matching iteration level
 
         structure = RunStructure()
@@ -176,7 +176,7 @@ class TestDPCLStructuralValidation:
     def test_forward_references_should_be_allowed(self):
         """Forward references to future nodes should be allowed."""
 
-        class TaskEarly(PromptTreeNode):
+        class TaskEarly(TreeNode):
             """
             Task with forward reference to later node.
             """
@@ -186,7 +186,7 @@ class TestDPCLStructuralValidation:
                 description="! @each[items]->task.late@{{value.results=items}}*",
             )
 
-        class TaskLate(PromptTreeNode):  # Defined after being referenced
+        class TaskLate(TreeNode):  # Defined after being referenced
             results: list[str]  # ✅ Matching iteration level with source
 
         structure = RunStructure()
@@ -200,11 +200,11 @@ class TestDPCLStructuralValidation:
         assert structure.get_node("task.late") is not None
 
     def test_valid_structural_references_should_pass(self):
-        """Valid DPCL structural references should pass validation."""
+        """Valid LangTree DSL structural references should pass validation."""
 
-        class TaskValid(PromptTreeNode):
+        class TaskValid(TreeNode):
             """
-            Task with valid DPCL structural references.
+            Task with valid LangTree DSL structural references.
             """
 
             items: list[str] = Field(
@@ -212,7 +212,7 @@ class TestDPCLStructuralValidation:
                 description="! @each[items]->task.processor@{{value.processed_items=items}}*",
             )  # ✅ Inclusion path exists, RHS path is valid subchain
 
-        class TaskProcessor(PromptTreeNode):
+        class TaskProcessor(TreeNode):
             processed_items: list[str]  # ✅ Matching iteration level with source
 
         structure = RunStructure()
@@ -232,7 +232,7 @@ class TestRuntimeVariableEnumeration:
     def test_list_all_runtime_variables_needed(self):
         """Should provide simple list of all runtime variables needing values."""
 
-        class TaskWithVariables(PromptTreeNode):
+        class TaskWithVariables(TreeNode):
             """Template with variables: {field_var} and {another_var}"""
 
             field_var: str = "default"
@@ -254,7 +254,7 @@ class TestRuntimeVariableEnumeration:
     def test_empty_list_when_no_runtime_variables(self):
         """Should return empty list when no runtime variables exist."""
 
-        class TaskNoVariables(PromptTreeNode):
+        class TaskNoVariables(TreeNode):
             """Template with no variables"""
 
             field: str = "static"
