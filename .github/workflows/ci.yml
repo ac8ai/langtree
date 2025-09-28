@@ -61,4 +61,4 @@ jobs:
     - name: Test installation
       run: |
         uv pip install dist/*.whl
-        python -c "import langtree; print('Package installed successfully')"
+        uv run python -c "import langtree; print('Package installed successfully')"
