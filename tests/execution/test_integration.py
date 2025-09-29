@@ -2016,6 +2016,7 @@ class TestLangTreeChainIntrospection:
             Processor task that transforms data.
             """
 
+            input_data: str = "default"  # Receives from TaskSource
             processor_field: str = "processed_value"
 
         class TaskSink(TreeNode):
@@ -2023,6 +2024,7 @@ class TestLangTreeChainIntrospection:
             Final sink task that consumes data.
             """
 
+            processed_data: str = "default"  # Receives from TaskProcessor
             result_field: str = "result_value"
 
         run_structure.add(TaskSource)
@@ -2183,6 +2185,7 @@ class TestLangTreeChainIntrospection:
             Processor A that transforms data.
             """
 
+            data_a: str = "default"  # Grammar fix: Receives from TaskDataSource
             processed_a: str = "processed_by_a"
 
         class TaskProcessorB(TreeNode):
@@ -2191,6 +2194,7 @@ class TestLangTreeChainIntrospection:
             Processor B that transforms data.
             """
 
+            data_b: str = "default"  # Grammar fix: Receives from TaskDataSource
             processed_b: str = "processed_by_b"
 
         class TaskAggregator(TreeNode):
@@ -2198,6 +2202,8 @@ class TestLangTreeChainIntrospection:
             Final aggregator that combines results.
             """
 
+            result_a: str = "default"  # Grammar fix: Receives from TaskProcessorA
+            result_b: str = "default"  # Grammar fix: Receives from TaskProcessorB
             final_result: str = "aggregated_result"
 
         run_structure.add(TaskDataSource)
@@ -2299,8 +2305,12 @@ class TestLangTreeChainIntrospection:
                 ! @->task.level2_{letter.lower()}2@{{{{value.data=*}}}}
                 Level 1 node {letter} that processes root data.
                 """,
-                "__annotations__": {f"level1_{letter.lower()}_data": str},
+                "__annotations__": {
+                    f"level1_{letter.lower()}_data": str,
+                    "data": str,  # Grammar fix: Target field for DSL commands {{value.data=*}}
+                },
                 f"level1_{letter.lower()}_data": f"processed_by_1{letter}",
+                "data": "default",  # Grammar fix: Target field for DSL commands
             }
             level1_class = type(f"TaskLevel1{letter}", (TreeNode,), class_dict)
             level1_classes.append(level1_class)
@@ -2315,8 +2325,12 @@ class TestLangTreeChainIntrospection:
                     ! @->task.level3_{letter.lower()}{j}_b@{{{{value.data=*}}}}
                     Level 2 node {letter}{j} that processes level 1 data.
                     """,
-                    "__annotations__": {f"level2_{letter.lower()}{j}_data": str},
+                    "__annotations__": {
+                        f"level2_{letter.lower()}{j}_data": str,
+                        "data": str,  # Grammar fix: Target field for DSL commands {{value.data=*}}
+                    },
                     f"level2_{letter.lower()}{j}_data": f"processed_by_2{letter}{j}",
+                    "data": "default",  # Grammar fix: Target field for DSL commands
                 }
                 level2_class = type(f"TaskLevel2{letter}{j}", (TreeNode,), class_dict)
                 level2_classes.append(level2_class)
@@ -2329,9 +2343,11 @@ class TestLangTreeChainIntrospection:
                     class_dict = {
                         "__doc__": f"Level 3 leaf node {letter}{j}{k}.",
                         "__annotations__": {
-                            f"level3_{letter.lower()}{j}{k.lower()}_data": str
+                            f"level3_{letter.lower()}{j}{k.lower()}_data": str,
+                            "data": str,  # Grammar fix: Target field for DSL commands {{value.data=*}}
                         },
                         f"level3_{letter.lower()}{j}{k.lower()}_data": f"final_result_{letter}{j}{k}",
+                        "data": "default",  # Grammar fix: Target field for DSL commands
                     }
                     level3_class = type(
                         f"TaskLevel3{letter}{j}{k}", (TreeNode,), class_dict
@@ -2415,6 +2431,7 @@ class TestLangTreeChainIntrospection:
                 count: int = 3
 
             transformation_result: TransformationResult = TransformationResult()
+            raw_data: str = "default"  # Grammar fix: Target field for DSL command {{value.raw_data=*}}
 
         class TaskOutputter(TreeNode):
             """
@@ -2422,6 +2439,7 @@ class TestLangTreeChainIntrospection:
             """
 
             final_output: str = "processing_complete"
+            transformed: str = "default"  # Grammar fix: Target field for DSL command {{value.transformed=*}}
 
         run_structure.add(TaskCollector)
         run_structure.add(TaskTransformer)
@@ -2733,6 +2751,7 @@ class TestLangTreeChainIntrospection:
             """
 
             result: str = "processed"
+            data: str = "default"  # Grammar fix: Target field for DSL command {{value.data=source_data}}
 
         run_structure.add(TaskSource)
         run_structure.add(TaskSink)
@@ -2939,6 +2958,9 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 default="invalid_self_ref",
                 description="! @->task.self_reference@{{value.data=self_field}}",
             )
+            data: str = (
+                "default"  # Grammar fix: Target field for self-referencing DSL command
+            )
 
         # Invalid Structure 2: Circular dependency chain
         class TaskCircularA(TreeNode):
@@ -2950,6 +2972,9 @@ class TestLangTreeChainBuilderAdversarialContinued:
                 default="data_a",
                 description="! @->task.circular_b@{{value.data_for_b=field_a}}",
             )
+            data_for_a: str = (
+                "default"  # Grammar fix: Target field for circular DSL command
+            )
 
         class TaskCircularB(TreeNode):
             """
@@ -2959,6 +2984,9 @@ class TestLangTreeChainBuilderAdversarialContinued:
             field_b: str = Field(
                 default="data_b",
                 description="! @->task.circular_a@{{value.data_for_a=field_b}}",
+            )
+            data_for_b: str = (
+                "default"  # Grammar fix: Target field for circular DSL command
             )
 
         # Invalid Structure 3: Missing field references
@@ -2980,6 +3008,7 @@ class TestLangTreeChainBuilderAdversarialContinued:
             """Target for invalid references."""
 
             target_field: str = "target_data"
+            valid_data: str = "default"  # Grammar fix: Target field for DSL command {{value.valid_data=nonexistent_field}}
 
         # Add all invalid structures
         run_structure.add(TaskSelfReference)
@@ -4298,7 +4327,9 @@ class TestAssemblyValidation:
         class TaskProcessor(TreeNode):
             """Target task for the command"""
 
-            pass
+            simple_field: str = (
+                "default"  # Add field so test reaches intended assembly validation
+            )
 
         class TaskDestinationFieldMismatch(TreeNode):
             """
@@ -4309,7 +4340,7 @@ class TestAssemblyValidation:
                 default=[],
                 description="! @each[items.subitems]->task.processor@{{value.simple_field=items.subitems.data}}*",
             )
-            # simple_field doesn't exist → destination field with 0 nesting
+            # simple_field exists → destination field with 0 nesting
             # But iteration items.subitems has 2 levels → MISMATCH!
 
         structure = RunStructure()
@@ -4343,7 +4374,7 @@ class TestAssemblyValidation:
         class TaskProcessor(TreeNode):
             """Target task for the command"""
 
-            pass
+            existing_field: str = "default"  # Receives from TaskSourceField
 
         class FieldGroup(TreeNode):
             items: list[str]
@@ -4387,7 +4418,7 @@ class TestAssemblyValidation:
         class TaskProcessor(TreeNode):
             """Target task for the command"""
 
-            pass
+            simple_field: str = "default"  # Grammar fix: Referenced in DSL command
 
         class TaskNoIteration(TreeNode):
             """
@@ -4395,7 +4426,7 @@ class TestAssemblyValidation:
             """
 
             items: list[Item] = Field(default=[])
-            # simple_field doesn't exist → destination field
+            # simple_field exists → destination field
             # But no iteration → no nesting constraints
 
         structure = RunStructure()
@@ -4506,7 +4537,8 @@ class TestAssemblyValidation:
             )
 
         class TaskProcessor(TreeNode):
-            pass
+            dest_field: str = "default"  # Grammar fix: Target field for DSL commands {{value.dest_field=...}}
+            source_field: str = "default"  # Grammar fix: Target field for DSL commands {{value.source_field=...}}
 
         # Test Case 1: All destination fields
         structure1 = RunStructure()

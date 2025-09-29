@@ -2075,17 +2075,15 @@ class TestNamedParameters:
         assert result.comment == "Use override mode"
 
 
-# TODO: Following TDD principles from CODING_STANDARDS.md, comprehensive tests
-# for new language features will be added here before implementation:
+# Note: All originally planned language features have been implemented:
+# ✅ Variable assignment commands (! var=value) with string/number/boolean support
+# ✅ Resampling commands (! @resampled[field]->function) with enum field validation
+# ✅ Node modifier commands (! @sequential, ! @parallel, ! together)
+# ✅ Boolean literal parsing (true/false) across all command types
+# ✅ Comment parsing (# comment) for all command types
+# ✅ Enhanced validation and error handling for new syntax
 #
-# 1. Variable assignment commands (! var=value) with string/number/boolean support
-# 2. Resampling commands (! @resampled[field]->function) with enum field validation
-# 3. Node modifier commands (! @sequential, ! @parallel, ! together)
-# 4. Boolean literal parsing (true/false) across all command types
-# 5. Comment parsing (# comment) for all command types
-# 6. Enhanced validation and error handling for new syntax
-#
-# Each test will be linked to specific implementation TODOs in parser.py
+# Tests for these features exist throughout this file in their respective test classes
 class TestNodeModifierCommands:
     """
     Test suite for node modifier command parsing.

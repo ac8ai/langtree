@@ -342,13 +342,12 @@ def get_assembly_variables_for_node(node: "StructureTreeNode") -> set[str]:
     # The proper implementation would traverse the tree hierarchy to find
     # Assembly Variables available to this node based on scope rules
 
-    # TODO: This function needs access to the RunStructure to get Assembly Variables
-    # Currently there's no direct link from StructureTreeNode to RunStructure
-    # The caller should provide the RunStructure context or we need architectural changes
+    # Note: For access to RunStructure, use get_assembly_variables_for_node_with_structure()
+    # which provides the full implementation with proper Assembly Variable registry access
 
     # Return empty set for now to prevent errors
     # The full implementation should:
-    # 1. Get RunStructure from context
+    # 1. Get RunStructure from context (available via _with_structure variant)
     # 2. Get Assembly Variable registry
     # 3. Filter variables by scope hierarchy (parent to child inheritance)
     # 4. Return set of variable names

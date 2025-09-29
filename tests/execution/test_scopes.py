@@ -655,7 +655,7 @@ class TestPathResolutionTypes:
 
         class TaskWithVariableMappings(TreeNode):
             """
-            ! @->task.target@{{prompt.simple=*, value.nested.field=*, outputs.result=*, regular.field=*}}
+            ! @->task.target@{{prompt.simple=*, value.nested=*, outputs.result=*, regular.field=*}}
             Task with complex variable mappings requiring different resolution.
             """
 
@@ -687,8 +687,13 @@ class TestPathResolutionTypes:
         class TaskTarget(TreeNode):
             """Target task with fields for variable mappings."""
 
+            class TargetNestedNode(TreeNode):
+                field: str = "target_default"
+
             simple: str = "default"  # For prompt.simple
-            nested: dict[str, str] = {}  # For value.nested.field
+            nested: TargetNestedNode = (
+                TargetNestedNode()
+            )  # For value.nested (TreeNode-to-TreeNode)
             result: str = "default"  # For outputs.result
             field: str = "default"  # For regular.field
 
@@ -712,7 +717,9 @@ class TestPathResolutionTypes:
         # Check each scope type is represented
         target_paths = [mapping.target_path for mapping in command.variable_mappings]
         assert "prompt.simple" in target_paths
-        assert "value.nested.field" in target_paths
+        assert (
+            "value.nested" in target_paths
+        )  # Fixed: TreeNode-to-TreeNode mapping, not dict field
         assert "outputs.result" in target_paths
         assert "regular.field" in target_paths
 
@@ -803,7 +810,12 @@ class TestScopeResolutionEdgeCases:
         class TaskLateTarget(TreeNode):
             """Target task added after the reference."""
 
-            pass
+            future_context: str = (
+                "default"  # Grammar fix: Referenced by prompt.future_context
+            )
+            future_value: str = (
+                "default"  # Grammar fix: Referenced by value.future_value
+            )
 
         structure.add(TaskLateTarget)
 
@@ -1153,7 +1165,8 @@ class TestContextResolutionIntegration:
         class TaskFinalSummary(TreeNode):
             """Final summary task."""
 
-            pass
+            conclusion: str = "default"  # Grammar fix: Target field for DSL command {{value.conclusion=*}}
+            all_analyses: str = "default"  # Grammar fix: Target field for DSL command {{prompt.all_analyses=*}}
 
         structure = RunStructure()
         structure.add(TaskComplexRealistic)

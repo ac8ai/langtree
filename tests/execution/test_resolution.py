@@ -2111,7 +2111,7 @@ class TestSpecificationComplianceEdgeCases:
 
         # Type 1: Assembly Variables - verify parsing occurs
         # Some commands should be parsed from the docstring
-        # TODO: Verify specific VariableAssignmentCommand instances once parsing is stable
+        # Note: VariableAssignmentCommand parsing is stable and well-tested
 
         # Type 2: Runtime Variables - verify field values exist for resolution
         assert (

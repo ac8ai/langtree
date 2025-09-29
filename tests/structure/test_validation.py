@@ -425,3 +425,131 @@ class TaskStructureATwoLayers(TreeNode):
     """Structure A two layers task."""
 
     pass
+
+
+class TestInvalidFieldTargetingValidation:
+    """Test that invalid field targeting patterns fail appropriately with fail-fast validation."""
+
+    def test_dict_field_targeting_should_fail(self):
+        """Dict field targeting like value.dict_field.key should fail immediately."""
+
+        class TaskSource(TreeNode):
+            """
+            ! @->task.target@{{value.config.database_url=*}}
+            Invalid: Trying to target a field inside a dictionary.
+            """
+
+            source_data: str = "data"
+
+        class TaskTarget(TreeNode):
+            """Target with dictionary field."""
+
+            config: dict[
+                str, str
+            ] = {}  # Dictionary - contents should not be targetable
+            other_field: str = "valid"
+
+        structure = RunStructure()
+        structure.add(TaskSource)
+
+        # This should fail immediately when trying to add TaskTarget
+        # because the command tries to target config.database_url where config is a dict
+        with pytest.raises(
+            ValueError, match="Target field 'config.database_url' not found"
+        ):
+            structure.add(TaskTarget)
+
+    def test_dict_to_dict_mapping_should_pass(self):
+        """Dict-to-dict mapping should work fine."""
+
+        class TaskSourceDict(TreeNode):
+            """
+            ! @->task.target@{{value.config=*}}
+            Valid: Dict-to-dict mapping.
+            """
+
+            config: dict[str, str] = {"key": "value"}
+
+        class TaskSourceClass(TreeNode):
+            """
+            ! @->task.target@{{value.config=*}}
+            Valid: Dict-to-dict mapping.
+            """
+
+            class ConfigComplex(TreeNode):
+                database_url: str = "sqlite:///:memory:"
+                api_key: str = "default_key"
+
+            config: ConfigComplex = ConfigComplex()
+
+        class TaskTarget(TreeNode):
+            """Target with matching dict field."""
+
+            config: dict[str, str] = {}  # Dict-to-dict is valid
+
+        structure = RunStructure()
+        structure.add(TaskSourceDict)
+        structure.add(TaskSourceClass)
+        structure.add(TaskTarget)  # Should succeed
+
+        # Verify the structure was built successfully
+        assert structure.get_node("task.source_dict") is not None
+        assert structure.get_node("task.source_class") is not None
+        assert structure.get_node("task.target") is not None
+
+    def test_nested_object_field_targeting_should_fail(self):
+        """Targeting non-existent fields in nested objects should fail."""
+
+        class TaskSource(TreeNode):
+            """
+            ! @->task.target@{{value.nested.nonexistent_field=*}}
+            Invalid: Targeting non-existent field in nested object.
+            """
+
+            source_data: str = "data"
+
+        class TaskTarget(TreeNode):
+            """Target with nested object."""
+
+            class NestedNode(TreeNode):
+                existing_field: str = "exists"
+
+            nested: NestedNode = (
+                NestedNode()
+            )  # Has existing_field but not nonexistent_field
+
+        structure = RunStructure()
+        structure.add(TaskSource)
+
+        # Should fail because nested.nonexistent_field doesn't exist
+        with pytest.raises(
+            ValueError, match="Target field 'nested.nonexistent_field' not found"
+        ):
+            structure.add(TaskTarget)
+
+    def test_top_level_field_targeting_should_pass(self):
+        """Targeting existing top-level fields should work."""
+
+        class TaskSource(TreeNode):
+            """
+            ! @->task.target@{{value.existing_field=*}}
+            Valid: Targeting existing top-level field.
+            """
+
+            source_data: str = "data"
+
+        class TaskTarget(TreeNode):
+            """Target with top-level field."""
+
+            existing_field: str = "default"
+
+        structure = RunStructure()
+        structure.add(TaskSource)
+        structure.add(TaskTarget)  # Should succeed
+
+        # Verify successful structure building
+        assert structure.get_node("task.source") is not None
+        assert structure.get_node("task.target") is not None
+
+    # NOTE: Nested field path validation (like nested.field) is not yet implemented
+    # The current validation only checks top-level fields. This could be enhanced in the future.

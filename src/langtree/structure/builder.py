@@ -413,70 +413,37 @@ class RunStructure:
         if source_node and command not in source_node.extracted_commands:
             source_node.extracted_commands.append(command)
 
-        try:
-            # Step 1: Invoke inclusion context resolution if applicable
-            if command.inclusion_path and command.resolved_inclusion:
-                self._resolve_inclusion_context(command, source_node_tag)
+        # Step 1: Inclusion context resolution handled by execution module
+        # (Builder validation already completed during command parsing)
 
-            # Step 2: Invoke destination context resolution now that target node exists
-            target_node = self.get_node(pending_target.target_path)
-            if target_node:
-                self._resolve_destination_context(
-                    command, target_node, pending_target.target_path
-                )
+        # Step 2: Invoke destination context resolution now that target node exists
+        target_node = self.get_node(pending_target.target_path)
+        if target_node:
+            self._resolve_destination_context(
+                command, target_node, pending_target.target_path
+            )
 
-            # Step 2.5: Validate cross-tree iteration count matching for @each commands
-            if (
-                target_node
-                and command.inclusion_path
-                and command.command_type.value == "each"
-            ):
-                self._validate_cross_tree_iteration_matching(
-                    command, source_node_tag, pending_target.target_path
-                )
+        # Step 2.5: Validate cross-tree iteration count matching for @each commands
+        if (
+            target_node
+            and command.inclusion_path
+            and command.command_type.value == "each"
+        ):
+            self._validate_cross_tree_iteration_matching(
+                command, source_node_tag, pending_target.target_path
+            )
 
-            # Step 3: Resolve each variable mapping (source + target) semantically
-            for variable_mapping in command.variable_mappings:
-                self._resolve_variable_mapping_context(
-                    variable_mapping,
-                    command,
-                    source_node_tag,
-                    pending_target.target_path,
-                )
+        # Step 3: Resolve each variable mapping (source + target) semantically
+        for variable_mapping in command.variable_mappings:
+            self._resolve_variable_mapping_context(
+                variable_mapping,
+                command,
+                source_node_tag,
+                pending_target.target_path,
+            )
 
-            # Step 4: Update variable registry entries from syntactic to semantic satisfaction
-            self._update_variable_registry_satisfaction(command, source_node_tag)
-
-        except Exception as e:
-            # Let validation errors bubble up - these are intended to fail the operation
-            from langtree.exceptions import FieldValidationError
-
-            if isinstance(e, FieldValidationError):
-                raise
-
-            # For other exceptions, continue swallowing for now
-            # TODO: Implement command.resolution_errors tracking
-            pass
-
-    def _resolve_inclusion_context(
-        self, command: ParsedCommand, source_node_tag: str
-    ) -> None:
-        """
-        Resolve inclusion context for @each commands with inclusion paths.
-
-        Validates that the inclusion path points to an iterable field and performs
-        semantic validation to ensure the command can execute successfully.
-
-        Params:
-            command: The parsed command with inclusion path information
-            source_node_tag: Tag of the source node for context resolution
-
-        Raises:
-            ValueError: When inclusion path is invalid or not iterable
-        """
-        # Basic validation - check if inclusion path exists and is accessible
-        # TODO: Implement actual iterable validation logic
-        pass
+        # Step 4: Update variable registry entries from syntactic to semantic satisfaction
+        self._update_variable_registry_satisfaction(command, source_node_tag)
 
     def _resolve_destination_context(
         self, command: ParsedCommand, target_node: StructureTreeNode, target_path: str

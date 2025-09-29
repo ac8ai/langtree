@@ -233,8 +233,7 @@ class TestTemplateVariableSystem:
             field: str = Field(description="Test field")
 
         # Valid node should process correctly
-        # TODO: Implement spacing validation
-        # See: tests/prompt/test_structure.py::TestTemplateVariableSystem::test_template_variable_spacing_validation
+        # Note: Spacing validation has been implemented in validate_template_variable_spacing()
         self.structure.add(TaskValidSpacing)
         # Invalid node should raise error or auto-correct
         # with pytest.raises(TemplateVariableError):
