@@ -5,6 +5,81 @@ This module defines specific exception types for different error conditions
 that can occur during LangTree DSL parsing, validation, and execution planning.
 """
 
+from dataclasses import dataclass
+from enum import Enum
+
+
+class ErrorLevel(Enum):
+    """Error message detail level for end users vs developers."""
+
+    USER = "user"  # Clean errors with docstring context only
+    DEVELOPER = "developer"  # Full context including Python source locations
+
+
+@dataclass
+class ErrorContext:
+    """
+    Context information for error messages.
+
+    Captures where an error occurred in both DSL terms (docstring line, node tag)
+    and Python source terms (file path, line numbers). Supports formatting at
+    different detail levels for user-facing vs developer debugging.
+
+    Params:
+        docstring_line: Line number within the docstring or field description
+        command_text: The original command text that caused the error
+        node_tag: TreeNode class name (e.g., "TaskNode")
+        node_file: Python file where TreeNode class is defined
+        node_line: Line number where TreeNode class starts in Python file
+        field_name: Field name if command is in Field description
+        field_line: Line number where Field is defined in Python file
+    """
+
+    docstring_line: int | None = None
+    command_text: str | None = None
+    node_tag: str | None = None
+    node_file: str | None = None
+    node_line: int | None = None
+    field_name: str | None = None
+    field_line: int | None = None
+
+    def format_location(self, error_level: ErrorLevel) -> str:
+        """
+        Format location information based on error level.
+
+        Params:
+            error_level: Whether to show USER or DEVELOPER level details
+
+        Returns:
+            Formatted location string with appropriate detail level
+        """
+        lines = []
+
+        # Always show docstring line and node/field context
+        if self.docstring_line is not None:
+            location_desc = "description line" if self.field_name else "docstring line"
+            lines.append(f"  at {location_desc} {self.docstring_line}")
+
+        # Show node and field names
+        if self.node_tag:
+            if self.field_name:
+                lines.append(f"  in {self.node_tag}.{self.field_name}")
+            else:
+                lines.append(f"  in {self.node_tag}")
+
+        # Developer level: add Python source locations
+        if error_level == ErrorLevel.DEVELOPER:
+            if self.node_file and self.node_line:
+                lines.append(f"  class at {self.node_file}:{self.node_line}")
+            if self.field_line:
+                lines.append(f"  field at {self.node_file}:{self.field_line}")
+
+        # Show command text if available
+        if self.command_text:
+            lines.append(f"  command: {self.command_text}")
+
+        return "\n".join(lines)
+
 
 class LangTreeDSLError(Exception):
     """Base exception for all LangTree DSL-related errors."""
@@ -97,6 +172,8 @@ class FieldValidationError(LangTreeDSLError):
         container: str,
         message: str = "does not exist",
         command_context: str = None,
+        context: ErrorContext | None = None,
+        error_level: ErrorLevel = ErrorLevel.USER,
     ):
         """
         Initialize the exception.
@@ -105,15 +182,25 @@ class FieldValidationError(LangTreeDSLError):
             field_path: The field path that was not found
             container: The structure/class where the field was expected
             message: Specific error message
-            command_context: Optional higher-level command context for error chaining
+            command_context: Optional higher-level command context for error chaining (deprecated)
+            context: ErrorContext with source location information
+            error_level: Level of detail to show in error message
         """
         self.field_path = field_path
         self.container = container
         self.command_context = command_context
+        self.context = context
+        self.error_level = error_level
 
         # Build error message with optional context
         primary_error = f"Field '{field_path}' {message} in {container}"
-        if command_context:
+
+        # Use new ErrorContext if provided
+        if context:
+            location_info = context.format_location(error_level)
+            full_message = f"{primary_error}\n{location_info}"
+        elif command_context:
+            # Backward compatibility with old command_context parameter
             full_message = f"{primary_error}\n  Context: {command_context}"
         else:
             full_message = primary_error

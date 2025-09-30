@@ -9,6 +9,7 @@ import re
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
+from attrs import frozen
 from inflection import underscore
 
 if TYPE_CHECKING:
@@ -17,7 +18,15 @@ if TYPE_CHECKING:
 COMMAND_PATTERN = re.compile(r"^\s*!\s*[^!\n]*(?:\n(?!\s*!)[^\n]*)*", re.MULTILINE)
 
 
-def extract_commands(content: str | None) -> tuple[list[str], str]:
+@frozen
+class ExtractedCommand:
+    """A command extracted from docstring with location information."""
+
+    text: str
+    line: int
+
+
+def extract_commands(content: str | None) -> tuple[list[ExtractedCommand], str]:
     """
     Extract commands from text content and return clean prompt content.
 
@@ -28,8 +37,8 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
         content: Raw text content that may contain command lines (starting with !)
 
     Returns:
-        Tuple of (extracted_commands, clean_content) where commands are stripped
-        of leading whitespace and clean_content has commands removed
+        Tuple of (extracted_commands, clean_content) where extracted_commands is a
+        list of ExtractedCommand instances and clean_content has commands removed
     """
     if not content:
         return [], ""
@@ -38,6 +47,7 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
     commands = []
     command_indices = set()
     current_command = None
+    current_command_start_line = None
     in_multiline_context = False
     bracket_depth = 0
     parsing_commands = True  # Start in command parsing mode
@@ -53,10 +63,15 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
         if stripped.startswith("!"):
             # Finish previous command if any
             if current_command is not None:
-                commands.append(current_command.strip())
+                commands.append(
+                    ExtractedCommand(
+                        text=current_command.strip(), line=current_command_start_line
+                    )
+                )
 
             # Start new command
             current_command = line
+            current_command_start_line = i
             command_indices.add(i)
 
             # Check if this command has multiline contexts
@@ -93,15 +108,24 @@ def extract_commands(content: str | None) -> tuple[list[str], str]:
         else:
             # Regular text found - stop parsing commands permanently
             if current_command is not None:
-                commands.append(current_command.strip())
+                commands.append(
+                    ExtractedCommand(
+                        text=current_command.strip(), line=current_command_start_line
+                    )
+                )
                 current_command = None
+                current_command_start_line = None
                 in_multiline_context = False
                 bracket_depth = 0
             parsing_commands = False
 
     # Finish last command if any
     if current_command is not None:
-        commands.append(current_command.strip())
+        commands.append(
+            ExtractedCommand(
+                text=current_command.strip(), line=current_command_start_line
+            )
+        )
 
     # Remove command lines from content
     clean_lines = [line for i, line in enumerate(lines) if i not in command_indices]

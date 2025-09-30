@@ -272,15 +272,40 @@ class CommentCommand:
 
 @dataclass
 class ParsedCommand:
+    """
+    Represents a parsed LangTree DSL command with source location tracking.
+
+    Params:
+        command_type: Type of command (EACH, ALL, etc.)
+        destination_path: Target path for the command
+        variable_mappings: List of variable mappings
+        inclusion_path: Optional inclusion path for @each commands
+        has_multiplicity: True if command ends with *
+        is_wildcard_assignment: True if uses * assignment
+        comment: Optional comment text
+        docstring_line: Line number within docstring or field description
+        source_node_tag: TreeNode class name where command is defined
+        source_node_file: Python file where TreeNode is defined
+        source_node_line: Line number where TreeNode class starts
+        field_name: Field name if command is in Field description
+        field_line: Line number where Field is defined
+        raw_command_text: Original command text as written
+    """
+
     command_type: CommandType
     destination_path: str
     variable_mappings: list[VariableMapping]
     inclusion_path: str | None = None  # For @each commands
-    has_multiplicity: bool = False  # True if command ends with *
-    is_wildcard_assignment: bool = False  # True if uses * assignment
-    comment: str | None = None  # Optional comment
-
-    # Scope resolution for all path components
+    has_multiplicity: bool = False
+    is_wildcard_assignment: bool = False
+    comment: str | None = None
+    docstring_line: int | None = None
+    source_node_tag: str | None = None
+    source_node_file: str | None = None
+    source_node_line: int | None = None
+    field_name: str | None = None
+    field_line: int | None = None
+    raw_command_text: str | None = None
     resolved_destination: ResolvedPath | None = None
     resolved_inclusion: ResolvedPath | None = None
 

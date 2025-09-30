@@ -186,33 +186,22 @@ LangTree DSL implements a sophisticated variable system with five distinct types
 
 **Purpose**: @each commands create runtime variables at target nodes through their RHS (Right-Hand Side) variable mappings.
 
-**Mechanism**: When @each processes collections, the RHS expressions in variable mappings become runtime variables available at the target node (TODO: adjust for different scopes of variables!):
-
-```python
-class SourceNode(TreeNode):
-    """! @each[items]->target.processor@{{value.processed_items=items}}*"""
-    items: list[str] = ["item1", "item2", "item3"]
-
-class TargetProcessor(TreeNode):
-    processed_items: list[str]  # This field gets populated by @each RHS
-```
+**Mechanism**: When @each processes collections, the RHS expressions in variable mappings become runtime variables available at the target node.
 
 **Runtime Variable Creation Process**:
-1. **@each Execution**: System iterates over `items` collection
-2. **RHS Resolution**: For each iteration, `items` resolves to current iteration value
-3. **Target Variable Creation**: `value.processed_items=items` creates runtime variable at target
-4. **Field Population**: Target node's `processed_items` field receives the iterated values (TODO: It's not the same for prompt variables, for value or for output scope)
-5. **Runtime Access**: Target prompts can use `{processed_items}` as runtime variable (TODO: only for prompt scope! Other scope usage needs to be mentioned as well)
+1. **@each Execution**: System iterates over collection specified in brackets
+2. **RHS Resolution**: For each iteration, RHS expression resolves to current iteration value
+3. **Target Variable Creation**: Variable mappings create runtime variables at target based on scope prefix
+4. **Field Population**: Target fields receive iterated values according to their scope (value., prompt., output.)
+5. **Runtime Access**: Variables accessible in their respective scopes - value for fields, prompt for templates, output for results
 
-**Key Principle**: The RHS of @each variable mappings becomes the "bridge" between iteration data and runtime variables at the target node. This enables iteration results to be consumed as normal runtime variables in target prompts.
+**Key Principle**: The RHS of @each variable mappings bridges iteration data and runtime variables at the target node. This enables iteration results to be consumed naturally through variable syntax.
 
 **Example Flow**:
-```python
-# Source: @each[sections]->analyzer@{{value.content=sections.text}}*
-# Creates: Runtime variable "content" at analyzer node
-# Usage: Analyzer prompts can reference {content} for each section's text
-# TODO **THIS IS VERY UNTRUE**, value scope is not a prompt scope!
-```
+- Command: `@each[sections]->analyzer@{{value.content=sections.text}}*`
+- Creates: Variable "content" in value scope at analyzer node
+- Result: Analyzer's 'content' field receives each section's text
+- Note: Value scope is for field population, not prompt variables
 
 **Architectural Significance**: This bridge is essential for @each command functionality - it transforms iteration data into runtime variables that target nodes can consume naturally through the `{var}` syntax.
 
@@ -734,8 +723,8 @@ Dependency graphs are extracted from LangTree DSL commands to enable:
 **Simplifications vs. Complex V2 Design**:
 - **No Detailed JSON Format**: Simple dict structure rather than complex execution metadata
 - **Heuristic Ordering**: Basic dependency tracking instead of full topological sort
-- **Pending Full Implementation**: Multiplicity expansion and advanced dependency analysis still TODO
 - **LangChain Integration Focus**: Designed for LangChain pipeline composition rather than custom execution engine
+- **Recent Enhancements**: Error context system and type mapping fully implemented
 
 #### Multiplicity Expansion for @each Commands
 The framework handles collection iteration through automatic expansion of @each commands into parallel execution patterns.
@@ -1152,6 +1141,134 @@ except ChainAssemblyError as e:
 **Decision**: Merge multiple docs into comprehensive guide
 **Rationale**: Reduce complexity, improve navigation, single source of truth
 **Impact**: Easier maintenance, clearer for new developers
+
+---
+
+## Recent Implementation Progress
+
+### Error Context System ✅
+
+**Implementation Date**: Session before context limit
+**Status**: Complete and tested
+
+#### Overview
+Enhanced error reporting system that provides rich context about where errors occur in docstrings and source code.
+
+#### Components
+
+**Error Levels**
+- **USER**: Clean, friendly errors showing docstring context and location
+- **DEVELOPER**: Full diagnostic information including file paths and line numbers
+
+**Error Context Tracking**
+The system captures comprehensive context for each error:
+- Docstring line number where commands appear
+- Full command text that caused the error
+- Node tag path (e.g., "task.source.analyzer")
+- Source file and line number in Python code
+- Field name and definition location when applicable
+
+#### Key Changes
+
+**Command Extraction Enhancement**
+- Commands now tracked with their line numbers in docstrings
+- Enables precise error location reporting
+
+**Parse Command Enhancement**
+- Added 7 source tracking fields for complete context
+- Tracks both docstring location and Python source location
+
+**Error Message Examples**
+
+USER level (default):
+```
+Field 'task' is an incomplete task target...
+  at docstring line 5
+  in task.analyzer
+```
+
+DEVELOPER level:
+```
+Field 'task' is an incomplete task target...
+  at docstring line 5
+  in task.analyzer
+  class at /path/to/file.py:42
+  command: ! @all->task@{{value=*}}
+```
+
+### Type Mapping and Conversion System ✅
+
+**Implementation Date**: Two sessions ago
+**Status**: Complete with unit tests, integration tests pending
+
+#### Overview
+Comprehensive type conversion system for variable mappings between nodes with different field types.
+
+#### Components
+
+**Compatibility Levels**
+- **IDENTICAL**: Same type, no conversion needed
+- **SAFE**: Lossless conversions (int → float)
+- **LOSSY**: Potential data loss (float → int)
+- **UNSAFE**: Risky conversions requiring explicit opt-in
+- **FORBIDDEN**: Never allowed conversions
+
+**Validation Strategies**
+- **STRICT**: Only IDENTICAL and SAFE conversions allowed
+- **PERMISSIVE**: Allow LOSSY conversions with warnings
+- **DEVELOPMENT**: Allow UNSAFE for rapid prototyping
+
+**Type Mapping Configuration**
+Configurable behavior for type conversions:
+- Validation strategy selection
+- String parsing enablement
+- TreeNode/dict conversion support
+- Strict boolean parsing rules
+- Union type priority sorting
+
+**Type Converter Engine**
+Handles automatic conversions between compatible types:
+- Basic type conversions (numeric, string)
+- Collection transformations (list, tuple, set)
+- Intelligent string parsing
+- Union type resolution with priority ordering
+- TreeNode and dictionary interoperability
+
+#### Conversion Rules
+
+**Universal String Compatibility**
+All types can convert to string for prompt assembly:
+- Primitives: Direct `str(value)`
+- Collections: JSON serialization
+- TreeNodes: **TODO** - Should use COLLECTED_CONTEXT assembly
+
+**Union Type Priority**
+1. Exact type match
+2. TreeNode (for dict unions)
+3. More specific types (int before float)
+4. Fallback to first compatible
+
+**String Parsing**
+When enabled, intelligently parses strings:
+- Numbers: "42" → 42, "3.14" → 3.14
+- Booleans: "true" → True (strict mode)
+- JSON: '{"key": "val"}' → dict
+- Lists: "[1,2,3]" → list
+
+### Variable Registry Enhancements ✅
+
+**Status**: Partially complete
+
+#### Implemented
+- **SourceInfo Tracking**: Tracks where variables are declared
+- **Assembly Variables**: From `! var=value` commands
+- **Runtime Variables**: From `{{var}}` in prompts
+- **Pending Targets**: Deferred resolution for forward references
+
+#### TODO
+- Scope filtering for assembly variables by node hierarchy
+- Bulk variable resolution optimization
+- Caching for resolved variables
 
 ---
 

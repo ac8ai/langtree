@@ -1383,3 +1383,28 @@ class TestContextResolutionHardCases:
         # Each validation should check the correct target context
         # TaskA should find unique_field_a, TaskB should find unique_field_b, etc.
         structure.add(TaskStressSource)
+
+
+class TestErrorLevelConfiguration:
+    """Test error_level parameter in RunStructure."""
+
+    def test_default_error_level_is_user(self):
+        """Test that default error level is USER."""
+        from langtree.exceptions.core import ErrorLevel
+
+        structure = RunStructure()
+        assert structure.error_level == ErrorLevel.USER
+
+    def test_set_error_level_to_developer(self):
+        """Test setting error level to DEVELOPER."""
+        from langtree.exceptions.core import ErrorLevel
+
+        structure = RunStructure(error_level=ErrorLevel.DEVELOPER)
+        assert structure.error_level == ErrorLevel.DEVELOPER
+
+    def test_set_error_level_with_string(self):
+        """Test setting error level using string value."""
+        from langtree.exceptions.core import ErrorLevel
+
+        structure = RunStructure(error_level="developer")
+        assert structure.error_level == ErrorLevel.DEVELOPER

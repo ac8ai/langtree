@@ -6,6 +6,7 @@ prompt tree structure, including node classes and the main RunStructure
 class that coordinates tree building and command processing.
 """
 
+import inspect
 from dataclasses import dataclass, field
 from typing import Any, Optional, get_args, get_origin
 
@@ -13,6 +14,7 @@ from pydantic import BaseModel
 
 from langtree.core.tree_node import TreeNode
 from langtree.exceptions import DuplicateTargetError, FieldTypeError
+from langtree.exceptions.core import ErrorContext, ErrorLevel
 from langtree.parsing.parser import (
     ExecutionCommand,
     NodeModifierCommand,
@@ -53,7 +55,19 @@ ResolutionResult = PromptValue | TreeNode
 
 @dataclass
 class StructureTreeNode:
-    """Node in the structure tree representing a parsed prompt component."""
+    """Node in the structure tree representing a parsed prompt component.
+
+    Params:
+        name: Fully qualified tag name (e.g., "task.analysis")
+        field_type: TreeNode subclass this node represents
+        parent: Parent node in the tree
+        children: Child nodes keyed by field name
+        clean_docstring: Docstring with commands extracted
+        clean_field_descriptions: Field descriptions with commands extracted
+        extracted_commands: Parsed commands from this node
+        definition_file: Python file where TreeNode class is defined
+        definition_line: Line number where TreeNode class starts
+    """
 
     name: str
     field_type: type[TreeNode] | None = None
@@ -62,6 +76,8 @@ class StructureTreeNode:
     clean_docstring: str | None = field(default=None)
     clean_field_descriptions: dict[str, str] = field(default_factory=dict)
     extracted_commands: list[ParsedCommandUnion] = field(default_factory=list)
+    definition_file: str | None = field(default=None)
+    definition_line: int | None = field(default=None)
 
 
 @dataclass
@@ -90,7 +106,18 @@ class RunStructure:
     The assembled chains will be LangChain Runnables that handle their own execution.
     """
 
-    def __init__(self, type_mapping_config: TypeMappingConfig | dict | None = None):
+    def __init__(
+        self,
+        type_mapping_config: TypeMappingConfig | dict | None = None,
+        error_level: ErrorLevel | str = ErrorLevel.USER,
+    ):
+        """
+        Initialize the RunStructure.
+
+        Params:
+            type_mapping_config: Configuration for type mapping and validation
+            error_level: Error message detail level (USER or DEVELOPER), can be ErrorLevel enum or string
+        """
         self._root_nodes = {}
         self._variable_registry = VariableRegistry()
         self._pending_target_registry = PendingTargetRegistry()
@@ -99,6 +126,39 @@ class RunStructure:
         # Initialize type mapping system
         self._type_mapping_config = create_type_mapping_config(type_mapping_config)
         self._type_converter = TypeConverter(self._type_mapping_config)
+
+        # Set error level
+        if isinstance(error_level, str):
+            self.error_level = ErrorLevel(error_level)
+        else:
+            self.error_level = error_level
+
+    def _create_error_context(
+        self, command: ParsedCommand | None
+    ) -> "ErrorContext | None":
+        """
+        Create ErrorContext from ParsedCommand for error messages.
+
+        Params:
+            command: ParsedCommand with source location information
+
+        Returns:
+            ErrorContext with location info, or None if command is None
+        """
+        from langtree.exceptions.core import ErrorContext
+
+        if command is None:
+            return None
+
+        return ErrorContext(
+            docstring_line=command.docstring_line,
+            command_text=command.raw_command_text,
+            node_tag=command.source_node_tag,
+            node_file=command.source_node_file,
+            node_line=command.source_node_line,
+            field_name=command.field_name,
+            field_line=command.field_line,
+        )
 
     def add(self, tree: type[TreeNode]) -> None:
         """Add a root prompt tree node class to the structure.
@@ -140,7 +200,23 @@ class RunStructure:
         Raises:
             ValueError: If a field annotation is missing or unsupported.
         """
-        node = StructureTreeNode(name=tag, field_type=subtree, parent=parent)
+        # Capture TreeNode definition location for error messages
+        definition_file = None
+        definition_line = None
+        try:
+            definition_file = inspect.getsourcefile(subtree)
+            _, definition_line = inspect.getsourcelines(subtree)
+        except (TypeError, OSError):
+            # Can't get source for built-in types or dynamically created classes
+            pass
+
+        node = StructureTreeNode(
+            name=tag,
+            field_type=subtree,
+            parent=parent,
+            definition_file=definition_file,
+            definition_line=definition_line,
+        )
         field_name = tag.split(".")[-1]
 
         # Check for duplicate target definitions
@@ -163,8 +239,16 @@ class RunStructure:
             processed_content = process_template_variables(clean_content, node)
             node.clean_docstring = processed_content
 
-            for command_str in commands:
-                parsed_command = parse_command(command_str)
+            for cmd in commands:
+                parsed_command = parse_command(cmd.text)
+
+                # Add source location tracking to parsed command
+                parsed_command.docstring_line = cmd.line
+                parsed_command.source_node_tag = tag
+                parsed_command.source_node_file = node.definition_file
+                parsed_command.source_node_line = node.definition_line
+                parsed_command.raw_command_text = cmd.text
+
                 node.extracted_commands.append(parsed_command)
 
                 # Validate field context scoping for docstring commands (field_name = None)
@@ -179,8 +263,18 @@ class RunStructure:
                     processed_content = process_template_variables(clean_content, node)
                     node.clean_field_descriptions[field_name_inner] = processed_content
 
-                for command_str in commands:
-                    parsed_command = parse_command(command_str)
+                for cmd in commands:
+                    parsed_command = parse_command(cmd.text)
+
+                    # Add source location tracking to parsed command
+                    parsed_command.docstring_line = cmd.line
+                    parsed_command.source_node_tag = tag
+                    parsed_command.source_node_file = node.definition_file
+                    parsed_command.source_node_line = node.definition_line
+                    parsed_command.field_name = field_name_inner
+                    # TODO: Capture field_line using inspect on field_def
+                    parsed_command.raw_command_text = cmd.text
+
                     node.extracted_commands.append(parsed_command)
 
                     # Validate field context scoping for field-level commands
@@ -214,8 +308,8 @@ class RunStructure:
                 # For TreeNode fields, validate command compatibility before processing subtask
                 if field_def.description:
                     commands, _ = extract_commands(field_def.description)
-                    for command_str in commands:
-                        parsed_command = parse_command(command_str)
+                    for cmd in commands:
+                        parsed_command = parse_command(cmd.text)
                         if (
                             hasattr(parsed_command, "command_type")
                             and parsed_command.command_type
@@ -2081,11 +2175,14 @@ class RunStructure:
                 f"{command_type}{inclusion_part}->{command.destination_path}@{{...}}"
             )
 
+            error_context = self._create_error_context(command)
             raise FieldValidationError(
                 field_path=destination_path,
                 container=source_node_tag,
                 message="is an incomplete task target. Use specific task names like 'task.analyzer' instead of just 'task'",
                 command_context=command_context,
+                context=error_context,
+                error_level=self.error_level,
             )
 
     def _validate_field_context_scoping(
@@ -2107,12 +2204,15 @@ class RunStructure:
 
         # @each commands are FORBIDDEN in docstrings (field_name = None)
         if field_name is None:
+            error_context = self._create_error_context(command)
             raise FieldValidationError(
                 field_path=inclusion_path,
                 container=source_node_tag,
                 message="@each commands are not allowed in class docstrings. "
                 "@each commands must be defined in field descriptions where they can reference the field context.",
                 command_context=f"@each[{command.inclusion_path}] in docstring of {source_node_tag}",
+                context=error_context,
+                error_level=self.error_level,
             )
 
         # LangTree DSL scoping rule: inclusion_path must ALWAYS start with field_name
@@ -2120,12 +2220,15 @@ class RunStructure:
             # Build command context for error chaining
             command_context = f"@each[{command.inclusion_path}]->{command.destination_path or 'current'}@{{...}}* in field '{field_name}'"
 
+            error_context = self._create_error_context(command)
             raise FieldValidationError(
                 field_path=inclusion_path,
                 container=source_node_tag,
                 message=f"inclusion_path '{inclusion_path}' must start with field '{field_name}' where command is defined. "
                 f"Commands can only reference the field they are defined in (LangTree DSL scoping rule)",
                 command_context=command_context,
+                context=error_context,
+                error_level=self.error_level,
             )
 
     def _validate_subchain_matching(
@@ -2479,17 +2582,23 @@ class RunStructure:
                     continue
 
                 # Field-level command with invalid RHS
+                error_context = self._create_error_context(command)
                 raise FieldValidationError(
                     field_path=field_name,
                     container=source_node_tag,
                     message=f"@all command references '{source_path}' but @all commands can only reference the exact field containing the command ('{field_name}') or wildcard (*). RHS must be containing field only.",
+                    context=error_context,
+                    error_level=self.error_level,
                 )
             else:
                 # Docstring-level command: only wildcard allowed
+                error_context = self._create_error_context(command)
                 raise FieldValidationError(
                     field_path="<docstring>",
                     container=source_node_tag,
                     message=f"@all command in docstring references '{source_path}' but docstring @all commands can only use wildcard (*) for data locality.",
+                    context=error_context,
+                    error_level=self.error_level,
                 )
 
     def list_runtime_variables(self) -> list[str]:

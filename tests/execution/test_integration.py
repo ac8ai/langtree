@@ -175,7 +175,7 @@ more text {variable}"""
 
         # Should only extract the first command
         assert len(commands) == 1
-        assert commands[0].strip() == "! repeat(5)"
+        assert commands[0].text.strip() == "! repeat(5)"
 
         # Everything after "tis is some text" should be in clean content, including "! v = 6"
         assert "tis is some text" in clean_content
@@ -199,9 +199,9 @@ Regular text here
 
         # Should extract first 3 commands
         assert len(commands) == 3
-        assert "! command1" in commands[0]
-        assert "! command2" in commands[1]
-        assert "! command3" in commands[2]
+        assert "! command1" in commands[0].text
+        assert "! command2" in commands[1].text
+        assert "! command3" in commands[2].text
 
         # The 4th command should be in clean content, not parsed
         assert "Regular text here" in clean_content

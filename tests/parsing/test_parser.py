@@ -24,6 +24,7 @@ from langtree.parsing.parser import (
     ParsedCommand,
     ResamplingCommand,
     VariableAssignmentCommand,
+    VariableMapping,
     parse_command,
 )
 
@@ -2928,3 +2929,110 @@ class TestComprehensiveCommentParsing:
         # Traditional command
         cmd5 = parse_command("! @each[items]->task.processor@{{value.data=items}}*")
         assert isinstance(cmd5, ParsedCommand)
+
+
+class TestParsedCommandSourceTracking:
+    """Tests for ParsedCommand source location tracking."""
+
+    def test_create_command_with_minimal_context(self):
+        """Test creating ParsedCommand with just command info."""
+        cmd = ParsedCommand(
+            command_type=CommandType.ALL,
+            destination_path="task.target",
+            variable_mappings=[],
+        )
+        assert cmd.command_type == CommandType.ALL
+        assert cmd.destination_path == "task.target"
+        # Context fields should be None by default
+        assert cmd.docstring_line is None
+        assert cmd.source_node_tag is None
+        assert cmd.source_node_file is None
+        assert cmd.source_node_line is None
+        assert cmd.raw_command_text is None
+
+    def test_create_command_with_full_class_docstring_context(self):
+        """Test creating ParsedCommand with full class docstring context."""
+        cmd = ParsedCommand(
+            command_type=CommandType.ALL,
+            destination_path="task.target",
+            variable_mappings=[],
+            docstring_line=5,
+            source_node_tag="TaskAnalysis",
+            source_node_file="/workspaces/langtree/examples/analysis.py",
+            source_node_line=42,
+            raw_command_text="! @all->task.target@{{value=*}}",
+        )
+        assert cmd.docstring_line == 5
+        assert cmd.source_node_tag == "TaskAnalysis"
+        assert cmd.source_node_file == "/workspaces/langtree/examples/analysis.py"
+        assert cmd.source_node_line == 42
+        assert cmd.raw_command_text == "! @all->task.target@{{value=*}}"
+        # Field context should be None for class docstring
+        assert cmd.field_name is None
+        assert cmd.field_line is None
+
+    def test_create_command_with_field_description_context(self):
+        """Test creating ParsedCommand with field description context."""
+        cmd = ParsedCommand(
+            command_type=CommandType.ALL,
+            destination_path="task.target",
+            variable_mappings=[],
+            docstring_line=3,
+            source_node_tag="TaskAnalysis",
+            source_node_file="/workspaces/langtree/examples/analysis.py",
+            source_node_line=42,
+            field_name="result",
+            field_line=47,
+            raw_command_text="! @all->task.target@{{value=result}}",
+        )
+        assert cmd.field_name == "result"
+        assert cmd.field_line == 47
+        assert cmd.source_node_tag == "TaskAnalysis"
+        assert cmd.docstring_line == 3
+
+    def test_create_error_context_from_command(self):
+        """Test creating ErrorContext from ParsedCommand."""
+        from langtree.exceptions.core import ErrorContext
+
+        cmd = ParsedCommand(
+            command_type=CommandType.ALL,
+            destination_path="task.target",
+            variable_mappings=[],
+            docstring_line=5,
+            source_node_tag="TaskAnalysis",
+            source_node_file="/workspaces/langtree/examples/analysis.py",
+            source_node_line=42,
+            raw_command_text="! @all->task.target@{{value=*}}",
+        )
+
+        # Should be able to create ErrorContext from command
+        ctx = ErrorContext(
+            docstring_line=cmd.docstring_line,
+            command_text=cmd.raw_command_text,
+            node_tag=cmd.source_node_tag,
+            node_file=cmd.source_node_file,
+            node_line=cmd.source_node_line,
+            field_name=cmd.field_name,
+            field_line=cmd.field_line,
+        )
+
+        assert ctx.docstring_line == 5
+        assert ctx.node_tag == "TaskAnalysis"
+        assert ctx.command_text == "! @all->task.target@{{value=*}}"
+
+    def test_command_without_context_backward_compat(self):
+        """Test that ParsedCommand works without context (backward compatibility)."""
+        cmd = ParsedCommand(
+            command_type=CommandType.EACH,
+            destination_path="task.processor",
+            variable_mappings=[
+                VariableMapping(target_path="value.input", source_path="data.output")
+            ],
+            inclusion_path="sections",
+        )
+
+        # Should work fine without context
+        assert cmd.command_type == CommandType.EACH
+        assert cmd.destination_path == "task.processor"
+        assert len(cmd.variable_mappings) == 1
+        assert cmd.docstring_line is None
