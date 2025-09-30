@@ -6,6 +6,7 @@ at runtime based on actual values, not pre-computed at configuration time.
 """
 
 import json
+import types
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Union, get_args, get_origin
@@ -172,8 +173,9 @@ class TypeConverter:
         )
 
     def _is_union(self, type_hint: Any) -> bool:
-        """Check if type is a Union."""
-        return get_origin(type_hint) is Union
+        """Check if type is a Union (supports both typing.Union and types.UnionType)."""
+        origin = get_origin(type_hint)
+        return origin is Union or origin is types.UnionType
 
     def _convert_from_union(
         self, value: Any, source_union: Any, target_type: Any
@@ -263,11 +265,11 @@ class TypeConverter:
         """Universal string conversion for COLLECTED_CONTEXT assembly."""
         if isinstance(value, str):
             return value
-        elif isinstance(value, (int, float, bool)):
+        elif isinstance(value, int | float | bool):
             return str(value)
         elif isinstance(value, dict):
             return json.dumps(value, ensure_ascii=False)
-        elif isinstance(value, (list, tuple, set)):
+        elif isinstance(value, list | tuple | set):
             return json.dumps(list(value), ensure_ascii=False)
         elif isinstance(value, TreeNode):
             # TODO: Use COLLECTED_CONTEXT assembly function for hierarchical prompt text

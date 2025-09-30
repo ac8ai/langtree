@@ -5,8 +5,6 @@ Tests all conversion paths, union type priority sorting, and edge cases
 to ensure the conversion logic works correctly before integration.
 """
 
-from typing import Union
-
 import pytest
 
 from langtree import TreeNode
@@ -154,7 +152,7 @@ class TestTypeConverter:
         assert result == "42"  # Converted from int, not float
 
         # Test with actual union conversion
-        union_type = Union[int, float]
+        union_type = int | float
         result = self.converter.convert_value(42, union_type, str)
         assert result == "42"
 
@@ -163,7 +161,7 @@ class TestTypeConverter:
         node = SimpleTreeNode(name="test", value=42)
 
         # Should prefer TreeNode → dict conversion over treating as dict
-        union_type = Union[dict, SimpleTreeNode]
+        union_type = dict | SimpleTreeNode
         result = self.converter.convert_value(node, union_type, dict)
 
         # Should use TreeNode.model_dump(), not treat as generic dict
@@ -172,7 +170,7 @@ class TestTypeConverter:
     def test_union_type_priority_specific_over_general(self):
         """Test that specific types (int) have priority over general (float)."""
         # Test with a value that could be both int and float
-        Union[float, int]  # float first in union
+        float | int  # float first in union
 
         # Value 42 is int, should prioritize int conversion even though float is first
         # This tests the priority sorting indirectly through string conversion
@@ -183,7 +181,7 @@ class TestTypeConverter:
     def test_union_conversion_fallback(self):
         """Test that union conversion falls back through priority list."""
         # Create a scenario where first priority fails, second succeeds
-        union_type = Union[int, str]  # int first, str second
+        union_type = int | str  # int first, str second
 
         # Value "hello" can't convert to int, should fall back to str
         result = self.converter.convert_value("hello", union_type, str)
@@ -199,7 +197,7 @@ class TestTypeConverter:
             self.converter.convert_value("not_a_number", str, int)
 
         # Union with no compatible members
-        union_type = Union[int, float]
+        union_type = int | float
         with pytest.raises(ValueError, match="Cannot convert"):
             self.converter.convert_value("hello", union_type, dict)
 
@@ -239,7 +237,7 @@ class TestTypeConverter:
     def test_use_priority_union_sorting_enabled(self):
         """Test smart priority union sorting (default behavior)."""
         # Default config uses priority sorting
-        union_type = Union[float, int]  # float first in static order
+        union_type = float | int  # float first in static order
 
         # Value 42 is int, should prioritize int even though float is first in union
         # This is tested indirectly through the conversion behavior
@@ -248,7 +246,7 @@ class TestTypeConverter:
 
         # Test with TreeNode priority over dict
         node = SimpleTreeNode(name="test", value=42)
-        union_type = Union[dict, SimpleTreeNode]  # dict first in static order
+        union_type = dict | SimpleTreeNode  # dict first in static order
 
         # Should use TreeNode conversion priority despite dict being first
         result = self.converter.convert_value(node, union_type, dict)
@@ -260,12 +258,12 @@ class TestTypeConverter:
         converter = TypeConverter(config)
 
         # Test that it still works correctly, even with static order
-        union_type = Union[float, int]  # float first in static order
+        union_type = float | int  # float first in static order
         result = converter.convert_value(42, union_type, str)
         assert result == "42"  # Should still work correctly
 
         # Test with string values that could be parsed as different types
-        union_type = Union[int, str]  # int first in static order
+        union_type = int | str  # int first in static order
 
         # When priority sorting is disabled, should try int first (static order)
         result = converter.convert_value("42", union_type, str)
@@ -284,7 +282,7 @@ class TestTypeConverter:
         static_converter = TypeConverter(static_config)
 
         # Both should work but may have different internal ordering
-        union_type = Union[float, int]
+        union_type = float | int
 
         priority_result = priority_converter.convert_value(42, union_type, str)
         static_result = static_converter.convert_value(42, union_type, str)
