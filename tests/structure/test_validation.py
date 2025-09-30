@@ -553,3 +553,103 @@ class TestInvalidFieldTargetingValidation:
 
     # NOTE: Nested field path validation (like nested.field) is not yet implemented
     # The current validation only checks top-level fields. This could be enhanced in the future.
+
+
+class TestTypeCompatibilityValidation:
+    """Test type compatibility checking between source and target fields."""
+
+    def setup_method(self):
+        """Create fixtures for type compatibility tests."""
+        # Use default config (allows string parsing)
+        self.structure = RunStructure()
+
+    def test_incompatible_types_should_fail(self):
+        """Test that incompatible type mappings fail validation."""
+
+        # Create structure with strict validation strategy
+        from langtree.structure.type_mapping import ValidationStrategy
+
+        strict_structure = RunStructure(
+            {
+                "validation_strategy": ValidationStrategy.STRICT,
+                "allow_string_parsing": False,
+            }
+        )
+
+        class TaskWithString(TreeNode):
+            """Invalid: String to int without parsing enabled."""
+
+            text_data: str = Field(
+                default="not_a_number",
+                description="! @->task.target@{{value.number_field=text_data}}",
+            )
+
+        class TaskTarget(TreeNode):
+            """Target expecting numeric field."""
+
+            number_field: int = 0
+
+        # Should fail because string → int is forbidden without parsing
+        with pytest.raises(ValueError, match="Type incompatibility"):
+            strict_structure.add(TaskWithString)
+            strict_structure.add(TaskTarget)
+
+    def test_compatible_types_should_pass(self):
+        """Test that compatible type mappings pass validation."""
+
+        class TaskWithInt(TreeNode):
+            """Valid: Int to float conversion (safe)."""
+
+            number_data: int = Field(
+                default=42,
+                description="! @->task.target@{{value.float_field=number_data}}",
+            )
+
+        class TaskTarget(TreeNode):
+            """Target with float field."""
+
+            float_field: float = 0.0
+
+        # Should pass because int → float is a safe conversion
+        self.structure.add(TaskWithInt)
+        self.structure.add(TaskTarget)
+
+        assert self.structure.get_node("task.with_int") is not None
+        assert self.structure.get_node("task.target") is not None
+
+    def test_validation_can_be_disabled(self):
+        """Test that type validation can be disabled for performance."""
+
+        # Create structure with validation disabled
+        no_validation_structure = RunStructure({"enable_type_validation": False})
+
+        class TaskWithBadType(TreeNode):
+            """Should pass even with bad type when validation disabled."""
+
+            bad_data: str = Field(
+                default="not_a_number",
+                description="! @->task.target@{{value.number_field=bad_data}}",
+            )
+
+        class TaskWithGoodType(TreeNode):
+            """Should pass with good type when validation disabled."""
+
+            good_data: int = Field(
+                default=42,
+                description="! @->task.target@{{value.number_field=good_data}}",
+            )
+
+        class TaskTarget(TreeNode):
+            """Target expecting numeric field."""
+
+            number_field: int = 0
+
+        # Both should pass when validation is disabled (even bad type mapping)
+        no_validation_structure.add(TaskWithBadType)
+        no_validation_structure.add(TaskWithGoodType)
+        no_validation_structure.add(TaskTarget)
+
+        # Verify all nodes were added successfully despite type incompatibility
+        assert no_validation_structure.get_node("task.with_bad_type") is not None
+        assert no_validation_structure.get_node("task.with_good_type") is not None
+        assert no_validation_structure.get_node("task.target") is not None

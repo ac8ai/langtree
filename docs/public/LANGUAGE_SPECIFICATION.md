@@ -1213,9 +1213,123 @@ CommandParseError: Space after '}}' not allowed - use '}}*' not '}} *'
 - Path validation depends on available variables
 
 ### Type Compatibility
-- Source and target paths must be type-compatible
-- Wildcard assignments require structural compatibility
-- Collection iteration requires iterable source types
+
+LangTree DSL implements comprehensive type compatibility checking for variable mappings to ensure safe data transformations during prompt assembly.
+
+#### Compatibility Levels
+
+**IDENTICAL**: Same types, no conversion needed
+- `str` → `str`, `int` → `int`, `ConfigObject` → `ConfigObject`
+
+**SAFE**: Safe conversions that preserve data integrity
+- `int` → `float` (numeric widening)
+- `TreeNode` → `dict` (serialization via model_dump())
+- Any type → `str` (universal string conversion for COLLECTED_CONTEXT)
+
+**LOSSY**: Potentially lossy conversions requiring explicit opt-in
+- `float` → `int` (precision loss possible)
+
+**UNSAFE**: Risky conversions requiring development mode
+- Experimental or debugging conversions
+
+**FORBIDDEN**: Never allowed conversions
+- Incompatible structural types
+
+#### Validation Strategies
+
+**STRICT** (default): Only IDENTICAL and SAFE conversions allowed
+```python
+structure = RunStructure()  # Default strategy
+```
+
+**PERMISSIVE**: Allows LOSSY conversions with warnings
+```python
+structure = RunStructure({"validation_strategy": "permissive"})
+```
+
+**DEVELOPMENT**: Allows all conversions including UNSAFE
+```python
+structure = RunStructure({"validation_strategy": "development"})
+```
+
+#### String Conversion Rules
+
+**Universal String Compatibility**: All types can convert to string for COLLECTED_CONTEXT assembly
+- Primitives: Direct string conversion (`str(value)`)
+- Collections: JSON serialization
+- TreeNodes: JSON serialization via `model_dump()`
+
+**String Parsing** (configurable): String-to-type conversions
+- **JSON**: `str` → `dict`, `list` for valid JSON strings
+- **Numeric**: `str` → `int`, `float` for valid numeric strings
+- **Boolean**: `str` → `bool` for "true"/"false"/"1"/"0" (case insensitive)
+
+#### Union Type Handling
+
+**Deferred Conversion Strategy**: For union types, conversion attempts are made at runtime
+- **Priority-Ordered Resolution**: Union members sorted by conversion priority, not random order
+- **First successful conversion is used** after priority sorting
+- **Enables flexible type handling** without early commitment
+
+**Union Member Priority Order**:
+1. **Exact type matches**: `isinstance(value, member_type)` - no conversion needed
+2. **TreeNode types**: Structured data priority over generic dict serialization
+3. **Specific numeric types**: `int` for integer values; `bool` only for actual boolean values
+4. **General types**: `float`, `bool` (fallback), `str` for broader compatibility
+5. **Structured types**: `dict`, `list`, `tuple`, `set`
+6. **Remaining types**: All other union members
+
+**Examples**:
+- `int | float` with value `42` → tries `int` first (exact match) → `42` not `42.0`
+- `bool | float` with value `1` → tries `float` first → `1.0` not `True`
+- `bool | float` with value `True` → tries `bool` first (exact match) → `True`
+
+#### Configuration Options
+
+**Factory Pattern**: Type mapping configuration supports multiple input formats
+```python
+# Dict override
+RunStructure({"allow_string_parsing": False})
+
+# TypeMappingConfig instance
+config = TypeMappingConfig(validation_strategy=ValidationStrategy.STRICT)
+RunStructure(config)
+
+# Default settings
+RunStructure()  # Uses default TypeMappingConfig
+```
+
+**Available Settings**:
+- `validation_strategy`: STRICT | PERMISSIVE | DEVELOPMENT
+- `allow_string_parsing`: Enable/disable string-to-type conversions
+- `allow_treenode_dict_conversion`: Enable/disable TreeNode ↔ dict conversion
+- `strict_bool_parsing`: Restrict bool parsing to "true"/"false"/"1"/"0"
+
+#### Error Messages
+
+Type incompatibility errors provide detailed context:
+```
+Type incompatibility in variable mapping from task.source.field_name (ConfigComplex)
+to task.target.config (dict[str, str]): forbidden conversion not allowed by strict strategy
+```
+
+- Source and target field types
+- Compatibility level assessment
+- Current validation strategy
+- Clear remediation guidance
+
+#### Performance Configuration
+
+Type validation can be disabled for performance-critical scenarios:
+```python
+# Disable type validation entirely
+RunStructure({"enable_type_validation": False})
+
+# Custom validation strategy
+RunStructure({"validation_strategy": "development", "enable_type_validation": True})
+```
+
+**Note**: Disabling validation removes assembly-time type checking. Type conversions still occur during result collection phase.
 
 ## Error Handling
 

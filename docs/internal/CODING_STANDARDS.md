@@ -333,13 +333,14 @@ class TestSpecificModule:
 - **Class attributes**: Type hints for all fields
 - **Complex types**: Use type aliases for clarity
 - **Generic types**: Specify container contents where applicable
+- **Union with None**: Use `type | None` instead of `Optional[type]`
 
 #### Type Alias Usage
 ```python
 # Define clear aliases for complex types
 PromptValue = str | int | float | bool | list | dict | None
 ConfigDict = dict[str, Any]
-ProcessingResult = tuple[bool, Optional[str], dict[str, Any]]
+ProcessingResult = tuple[bool, str | None, dict[str, Any]]
 ```
 
 ## Error Handling Standards

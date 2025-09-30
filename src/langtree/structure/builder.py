@@ -27,6 +27,13 @@ from langtree.structure.registry import (
     PendingTargetRegistry,
     VariableRegistry,
 )
+from langtree.structure.type_mapping import (
+    CompatibilityLevel,
+    TypeConverter,
+    TypeMappingConfig,
+    ValidationStrategy,
+    create_type_mapping_config,
+)
 from langtree.templates.utils import extract_commands, get_root_tag
 from langtree.templates.variables import process_template_variables
 
@@ -83,11 +90,15 @@ class RunStructure:
     The assembled chains will be LangChain Runnables that handle their own execution.
     """
 
-    def __init__(self):
+    def __init__(self, type_mapping_config: TypeMappingConfig | dict | None = None):
         self._root_nodes = {}
         self._variable_registry = VariableRegistry()
         self._pending_target_registry = PendingTargetRegistry()
         self._assembly_variable_registry = AssemblyVariableRegistry()
+
+        # Initialize type mapping system
+        self._type_mapping_config = create_type_mapping_config(type_mapping_config)
+        self._type_converter = TypeConverter(self._type_mapping_config)
 
     def add(self, tree: type[TreeNode]) -> None:
         """Add a root prompt tree node class to the structure.
@@ -557,7 +568,118 @@ class RunStructure:
                     )
 
         # Target validation is handled by _resolve_destination_context
-        # TODO: Add type compatibility checking between source and target
+
+        # Type compatibility checking between source and target (if enabled)
+        if self._type_mapping_config.enable_type_validation:
+            self._validate_type_compatibility(
+                variable_mapping, source_node, target_path, source_node_tag
+            )
+
+    def _validate_type_compatibility(
+        self,
+        variable_mapping,
+        source_node,
+        target_path: str,
+        source_node_tag: str,
+    ) -> None:
+        """
+        Validate type compatibility between source and target fields in variable mapping.
+
+        Checks that the source field type can be converted to the target field type
+        according to the configured type mapping rules. Uses deferred conversion
+        strategy for union types.
+
+        Params:
+            variable_mapping: The variable mapping containing resolved source/target
+            source_node: The source StructureTreeNode
+            target_path: Path to the target node
+            source_node_tag: Tag of the source node for error messages
+
+        Raises:
+            ValueError: When types are incompatible according to validation strategy
+        """
+        # Skip validation if either source or target is not resolved
+        if not variable_mapping.resolved_source or not variable_mapping.resolved_target:
+            return
+
+        # Get target node
+        target_node = self.get_node(target_path)
+        if not target_node or not target_node.field_type:
+            return  # Target validation handled elsewhere
+
+        # Extract source field type
+        source_field_path = variable_mapping.resolved_source.path
+        source_type = self._get_field_type(source_node.field_type, source_field_path)
+        if source_type is None:
+            return  # Source field existence validation handled elsewhere
+
+        # Extract target field type
+        target_field_path = variable_mapping.resolved_target.path
+        target_type = self._get_field_type(target_node.field_type, target_field_path)
+        if target_type is None:
+            return  # Target field existence validation handled elsewhere
+
+        # Check type compatibility
+        compatibility = self._type_converter.check_compatibility(
+            source_type, target_type
+        )
+
+        # Validate according to strategy
+        if not self._is_compatible_according_to_strategy(compatibility):
+            raise ValueError(
+                f"Type incompatibility in variable mapping from {source_node_tag}.{source_field_path} "
+                f"({source_type}) to {target_path}.{target_field_path} ({target_type}): "
+                f"{compatibility.value} conversion not allowed by {self._type_mapping_config.validation_strategy.value} strategy"
+            )
+
+    def _get_field_type(self, node_type: type, field_path: str):
+        """
+        Extract field type from node type using field path.
+
+        Supports simple field access (field_name) for now.
+        Future: Could support nested paths (field.subfield).
+
+        Params:
+            node_type: The TreeNode class type
+            field_path: Path to the field (e.g., "config", "items")
+
+        Returns:
+            The field type annotation, or None if not found
+        """
+        if not hasattr(node_type, "model_fields"):
+            return None
+
+        field_info = node_type.model_fields.get(field_path)
+        if field_info is None:
+            return None
+
+        return field_info.annotation
+
+    def _is_compatible_according_to_strategy(
+        self, compatibility: CompatibilityLevel
+    ) -> bool:
+        """
+        Check if compatibility level meets the configured validation strategy.
+
+        Params:
+            compatibility: The compatibility level from type checking
+
+        Returns:
+            True if compatible according to strategy, False otherwise
+        """
+        strategy = self._type_mapping_config.validation_strategy
+
+        if strategy == ValidationStrategy.STRICT:
+            return compatibility in (
+                CompatibilityLevel.IDENTICAL,
+                CompatibilityLevel.SAFE,
+            )
+        elif strategy == ValidationStrategy.PERMISSIVE:
+            return compatibility != CompatibilityLevel.FORBIDDEN
+        elif strategy == ValidationStrategy.DEVELOPMENT:
+            return True  # Allow everything including UNSAFE
+        else:
+            return False
 
     def _update_variable_registry_satisfaction(
         self, command: ParsedCommand, source_node_tag: str

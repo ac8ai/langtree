@@ -565,6 +565,57 @@ The LangTree DSL framework consists of three main components that work together 
 - Handles complex variable mappings and multiplicity indicators
 - Validates command syntax and semantic correctness
 
+### Three-Phase Execution Architecture
+
+LangTree DSL follows a three-phase execution model that separates validation, execution, and result assembly:
+
+#### Phase 1: Assembly Time (Current Implementation ✅)
+**Purpose**: Validate structure and prepare LangChain pipelines
+- **Type Validation**: Check that source → target type mappings are valid (configurable)
+- **Dependency Resolution**: Build execution dependency graph
+- **Chain Building**: Create LangChain Runnable pipelines
+- **Variable Tracking**: Register all assembly and runtime variables
+- **Command Processing**: Parse and validate all LangTree DSL commands
+
+```python
+# Assembly phase - current implementation
+structure = RunStructure()
+structure.add(TaskNode)  # Type validation occurs here
+execution_plan = structure.get_execution_plan()
+```
+
+**Type Validation**: Optional for performance (controlled by `enable_type_validation` flag)
+
+#### Phase 2: Chain Execution (LangChain Implementation)
+**Purpose**: Execute LangChain pipelines, collect raw outputs
+- **String Conversion**: All data becomes strings for LLM processing
+- **Context Assembly**: Build prompts with `{COLLECTED_CONTEXT}` resolution
+- **Pipeline Execution**: Run prepared LangChain chains in dependency order
+- **Raw Output Storage**: Store string outputs from each chain
+
+```python
+# Execution phase - delegated to LangChain
+chains = structure.build_langchain_pipeline()  # Future implementation
+results = chains.invoke(external_inputs)
+```
+
+**Note**: LangTree DSL framework builds the chains; LangChain handles execution
+
+#### Phase 3: Result Collection (Planned Implementation ⏭️)
+**Purpose**: Apply type conversions and assemble final structured outputs
+- **Type Conversion**: Apply stored conversion rules to actual output data
+- **Data Assembly**: Convert string outputs back to structured types
+- **Final Aggregation**: Build complete structured artifacts
+- **Context Collection**: Assemble `{COLLECTED_CONTEXT}` with proper type conversions
+
+```python
+# Result collection phase - future implementation
+structured_results = structure.collect_results(raw_outputs)  # Applies type conversions
+final_context = structure.assemble_collected_context(structured_results)
+```
+
+**Implementation Status**: Type conversion logic exists but is not yet called during result collection.
+
 ### Chain Assembly Architecture
 
 #### Template Variable Resolution System
