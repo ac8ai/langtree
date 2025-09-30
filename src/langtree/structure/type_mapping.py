@@ -135,14 +135,14 @@ class TypeConverter:
 
         # 4. General numeric and string types
         general_numeric = [
-            m for m in members_list if m == float and m not in exact_matches
+            m for m in members_list if m is float and m not in exact_matches
         ]
         bool_fallback = [
             m
             for m in members_list
-            if m == bool and m not in exact_matches and m not in specific_numeric
+            if m is bool and m not in exact_matches and m not in specific_numeric
         ]
-        string_types = [m for m in members_list if m == str and m not in exact_matches]
+        string_types = [m for m in members_list if m is str and m not in exact_matches]
         general_types = general_numeric + bool_fallback + string_types
 
         # 5. Structured types (dict, list, tuple, set)
@@ -227,30 +227,30 @@ class TypeConverter:
             return value
 
         # Universal string compatibility for COLLECTED_CONTEXT
-        if target_type == str:
+        if target_type is str:
             return self._convert_to_string(value)
 
         # String parsing if enabled
-        if source_type == str and self.config.allow_string_parsing:
+        if source_type is str and self.config.allow_string_parsing:
             return self._parse_from_string(value, target_type)
 
         # Check if string parsing is disabled but needed
-        if source_type == str and not self.config.allow_string_parsing:
+        if source_type is str and not self.config.allow_string_parsing:
             raise ValueError(
                 f"String parsing disabled: cannot convert {source_type} to {target_type}"
             )
 
         # TreeNode ↔ dict conversion
         if self.config.allow_treenode_dict_conversion:
-            if self._is_treenode_type(source_type) and target_type == dict:
+            if self._is_treenode_type(source_type) and target_type is dict:
                 return self._treenode_to_dict(value)
-            elif source_type == dict and self._is_treenode_type(target_type):
+            elif source_type is dict and self._is_treenode_type(target_type):
                 return self._dict_to_treenode(value, target_type)
 
         # Check if TreeNode conversion is disabled but needed
         if not self.config.allow_treenode_dict_conversion:
-            if (self._is_treenode_type(source_type) and target_type == dict) or (
-                source_type == dict and self._is_treenode_type(target_type)
+            if (self._is_treenode_type(source_type) and target_type is dict) or (
+                source_type is dict and self._is_treenode_type(target_type)
             ):
                 raise ValueError(
                     f"TreeNode ↔ dict conversion disabled: cannot convert {source_type} to {target_type}"
@@ -281,7 +281,7 @@ class TypeConverter:
 
     def _parse_from_string(self, value: str, target_type: Any) -> Any:
         """Parse string to target type with intelligent conversion."""
-        if target_type == str:
+        if target_type is str:
             return value
 
         # JSON parsing for dict/list
@@ -295,13 +295,13 @@ class TypeConverter:
                 raise ValueError(f"Cannot parse '{value}' as JSON for {target_type}")
 
         # Bool parsing (strict)
-        if target_type == bool:
+        if target_type is bool:
             return self._parse_bool_strict(value)
 
         # Numeric parsing
-        if target_type == int:
+        if target_type is int:
             return int(value)
-        elif target_type == float:
+        elif target_type is float:
             return float(value)
 
         raise ValueError(f"Cannot parse string '{value}' to {target_type}")
@@ -338,9 +338,9 @@ class TypeConverter:
         self, value: Any, source_type: Any, target_type: Any
     ) -> Any:
         """Handle basic type conversions (int ↔ float, etc.)."""
-        if target_type == int and isinstance(value, float):
+        if target_type is int and isinstance(value, float):
             return int(value)  # Lossy conversion
-        elif target_type == float and isinstance(value, int):
+        elif target_type is float and isinstance(value, int):
             return float(value)  # Safe conversion
         else:
             # Attempt direct conversion
@@ -354,25 +354,25 @@ class TypeConverter:
             return CompatibilityLevel.IDENTICAL
 
         # Universal string compatibility
-        if target_type == str:
+        if target_type is str:
             return CompatibilityLevel.SAFE
 
         # String parsing compatibility
-        if source_type == str and self.config.allow_string_parsing:
+        if source_type is str and self.config.allow_string_parsing:
             if target_type in (int, float, bool, dict, list):
                 return CompatibilityLevel.SAFE
 
         # TreeNode ↔ dict
         if self.config.allow_treenode_dict_conversion:
-            if (self._is_treenode_type(source_type) and target_type == dict) or (
-                source_type == dict and self._is_treenode_type(target_type)
+            if (self._is_treenode_type(source_type) and target_type is dict) or (
+                source_type is dict and self._is_treenode_type(target_type)
             ):
                 return CompatibilityLevel.SAFE
 
         # Basic numeric conversions
-        if source_type == int and target_type == float:
+        if source_type is int and target_type is float:
             return CompatibilityLevel.SAFE
-        elif source_type == float and target_type == int:
+        elif source_type is float and target_type is int:
             return CompatibilityLevel.LOSSY
 
         return CompatibilityLevel.FORBIDDEN
