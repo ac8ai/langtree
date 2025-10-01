@@ -105,33 +105,57 @@ def validate_template_variable_names(content: str) -> list[str]:
     all_variable_pattern = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")
 
     # Find all potential template/runtime variables
-    matches = all_variable_pattern.finditer(content)
+    matches = list(all_variable_pattern.finditer(content))
 
     for match in matches:
         var_name = match.group(1)
 
-        # Check if it looks like a template variable (more precise pattern matching)
-        is_template_like = (
-            var_name.isupper()  # All uppercase like INVALID_TEMPLATE
-            or
-            # Mixed case that looks like misspelled template variables
-            (
-                any(c.isupper() for c in var_name)
-                and (
-                    "subtree" in var_name.lower()
-                    or "prompt" in var_name.lower()
-                    or "collected" in var_name.lower()
-                )
-            )
-            or
-            # Exact misspellings of known template variables
-            var_name.lower() in ("prompt_subtree", "collected_context")
-        )
+        # Check if this looks like a misspelled template variable
+        # Only check for case variations and typos of the actual template variables
+        is_likely_template_error = False
+        error_suggestion = None
 
-        if is_template_like and var_name not in VALID_TEMPLATE_VARIABLES:
+        # Check for case-insensitive match with template variables
+        if var_name.upper() == "PROMPT_SUBTREE" and var_name != "PROMPT_SUBTREE":
+            is_likely_template_error = True
+            error_suggestion = f"'{{{var_name}}}' appears to be a misspelled template variable. Did you mean '{{PROMPT_SUBTREE}}'?"
+        elif (
+            var_name.upper() == "COLLECTED_CONTEXT" and var_name != "COLLECTED_CONTEXT"
+        ):
+            is_likely_template_error = True
+            error_suggestion = f"'{{{var_name}}}' appears to be a misspelled template variable. Did you mean '{{COLLECTED_CONTEXT}}'?"
+        # Check for common typos with high similarity
+        elif var_name in ["PROMPT_TREE", "PROMPTSUBTREE", "PROMPT", "SUBTREE"]:
+            is_likely_template_error = True
+            error_suggestion = f"'{{{var_name}}}' appears to be a misspelled template variable. Did you mean '{{PROMPT_SUBTREE}}'?"
+        elif var_name in [
+            "COLLECTED",
+            "CONTEXT",
+            "COLLECT_CONTEXT",
+            "COLLECTEDCONTEXT",
+        ]:
+            is_likely_template_error = True
+            error_suggestion = f"'{{{var_name}}}' appears to be a misspelled template variable. Did you mean '{{COLLECTED_CONTEXT}}'?"
+
+        if is_likely_template_error and error_suggestion:
+            line_number = content[: match.start()].count("\n") + 1
+            errors.append(f"{error_suggestion} at line {line_number}")
+
+    # Check for variables without lowercase letters (reserved for template variables)
+    for match in matches:
+        var_name = match.group(1)
+
+        # Skip if it's a valid template variable
+        if var_name in VALID_TEMPLATE_VARIABLES:
+            continue
+
+        # Check if variable has no lowercase letters (reserved namespace)
+        if not any(c.islower() for c in var_name):
             line_number = content[: match.start()].count("\n") + 1
             errors.append(
-                f"Unknown template variable '{{{var_name}}}' at line {line_number}. Only {' and '.join(VALID_TEMPLATE_VARIABLES)} are supported."
+                f"Variable '{{{var_name}}}' at line {line_number} uses naming without lowercase letters "
+                f"which is reserved for template variables. "
+                f"Use lowercase ('{{{var_name.lower()}}}'), mixed case, or add lowercase letters."
             )
 
     # Check runtime variables for double underscore usage (reserved for system)

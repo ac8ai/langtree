@@ -642,8 +642,10 @@ LangTree DSL implements a sophisticated variable system with five distinct types
 
 **User Syntax**:
 - `{variable_name}` - Single token only, no dots allowed
-- Examples: `{model_name}`, `{temperature}`, `{analysis_type}`
-- **Invalid**: `{task.model}`, `{prompt.data}` - users cannot use dots
+- **Naming Rule**: Variables must contain at least one lowercase letter
+- Valid examples: `{model_name}`, `{temperature}`, `{analysisType}`, `{DataSource}`
+- **Invalid - no lowercase**: `{MODEL_NAME}`, `{DATA_SOURCE}`, `{CONFIG_1}`, `{OUTPUT_2}`
+- **Invalid - dots**: `{task.model}`, `{prompt.data}` - users cannot use dots
 
 **Internal System Expansion**:
 - User writes: `{model_name}` in prompts/docstrings
@@ -859,6 +861,14 @@ LangTree DSL enforces strict validation during parsing to catch errors early and
 ## Template Variables
 
 LangTree DSL provides two special template variables for automatic prompt assembly and context injection. These variables use the same `{var}` syntax as Runtime Variables but have reserved names and are automatically resolved by the system. They cannot be used as Assembly Variables or user-defined Runtime Variables.
+
+**Naming Reservation**: All variable names without lowercase letters are reserved for template variables. This means:
+- `{PROMPT_SUBTREE}` ✅ - Valid template variable
+- `{COLLECTED_CONTEXT}` ✅ - Valid template variable
+- `{OUTPUT}` ❌ - Reserved namespace (no lowercase), but not a valid template variable (will error)
+- `{DATA_SOURCE}` ❌ - Reserved namespace (no lowercase), but not a valid template variable (will error)
+- `{OUTPUT_1}` ❌ - Reserved namespace (no lowercase with number), but not a valid template variable (will error)
+- `{outputData}` ✅ - Valid runtime variable (has lowercase letters)
 
 ### {PROMPT_SUBTREE}
 

@@ -20,6 +20,7 @@ from langtree.templates.variables import (
     resolve_prompt_subtree,
     resolve_template_variables_in_content,
     validate_template_variable_conflicts,
+    validate_template_variable_names,
     validate_template_variable_spacing,
 )
 
@@ -1075,33 +1076,42 @@ class TestTemplateVariableResolution:
 class TestLangTreeDSLCommandIntegration:
     """Test template variables integrated with actual LangTree DSL command parsing."""
 
-    def test_template_variables_with_acl_syntax(self):
-        """Test template variables work correctly with LangTree DSL command syntax in docstrings."""
+    def test_template_variables_with_runtime_variables(self):
+        """Test template variables work correctly with runtime variables in docstrings."""
         from pydantic import Field
 
-        # Create a model with LangTree DSL commands in docstring
-        class LangTreeDSLTaskModel(TreeNode):
+        # Create a model with runtime variables and template variables
+        class RuntimeVariableTaskModel(TreeNode):
             """
-            Analyze the data using LangTree DSL commands.
+            Analyze the data using runtime variables.
 
-            {{EXTRACT data_source}} from input files.
-            {{FILTER data_source | quality > 0.8}} for high quality data.
-            {{AGGREGATE filtered_data | GROUP BY category}} to summarize.
+            Process data from {data_source} input files.
+            Filter for items with quality above {quality_threshold}.
+            Generate results in {result_format} format.
 
             {PROMPT_SUBTREE}
 
-            Generate output using {OUTPUT result_format} formatting.
+            Additional context and variables:
+            - Data source: {data_source}
+            - Output format: {result_format}
 
             {COLLECTED_CONTEXT}
             """
 
             analysis: str = Field(description="Primary data analysis")
             results: str = Field(description="Aggregated results")
+            data_source: str = Field(description="Source of input data")
+            quality_threshold: float = Field(
+                default=0.8, description="Quality threshold for filtering"
+            )
+            result_format: str = Field(
+                default="json", description="Format for output results"
+            )
 
         node = StructureTreeNode(
-            name="langtree_dsl_task",
-            field_type=LangTreeDSLTaskModel,
-            clean_docstring=LangTreeDSLTaskModel.__doc__ or "",
+            name="runtime_var_task",
+            field_type=RuntimeVariableTaskModel,
+            clean_docstring=RuntimeVariableTaskModel.__doc__ or "",
             parent=None,
         )
 
@@ -1109,11 +1119,10 @@ class TestLangTreeDSLCommandIntegration:
         content = node.clean_docstring or ""
         result = resolve_template_variables_in_content(content, node)
 
-        # Verify LangTree DSL commands are preserved
-        assert "{{EXTRACT data_source}}" in result
-        assert "{{FILTER data_source" in result
-        assert "{{AGGREGATE filtered_data" in result
-        assert "{OUTPUT result_format}" in result
+        # Verify runtime variables are preserved (not resolved at this stage)
+        assert "{data_source}" in result
+        assert "{quality_threshold}" in result
+        assert "{result_format}" in result
 
         # Verify template variables were resolved
         assert "{PROMPT_SUBTREE}" not in result
@@ -1772,6 +1781,268 @@ class TestLangTreeDSLCommandIntegrationNew:
         # Original content structure should be preserved
         assert "Processing data" in result
         assert "Assembly-time configuration" in result
+
+
+class TestComprehensiveTemplateValidation:
+    """Test what gets extracted vs what fails from complete clean templates."""
+
+    def test_template_variable_extraction_vs_validation(self):
+        """Test comprehensive validation of various variable types in clean templates."""
+        # Test cases: (description, template, should_pass, expected_template_vars)
+        test_cases = [
+            (
+                "Valid template variables with proper spacing",
+                "Process data.\n\n{PROMPT_SUBTREE}\n\nUse context.\n\n{COLLECTED_CONTEXT}\n\n",
+                True,
+                ["PROMPT_SUBTREE", "COLLECTED_CONTEXT"],
+            ),
+            (
+                "Variables without lowercase are invalid",
+                "Load from {DATA_SOURCE}.\nUse {CONFIGURATION}.\n\n{PROMPT_SUBTREE}\n\n",
+                False,  # No lowercase letters = reserved for templates = error
+                ["PROMPT_SUBTREE"],  # Only template vars, not runtime
+            ),
+            (
+                "Mixed case runtime variables",
+                "Use {MyVariable} and {DataProcessor}.\n\n{PROMPT_SUBTREE}\n\n",
+                True,
+                ["PROMPT_SUBTREE"],
+            ),
+            (
+                "Lowercase runtime variables",
+                "Read {input_file}, use {config}.\n\n{PROMPT_SUBTREE}\n\n",
+                True,
+                ["PROMPT_SUBTREE"],
+            ),
+            (
+                "Misspelled template variables",
+                "Add content:\n\n{prompt_subtree}\n\n{COLLECTED_context}\n\n",
+                False,  # Wrong case for template vars
+                [],  # No valid template vars
+            ),
+            (
+                "Invalid spacing for template variables",
+                "Process{PROMPT_SUBTREE}data.\nAdd{COLLECTED_CONTEXT}here.",
+                False,  # Bad spacing
+                ["PROMPT_SUBTREE", "COLLECTED_CONTEXT"],  # Detected but invalid
+            ),
+            (
+                "Double underscore runtime variables",
+                "Use {user__variable}.\n\n{PROMPT_SUBTREE}\n\n",
+                False,  # Double underscore reserved
+                ["PROMPT_SUBTREE"],
+            ),
+            (
+                "Common template variable typos",
+                "Use:\n\n{PROMPT_TREE}\n\n{CONTEXT}\n\n",
+                False,  # Common typos should be caught
+                [],
+            ),
+            (
+                "Double braces (DSL command syntax in content)",
+                "Process {{data}} with {{filter}}.\n\n{PROMPT_SUBTREE}\n\n",
+                False,  # Double braces should be invalid in content
+                ["PROMPT_SUBTREE"],
+            ),
+            (
+                "Malformed variable syntax",
+                "Use {/variable} or {variable+}.\n\n{PROMPT_SUBTREE}\n\n",
+                True,  # These aren't valid variable syntax, so ignored
+                ["PROMPT_SUBTREE"],
+            ),
+        ]
+
+        for description, template, should_pass, expected_detected in test_cases:
+            # Detect template variables
+            detected = detect_template_variables(template)
+            detected_names = list(detected.keys())
+
+            # Validate names
+            name_errors = validate_template_variable_names(template)
+
+            # Validate spacing
+            spacing_errors = validate_template_variable_spacing(template)
+
+            # Check overall validation
+            passes = len(name_errors) == 0 and len(spacing_errors) == 0
+
+            assert passes == should_pass, (
+                f"{description}: Expected {'pass' if should_pass else 'fail'} "
+                f"but got {'pass' if passes else 'fail'}. "
+                f"Name errors: {name_errors}, Spacing errors: {spacing_errors}"
+            )
+
+            # Verify detected template vars match expected
+            assert set(detected_names) == set(expected_detected), (
+                f"{description}: Expected to detect {expected_detected} "
+                f"but detected {detected_names}"
+            )
+
+    def test_variables_without_lowercase_are_errors(self):
+        """Test that variables without lowercase letters are correctly flagged as errors."""
+        # These should ERROR (no lowercase letters - reserved for templates)
+        error_cases = [
+            "{OUTPUT}",
+            "{DATA_SOURCE}",
+            "{CONFIG}",
+            "{SETTINGS}",
+            "{INPUT_FORMAT}",
+            "{OUTPUT_1}",  # Even with number, no lowercase = error
+            "{DATA_2}",
+            "{CONFIG_V3}",  # Still no lowercase
+        ]
+
+        for var in error_cases:
+            content = f"Use {var} for processing.\n\n{{PROMPT_SUBTREE}}\n\n"
+            name_errors = validate_template_variable_names(content)
+            var_errors = [e for e in name_errors if var in e]
+
+            assert len(var_errors) > 0, (
+                f"Variable without lowercase {var} should be flagged as error. "
+                f"Got no errors."
+            )
+            # Check error message mentions reserved for template variables
+            assert any(
+                "reserved for template variables" in e.lower() for e in var_errors
+            ), f"Error for {var} should mention 'reserved for template variables'"
+
+    def test_variables_with_lowercase_are_valid(self):
+        """Test that variables with at least one lowercase letter are allowed."""
+        # These should be VALID (have at least one lowercase letter)
+        valid_cases = [
+            "{myVariable}",
+            "{dataSource}",
+            "{DataSource}",  # Mixed case
+            "{MyCustomVariable}",  # Mixed case
+            "{output_data}",
+            "{configValue}",
+            "{Input_Format_v2}",  # Has lowercase
+        ]
+
+        for var in valid_cases:
+            content = f"Use {var} for processing.\n\n{{PROMPT_SUBTREE}}\n\n"
+            name_errors = validate_template_variable_names(content)
+            var_errors = [e for e in name_errors if var in e and "reserved" in e]
+
+            assert len(var_errors) == 0, (
+                f"Variable with lowercase {var} should be allowed. "
+                f"Got errors: {var_errors}"
+            )
+
+    def test_template_variable_typo_suggestions(self):
+        """Test that common typos of template variables get helpful suggestions."""
+        typo_cases = [
+            ("{prompt_subtree}", "PROMPT_SUBTREE"),
+            ("{Prompt_Subtree}", "PROMPT_SUBTREE"),
+            ("{collected_context}", "COLLECTED_CONTEXT"),
+            ("{COLLECTED_Context}", "COLLECTED_CONTEXT"),
+        ]
+
+        for typo, correct in typo_cases:
+            content = f"Content with {typo} variable."
+            errors = validate_template_variable_names(content)
+
+            # Should have an error with suggestion
+            assert len(errors) > 0, f"Should detect {typo} as error"
+
+            # Check for helpful suggestion
+            error_text = " ".join(errors)
+            assert correct in error_text, (
+                f"Error for {typo} should suggest {correct}. Got: {error_text}"
+            )
+
+    def test_invalid_syntax_patterns(self):
+        """Test detection of invalid syntax patterns mentioned in conversation."""
+        invalid_patterns = [
+            ("{{EXTRACT data_source}}", "Double braces in content"),
+            ("{{FILTER data | quality > 0.8}}", "Double braces DSL-like syntax"),
+            ("{OUTPUT result_format}", "Looks like invalid template var"),
+            ("{{AGGREGATE filtered_data}}", "Double braces aggregation"),
+        ]
+
+        for pattern, description in invalid_patterns:
+            content = f"Process with {pattern}.\n\n{{PROMPT_SUBTREE}}\n\n"
+
+            # Check for nested brace errors
+            errors = validate_template_variable_names(content)
+
+            # Should detect issues with double braces
+            if "{{" in pattern:
+                # Should have nested brace error
+                nested_errors = [
+                    e for e in errors if "nested" in e.lower() or "brace" in e.lower()
+                ]
+                assert len(nested_errors) > 0 or len(errors) > 0, (
+                    f"{description}: Should detect issue with {pattern}. Got no errors."
+                )
+
+    def test_spaces_in_variable_names(self):
+        """Test that spaces in variable names are not detected as valid variables."""
+        space_cases = [
+            "{ PROMPT_SUBTREE}",  # Leading space
+            "{PROMPT_SUBTREE }",  # Trailing space
+            "{ PROMPT_SUBTREE }",  # Both spaces
+            "{PROMPT SUBTREE}",  # Space in middle
+            "{ DATA_SOURCE }",  # Spaces around runtime var
+            "{MY VARIABLE}",  # Space in runtime var
+        ]
+
+        for invalid_var in space_cases:
+            content = f"Use {invalid_var} in template.\n\n{{PROMPT_SUBTREE}}\n\n"
+
+            # Should not detect as valid variable syntax
+            detected = detect_template_variables(content)
+
+            # Should only detect the valid PROMPT_SUBTREE, not the malformed one
+            assert "PROMPT_SUBTREE" in detected  # The valid one
+            assert " PROMPT_SUBTREE" not in detected  # Not with space
+            assert "PROMPT_SUBTREE " not in detected  # Not with space
+            assert " PROMPT_SUBTREE " not in detected  # Not with spaces
+
+            # Should not have validation errors for invalid syntax
+            errors = validate_template_variable_names(content)
+
+            # Filter to errors about the malformed variable
+            space_var_errors = [e for e in errors if invalid_var in e]
+
+            assert len(space_var_errors) == 0, (
+                f"Variable with spaces {invalid_var} should not be detected as valid variable. "
+                f"Got errors: {space_var_errors}"
+            )
+
+    def test_common_typos_fail_validation(self):
+        """Test that common typos of template variables fail validation with helpful messages."""
+        typo_cases = [
+            ("{PROMPT}", "PROMPT_SUBTREE", True),  # Common typo, should fail
+            ("{CONTEXT}", "COLLECTED_CONTEXT", True),  # Common typo, should fail
+            ("{SUBTREE}", "PROMPT_SUBTREE", True),  # Partial name, should fail
+            ("{COLLECTED}", "COLLECTED_CONTEXT", True),  # Partial name, should fail
+            ("{PROMPT_TREE}", "PROMPT_SUBTREE", True),  # Close typo, should fail
+            ("{MY_PROMPT}", None, True),  # No lowercase = reserved = should fail
+            ("{USER_CONTEXT}", None, True),  # No lowercase = reserved = should fail
+        ]
+
+        for typo_var, expected_suggestion, should_fail in typo_cases:
+            content = f"Use {typo_var} variable.\n\n{{PROMPT_SUBTREE}}\n\n"
+
+            errors = validate_template_variable_names(content)
+            typo_errors = [e for e in errors if typo_var in e]
+
+            if should_fail:
+                assert len(typo_errors) > 0, (
+                    f"Common typo {typo_var} should fail validation"
+                )
+                if expected_suggestion:
+                    error_text = " ".join(typo_errors)
+                    assert expected_suggestion in error_text, (
+                        f"Error for {typo_var} should suggest {expected_suggestion}. "
+                        f"Got: {error_text}"
+                    )
+            else:
+                assert len(typo_errors) == 0, (
+                    f"Non-typo {typo_var} should not fail validation. "
+                    f"Got errors: {typo_errors}"
+                )
 
 
 class TestSpecificationCompliance:

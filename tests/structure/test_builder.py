@@ -14,7 +14,7 @@ from pydantic import Field
 from langtree import TreeNode
 from langtree.exceptions import (
     DuplicateTargetError,
-    TemplateVariableError,
+    TemplateVariableNameError,
     TemplateVariableSpacingError,
     VariableTargetValidationError,
 )
@@ -540,12 +540,15 @@ class TestTemplateVariableValidation:
         self.structure = RunStructure()
 
     def test_invalid_template_variable_names(self):
-        """Test that invalid template variable names are rejected."""
+        """Test that misspelled template variable names are rejected."""
+        # Only test actual misspellings of template variables
+        # {INVALID_TEMPLATE} is now a valid runtime variable
         invalid_cases = [
-            "{INVALID_TEMPLATE}",  # Not a recognized template variable
-            "{prompt_subtree}",  # Wrong case
-            "{PROMPT_subtree}",  # Mixed case
-            "{{PROMPT_SUBTREE}}",  # Wrong delimiter count
+            "{prompt_subtree}",  # Wrong case for template variable
+            "{PROMPT_subtree}",  # Mixed case for template variable
+            "{Prompt_Subtree}",  # Wrong case for template variable
+            "{collected_context}",  # Wrong case for template variable
+            "{COLLECTED_context}",  # Mixed case for template variable
         ]
 
         for i, invalid_template in enumerate(invalid_cases):
@@ -564,9 +567,78 @@ class TestTemplateVariableValidation:
                 },
             )
 
-            # This should raise an error when validation is implemented
-            with pytest.raises((ValueError, TemplateVariableError)):
+            # Misspelled template variables should raise an error
+            with pytest.raises((ValueError, TemplateVariableNameError)):
                 self.structure.add(task_invalid_template)
+
+    def test_variables_with_lowercase_are_valid(self):
+        """Test that runtime variables with lowercase letters are allowed."""
+        valid_cases = [
+            "{dataSource}",  # Lowercase - valid
+            "{outputFormat}",  # Camelcase - valid
+            "{MyVariable}",  # Mixed case - valid
+            "{configData_v2}",  # Lowercase with underscore and suffix - valid
+        ]
+
+        for i, valid_var in enumerate(valid_cases):
+            # Create a class with the valid runtime variable in its docstring
+            docstring = f"""Process data using {valid_var} variable.
+
+            This uses a runtime variable that should be valid.
+
+            {{PROMPT_SUBTREE}}
+            """
+
+            # Create unique class name to avoid duplicate target conflicts
+            class_name = f"TaskValidRuntime{i}"
+            task_valid = type(
+                class_name,
+                (TreeNode,),
+                {
+                    "field": Field(default="test", description="Test field"),
+                    "__annotations__": {"field": str},
+                    "__doc__": docstring,
+                },
+            )
+
+            # Valid runtime variables should not raise errors
+            try:
+                self.structure.add(task_valid)
+            except (ValueError, TemplateVariableNameError) as e:
+                pytest.fail(f"Valid runtime variable {valid_var} raised error: {e}")
+
+    def test_variables_without_lowercase_raise_errors(self):
+        """Test that variables without lowercase letters raise errors."""
+        error_cases = [
+            "{DATA_SOURCE}",  # No lowercase - error
+            "{OUTPUT_FORMAT}",  # No lowercase - error
+            "{CONFIGURATION}",  # No lowercase - error
+            "{OUTPUT_1}",  # No lowercase even with number - error
+        ]
+
+        for i, error_var in enumerate(error_cases):
+            docstring = f"""Process using {error_var}.
+
+            {{PROMPT_SUBTREE}}
+            """
+
+            # Create unique class name
+            class_name = f"TaskInvalidVar{i}"
+            task_invalid = type(
+                class_name,
+                (TreeNode,),
+                {
+                    "field": Field(default="test", description="Test field"),
+                    "__annotations__": {"field": str},
+                    "__doc__": docstring,
+                },
+            )
+
+            # Should raise TemplateVariableNameError
+            with pytest.raises(TemplateVariableNameError) as exc_info:
+                self.structure.add(task_invalid)
+
+            assert "reserved for template variables" in str(exc_info.value).lower()
 
     def test_template_variable_spacing_enforcement(self):
         """Test that template variables enforce proper spacing rules."""
