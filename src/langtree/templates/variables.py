@@ -594,53 +594,51 @@ def resolve_collected_context(
     """
     Resolve {COLLECTED_CONTEXT} template variable for a given node.
 
+    Collects clean_docstring content from parent nodes up to (but not including)
+    the root StructureTreeRoot. Concatenates parent docstrings without adding
+    extra headings - just joins the existing clean content.
+
     Args:
         node: Structure tree node to resolve context for
         context_data: Optional context data to include
 
     Returns:
-        Resolved context content
+        Resolved context content - concatenated parent docstrings, or empty string if no context
     """
     if context_data:
         return context_data
 
-    # Implement basic context collection from node hierarchy
+    # Return empty string if no node
     if not node:
-        return "# Context\n\n*No context available*"
+        return ""
 
     context_parts = []
 
-    # Collect context from parent nodes (following hierarchical prompt assembly)
-    # Check if node has parent attribute before accessing it
+    # Collect context from parent nodes (stop at StructureTreeRoot)
+    # Walk up the parent chain, collecting from all TreeNode instances
+    # Stop when we hit StructureTreeRoot (which has field_type=None)
     if hasattr(node, "parent") and node.parent:
         current = node.parent
-        while current:
+        # Continue while we have a current node and it's a TreeNode (field_type is not None)
+        while (
+            current
+            and hasattr(current, "field_type")
+            and current.field_type is not None
+        ):
             if hasattr(current, "clean_docstring") and current.clean_docstring:
-                # Add parent context with appropriate heading
-                parent_name = current.name.replace("_", " ").title()
-                context_parts.append(f"## {parent_name}")
+                # Just concatenate the clean_docstring - no extra headings
                 context_parts.append(current.clean_docstring)
-                context_parts.append("")  # Empty line separator
+            # Move to parent (might be None or StructureTreeRoot with field_type=None)
             current = current.parent if hasattr(current, "parent") else None
 
-    # Collect context from processed field descriptions in current node
-    if hasattr(node, "clean_field_descriptions") and node.clean_field_descriptions:
-        context_parts.append("## Field Context")
-        for field_name, description in node.clean_field_descriptions.items():
-            field_title = field_name.replace("_", " ").title()
-            context_parts.append(f"### {field_title}")
-            context_parts.append(description)
-            context_parts.append("")  # Empty line separator
-
-    # If we have collected context, format it properly
+    # If we have collected context, join parts with double newlines
     if context_parts:
-        # Remove trailing empty line
-        if context_parts and context_parts[-1] == "":
-            context_parts.pop()
-        return "\n".join(context_parts)
+        # Reverse to get top-down order (root first, immediate parent last)
+        context_parts.reverse()
+        return "\n\n".join(context_parts)
 
-    # Default placeholder if no context collected
-    return "# Context\n\n*Context data will be provided during execution*"
+    # Return empty string if no context collected
+    return ""
 
 
 def resolve_template_variables_in_content(

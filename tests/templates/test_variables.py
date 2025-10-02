@@ -919,15 +919,13 @@ class TestTemplateVariableResolution:
         result = resolve_collected_context(node, context_data)  # type: ignore
         assert result == context_data
 
-        # Test without context data (should return placeholder)
+        # Test without context data (should return empty string)
         result = resolve_collected_context(node)  # type: ignore
-        assert "# Context" in result
-        assert "*Context data will be provided during execution*" in result
+        assert result == ""
 
-        # Test with None context data
+        # Test with None context data (should return empty string)
         result = resolve_collected_context(node, None)  # type: ignore
-        assert "# Context" in result
-        assert "*Context data will be provided during execution*" in result
+        assert result == ""
 
     def test_resolve_template_variables_in_content_comprehensive(self):
         """Test complete template variable resolution with real nodes."""
@@ -2206,5 +2204,6 @@ Additional context for processing:
         # Test COLLECTED_CONTEXT resolution - should collect from hierarchy
         context_result = resolve_collected_context(middle_node)
         assert isinstance(context_result, str)
-        # Should either collect real context or provide placeholder
-        assert len(context_result) > 0
+        # root_node has parent=None (it's the root), so middle_node should return
+        # the root's clean_docstring which is "Root level prompt with context."
+        assert "Root level prompt with context" in context_result
