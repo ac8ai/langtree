@@ -713,13 +713,18 @@ def get_assembly_variables_for_node_with_structure(
     # Get Assembly Variable registry from RunStructure
     assembly_registry = run_structure.get_assembly_variable_registry()
 
-    # Get all Assembly Variables that are available to this node
-    # For the initial implementation, return all variables
-    # TODO: Implement proper scope filtering based on node hierarchy
-    # Assembly Variables should be available from definition node through all descendant nodes
-    all_variables = assembly_registry.list_variables()
+    # Assembly Variables are available from definition node through all descendant nodes
+    # Walk up the parent chain and collect variables defined at each ancestor
+    available_vars = set()
+    current = node
+    while current:
+        # Get variables defined at this node
+        for var in assembly_registry.list_variables():
+            if var.source_node_tag == current.name:
+                available_vars.add(var.name)
+        current = current.parent
 
-    return {var.name for var in all_variables}
+    return available_vars
 
 
 def field_name_to_title(field_name: str, heading_level: int = 1) -> str:

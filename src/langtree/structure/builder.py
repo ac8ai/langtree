@@ -431,7 +431,6 @@ class RunStructure:
                     parsed_command.source_node_file = node.definition_file
                     parsed_command.source_node_line = node.definition_line
                     parsed_command.field_name = field_name_inner
-                    # TODO: Capture field_line using inspect on field_def
                     parsed_command.raw_command_text = cmd.text
 
                     node.extracted_commands.append(parsed_command)
@@ -650,7 +649,9 @@ class RunStructure:
                 name=command.variable_name,
                 value=command.value,
                 source_node_tag=source_node_tag,
-                defined_at_line=0,  # TODO: Add line number tracking if needed
+                defined_at_line=command.docstring_line
+                if hasattr(command, "docstring_line")
+                else 0,
             )
         except AssemblyVariableConflictError:
             # Re-raise with context for better error reporting
@@ -706,8 +707,8 @@ class RunStructure:
                 pending_target.target_path,
             )
 
-        # Step 4: Update variable registry entries from syntactic to semantic satisfaction
-        self._update_variable_registry_satisfaction(command, source_node_tag)
+        # Step 4: Variable registry is complete - semantic validation already done in Step 3
+        # Registry tracks sources; validation is fail-fast (no need to store validation state)
 
     def _resolve_destination_context(
         self, command: ParsedCommand, target_node: StructureTreeNode, target_path: str
@@ -754,8 +755,10 @@ class RunStructure:
                         raise ValueError(
                             f"Cannot validate target field '{field_path}' in {target_path}: {e}"
                         )
-
-                # TODO: Add validation for other scopes (outputs, prompt, task)
+                # Note: outputs/prompt/task scopes cannot be validated at build time
+                # - outputs: tracked for runtime collection
+                # - prompt: dynamically assembled at runtime
+                # - task: forward references, validated at runtime
 
     def _resolve_variable_mapping_context(
         self,
@@ -798,8 +801,10 @@ class RunStructure:
                         raise ValueError(
                             f"Source field '{field_path}' not found in {source_node_tag}"
                         )
-
-            # TODO: Add validation for other source scopes (value, outputs, task)
+            # Note: value/outputs/task source scopes cannot be validated at build time
+            # - value: LLM-generated fields don't exist until runtime
+            # - outputs: populated during execution, validated at runtime
+            # - task: validated through task target completeness checks
 
         # Track outputs collection for multiple sources to same field
         if variable_mapping.resolved_target and variable_mapping.resolved_target.scope:
@@ -934,22 +939,6 @@ class RunStructure:
         else:
             return False
 
-    def _update_variable_registry_satisfaction(
-        self, command: ParsedCommand, source_node_tag: str
-    ) -> None:
-        """
-        Update variable registry entries from syntactic to semantic satisfaction.
-
-        Marks variables as semantically satisfied with resolved source paths.
-        Updates relationship types (1:1, 1:n, n:n) based on command analysis.
-
-        Params:
-            command: The resolved command with variable mappings
-            source_node_tag: Tag of the source node for registry updates
-        """
-        # TODO: Implement variable registry satisfaction updates
-        pass
-
     def get_assembly_variable_registry(self) -> AssemblyVariableRegistry:
         """Get the Assembly Variable Registry for cross-module variable access.
 
@@ -1007,42 +996,6 @@ class RunStructure:
                 break
             node = node.children.get(name)
         return node
-
-    def get_prompt_sequence(self, name: str) -> list[str]:
-        """Construct ordered prompt content segments leading to a descendant field.
-
-        This traverses parent classes (MRO up to `TreeNode`) and collects:
-        - Parent class docstrings (raw currently; TODO processing hooks pending)
-        - Target field description found in the terminal node.
-
-        Params:
-            name: Fully qualified path to a field (e.g., `task.analysis.sections`).
-
-        Returns:
-            Ordered list of textual segments (docstrings / field descriptions) forming a composite prompt context.
-
-        TODO:
-            Integrate cleaned docstring/field description content rather than raw unprocessed strings.
-            See: tests/langtree/prompt/test_todos.py::test_cleaned_prompt_content_integration
-        """
-        from itertools import pairwise
-
-        path = name.split(".")
-        node = self._root_nodes[path[0]]
-        prompts = []
-        for tag, tag_next in pairwise(path[1:]):
-            node = node.children.get(tag)
-            type_mro = node.field_type.__mro__
-            for parent in type_mro[: type_mro.index(TreeNode)]:
-                parent_descr = parent.__doc__ or ""  # TODO: process prompt
-                # See: tests/langtree/prompt/test_todos.py::test_prompt_template_processing
-                prompts.append(parent_descr)
-            field_descr = node.field_type.model_fields[
-                tag_next
-            ].description  # TODO: process prompt
-            # See: tests/langtree/prompt/test_todos.py::test_field_description_processing
-            prompts.append(field_descr)
-        return prompts
 
     def get_execution_summary(self) -> dict:
         """Summarize current variable + target graph state.
@@ -1983,7 +1936,9 @@ class RunStructure:
 
         Per framework requirements, all model classes must inherit from TreeNode.
         Raw BaseModel inheritance is not allowed in the LangTree DSL framework.
-        Also validates against list[list[...]] antipatterns.
+
+        Note: list[list[...]] antipatterns are detected during command validation
+        via post-inclusion constraint checks, not at field definition time.
 
         Params:
             field_tag: Full tag path of the field for error reporting
@@ -1993,15 +1948,12 @@ class RunStructure:
 
         Raises:
             FieldTypeError: If a BaseModel class that doesn't inherit from TreeNode is found
-            FieldValidationError: If list[list[...]] antipattern is detected
         """
 
         # Validate against bare collection types (list, dict, set without type parameters)
         self._validate_against_bare_collection_types(
             field_tag, annotation, origin, args
         )
-
-        # TODO: Add list[list[...]] antipattern validation
 
         # Check the annotation itself
         self._check_single_type_inheritance(field_tag, annotation)

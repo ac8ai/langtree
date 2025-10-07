@@ -294,9 +294,7 @@ class TestTemplateVariableSystem:
             result: str = Field(description="Processing result")
 
         self.structure.add(TaskSourceData)
-        self.structure.add(
-            TaskTargetProcess
-        )  # TODO: Implement automatic context fallback
+        self.structure.add(TaskTargetProcess)
         # target = self.structure._root_nodes['TargetNode']
         # If context is needed but {COLLECTED_CONTEXT} not present,
         # should automatically append "\n\n# Context\n\n{COLLECTED_CONTEXT}"
@@ -318,7 +316,7 @@ class TestTemplateVariableSystem:
             field1: str = Field(description="Field 1 description")
             field2: str = Field(description="Field 2 description")
 
-        self.structure.add(TaskParentLevel)  # TODO: Implement heading level detection
+        self.structure.add(TaskParentLevel)
         # When {PROMPT_SUBTREE} is resolved:
         # - Detect that parent has level 1 heading
         # - Child content should become level 2 headings
@@ -347,9 +345,7 @@ class TestTemplateVariableSystem:
             analysis: str = Field(description="Analysis step")
             summary: str = Field(description="Summary step")
 
-        self.structure.add(
-            TaskComplexTemplate
-        )  # TODO: Implement template resolution order
+        self.structure.add(TaskComplexTemplate)
         # 1. First resolve {COLLECTED_CONTEXT} with context data
         # 2. Then resolve {PROMPT_SUBTREE} with child field content
         # 3. Both should maintain proper spacing and heading levels
@@ -367,7 +363,7 @@ class TestTemplateVariableSystem:
             technical_details: str = Field(description="Technical details")
             final_summary: str = Field(description="Final summary")
 
-        self.structure.add(TaskTitleGeneration)  # TODO: Implement title generation
+        self.structure.add(TaskTitleGeneration)
         # Field names should be converted to titles:
         # main_analysis -> "# Main Analysis"
         # technical_details -> "# Technical Details"
@@ -420,7 +416,7 @@ class TestTemplateVariableSystem:
 
             result: str = Field(description="Final result")
 
-        self.structure.add(TaskRootLevel)  # TODO: Implement nested resolution
+        self.structure.add(TaskRootLevel)
         # Should correctly resolve heading levels:
         # Root: # (level 1)
         # Middle: ## (level 2)
@@ -1108,7 +1104,6 @@ class TestPendingTargetIntegrationWithResolution:
         """Set up test fixtures."""
         self.run_structure = RunStructure()
 
-    # @pytest.mark.skip("TODO: Implement multiple forward references batch resolution")
     def test_multiple_forward_references_to_same_node_batch_resolution(self):
         """Test multiple commands referencing the same late-defined node (batch resolution)."""
 

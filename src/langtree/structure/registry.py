@@ -615,7 +615,7 @@ class PendingTargetRegistry:
 
     Tracks commands referencing destination task paths not yet materialized in the structure.
     When a node appears, `resolve_pending` retrieves and removes all matching entries
-    (exact path and descendants), allowing a future callback to finalize resolution (TODO).
+    (exact path and descendants). Caller processes resolved commands via callback.
     """
 
     def __init__(self):
@@ -689,9 +689,5 @@ class PendingTargetRegistry:
             List of PendingTarget objects that were waiting for this target
         """
         resolved = self.resolve_pending(target_path)
-
-        # TODO: Process the resolved commands with the target node
-        # This would involve updating the commands with the resolved target
-        # and potentially triggering further processing
-
+        # Caller processes resolved commands (see builder._complete_pending_command_processing)
         return resolved

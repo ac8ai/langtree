@@ -272,9 +272,6 @@ class TypeConverter:
         elif isinstance(value, list | tuple | set):
             return json.dumps(list(value), ensure_ascii=False)
         elif isinstance(value, TreeNode):
-            # TODO: Use COLLECTED_CONTEXT assembly function for hierarchical prompt text
-            # This should build readable text for LLMs, not JSON
-            # Will reuse the same function that creates COLLECTED_CONTEXT
             raise NotImplementedError(
                 "TreeNode → string conversion for prompts not yet implemented"
             )

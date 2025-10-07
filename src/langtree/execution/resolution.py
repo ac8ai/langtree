@@ -766,9 +766,7 @@ def _resolve_in_global_tree_context(
         Either a complete TreeNode instance or a field value from any node in the tree.
         Type depends on whether path points to a node or a field within a node.
 
-        # TODO: Could use overloads to distinguish node vs field access at compile time
-        # @overload def _resolve_in_global_tree_context(path: NodePath) -> TreeNode
-        # @overload def _resolve_in_global_tree_context(path: FieldPath) -> PromptValue        Raises:
+    Raises:
         ValueError: When path is empty or invalid format
         KeyError: When path doesn't exist in global tree
         AttributeError: When attempting to access non-existent attributes
@@ -948,6 +946,8 @@ def _resolve_in_target_prompt_context(
     run_structure: "RunStructure", path: str, target_node: "StructureTreeNode | None"
 ):
     """Resolve path in target node's prompt context.
+
+    WARNING: This function is currently unused and returns debug strings only.
 
     Params:
         run_structure: The RunStructure instance
