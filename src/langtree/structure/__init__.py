@@ -10,11 +10,14 @@ from langtree.structure.builder import (
     StructureTreeNode,
     StructureTreeRoot,
 )
+from langtree.structure.format_descriptions import OutputFormatDescriptions
 from langtree.structure.registry import (
     AssemblyVariable,
     AssemblyVariableRegistry,
     PendingTarget,
     PendingTargetRegistry,
+    ResolvedTarget,
+    ResolvedTargetRegistry,
     VariableInfo,
     VariableRegistry,
 )
@@ -25,10 +28,13 @@ __all__ = [
     "RunStructure",
     "StructureTreeNode",
     "StructureTreeRoot",
+    "OutputFormatDescriptions",
     "AssemblyVariable",
     "AssemblyVariableRegistry",
     "PendingTarget",
     "PendingTargetRegistry",
+    "ResolvedTarget",
+    "ResolvedTargetRegistry",
     "VariableInfo",
     "VariableRegistry",
     "validate_comprehensive",

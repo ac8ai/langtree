@@ -7,16 +7,19 @@ This module handles the detection, validation, and processing of template variab
 
 # Group 1: External direct imports (alphabetical)
 import re
+from dataclasses import dataclass
 
 # Group 2: External from imports (alphabetical by source module)
 from typing import TYPE_CHECKING, Optional
 
 # Group 4: Internal from imports (alphabetical by source module)
+from langtree.core.tree_node import TreeNode
 from langtree.exceptions import (
     TemplateVariableConflictError,
     TemplateVariableNameError,
     TemplateVariableSpacingError,
 )
+from langtree.templates.utils import ExtractedCommand
 
 if TYPE_CHECKING:
     from langtree.structure.builder import RunStructure, StructureTreeNode
@@ -39,6 +42,224 @@ INVALID_SPACING_PATTERN = re.compile(
     r"(?:\S\{(?:PROMPT_SUBTREE|COLLECTED_CONTEXT)\})|"  # Text directly before
     r"(?:\{(?:PROMPT_SUBTREE|COLLECTED_CONTEXT)\}\S)"  # Text directly after
 )
+
+
+@dataclass(frozen=True)
+class ProcessedDocstring:
+    """
+    Processed docstring from a single class in the inheritance chain.
+
+    Params:
+        commands: Extracted DPCL commands with line numbers
+        clean: Clean docstring content (stripped, commands removed)
+        line_offset: Number of lines removed from top of original docstring
+        source_class: Name of the class this docstring came from
+        merged_start: Line number where this segment starts in merged content (set during merge)
+    """
+
+    commands: tuple[ExtractedCommand, ...]
+    clean: str
+    line_offset: int
+    source_class: str
+    merged_start: int = 0
+
+
+@dataclass(frozen=True)
+class LineMapping:
+    """
+    Line number mapping from merged docstring back to original class docstring.
+
+    Enables error reporting to pinpoint exact class and line number where
+    an error occurred in the original source.
+
+    Params:
+        class_name: Name of the class this segment came from
+        merged_start: Line number where this segment starts in merged docstring
+        merged_end: Line number where this segment ends in merged docstring (exclusive)
+        original_offset: Lines removed from top of original class docstring
+    """
+
+    class_name: str
+    merged_start: int
+    merged_end: int
+    original_offset: int
+
+
+def process_class_docstring(content: str, class_name: str) -> ProcessedDocstring:
+    """
+    Process a single class docstring with line tracking.
+
+    Extracts DPCL commands from the top of the docstring and validates that
+    each template variable appears at most once. Tracks line numbers for
+    accurate error reporting.
+
+    Params:
+        content: Raw docstring content from a single class
+        class_name: Name of the class (for error reporting)
+
+    Returns:
+        ProcessedDocstring with commands, clean content, and line offset
+
+    Raises:
+        TemplateVariableNameError: If template variable appears more than once
+    """
+    from langtree.templates.utils import extract_commands
+
+    if not content or not content.strip():
+        return ProcessedDocstring(
+            commands=(),
+            clean="",
+            line_offset=0,
+            source_class=class_name,
+            merged_start=0,
+        )
+
+    # Extract commands (they appear at top before content)
+    commands, clean_unstripped = extract_commands(content)
+
+    # Calculate line offset BEFORE stripping
+    # This is where clean content starts in the original
+    if clean_unstripped:
+        clean_start_pos = content.index(clean_unstripped)
+        line_offset = content[:clean_start_pos].count("\n")
+    else:
+        # No clean content (all commands or empty)
+        line_offset = content.count("\n")
+
+    # Now strip the clean content
+    clean_stripped = clean_unstripped.strip()
+
+    # Validate no duplicate template variables in this class
+    duplicate_errors = validate_no_duplicate_template_variables(clean_stripped)
+    if duplicate_errors:
+        raise TemplateVariableNameError(
+            f"In class {class_name}: {'; '.join(duplicate_errors)}"
+        )
+
+    return ProcessedDocstring(
+        commands=tuple(commands),
+        clean=clean_stripped,
+        line_offset=line_offset,
+        source_class=class_name,
+        merged_start=0,
+    )
+
+
+def merge_processed_docstrings(
+    processed_docs: list[ProcessedDocstring],
+) -> tuple[str, list[LineMapping]]:
+    """
+    Merge multiple processed docstrings with line number tracking.
+
+    Concatenates clean docstring content from multiple classes and creates
+    line mappings to enable reverse lookup from merged line numbers back to
+    original class and line numbers.
+
+    Params:
+        processed_docs: List of processed docstrings from inheritance chain
+
+    Returns:
+        Tuple of (merged_content, line_mappings) where line_mappings enable
+        finding original class and line number for any line in merged content
+    """
+    if not processed_docs:
+        return "", []
+
+    merged_parts = []
+    line_mappings = []
+    current_line = 0
+
+    for doc in processed_docs:
+        if not doc.clean:
+            # Skip empty docstrings
+            continue
+
+        segment_start = current_line
+        line_count = doc.clean.count("\n") + 1  # +1 because last line has no \n
+
+        # Create line mapping for this segment
+        line_mappings.append(
+            LineMapping(
+                class_name=doc.source_class,
+                merged_start=segment_start,
+                merged_end=segment_start + line_count,
+                original_offset=doc.line_offset,
+            )
+        )
+
+        # Add clean content
+        merged_parts.append(doc.clean)
+        current_line += line_count
+
+    # Join with double newlines between segments
+    merged = "\n\n".join(merged_parts)
+
+    # Adjust line mappings to account for separator lines
+    # Each separator adds 1 line (the blank line between segments)
+    if len(line_mappings) > 1:
+        # Adjust all mappings after the first one
+        separator_count = 0
+        adjusted_mappings = []
+
+        for i, mapping in enumerate(line_mappings):
+            if i > 0:
+                separator_count += 1  # One blank line before this segment
+
+            adjusted_mappings.append(
+                LineMapping(
+                    class_name=mapping.class_name,
+                    merged_start=mapping.merged_start + separator_count,
+                    merged_end=mapping.merged_end + separator_count,
+                    original_offset=mapping.original_offset,
+                )
+            )
+
+        return merged, adjusted_mappings
+
+    return merged, line_mappings
+
+
+def collect_inherited_docstrings(tree_node_class: type[TreeNode]) -> str:
+    """
+    Collect docstrings from Python class inheritance chain up to TreeNode.
+
+    Walks the class inheritance hierarchy (MRO) and collects docstrings from
+    all parent classes up to (but not including) TreeNode itself. Docstrings
+    are concatenated in MRO order (child last, most distant parent first).
+
+    Params:
+        tree_node_class: The TreeNode subclass to collect docstrings for
+
+    Returns:
+        Concatenated docstrings from inheritance chain, or empty string if none
+    """
+    from textwrap import dedent
+
+    if not tree_node_class or not issubclass(tree_node_class, TreeNode):
+        return ""
+
+    docstrings = []
+
+    # Walk MRO (Method Resolution Order) - skip first (self) and last (object)
+    # Stop when we hit TreeNode itself
+    for base_class in tree_node_class.__mro__[:-1]:  # Exclude 'object'
+        # Stop at TreeNode - don't include its docstring
+        if base_class is TreeNode:
+            break
+
+        # Collect docstring if present, using dedent to remove indentation
+        if base_class.__doc__:
+            # Use textwrap.dedent to properly dedent docstrings
+            # Unlike inspect.cleandoc, this treats all lines uniformly including the first line
+            cleaned = dedent(base_class.__doc__).strip()
+            if cleaned:  # Only add if non-empty after cleaning
+                docstrings.append(cleaned)
+
+    # Reverse to get parent-first order (most distant parent → child)
+    docstrings.reverse()
+
+    # Join with double newlines to maintain markdown separation
+    return "\n\n".join(docstrings) if docstrings else ""
 
 
 def detect_template_variables(content: str) -> dict[str, list[int]]:
@@ -260,7 +481,13 @@ def validate_template_variable_spacing(content: str) -> list[str]:
 
             # Split into lines and check for empty lines
             lines = after_content.split("\n")
-            if len(lines) <= 1:
+
+            # CRITICAL: First check if there's non-whitespace text on the same line
+            # If lines[0] has any non-whitespace content, that's a spacing violation
+            if lines and lines[0].strip() != "":
+                # There's text on the same line as the template variable - this is invalid
+                after_valid = False
+            elif len(lines) <= 1:
                 # No newlines after, only valid if it's just whitespace
                 after_valid = after_content.strip() == ""
             elif len(lines) == 2 and lines[0] == "":
@@ -280,9 +507,94 @@ def validate_template_variable_spacing(content: str) -> list[str]:
     return errors
 
 
+def validate_no_duplicate_template_variables(content: str) -> list[str]:
+    """
+    Validate that template variables don't appear multiple times.
+
+    Checks that each template variable (PROMPT_SUBTREE, COLLECTED_CONTEXT)
+    appears at most once in the content. Multiple occurrences indicate a
+    configuration error.
+
+    Params:
+        content: Text content to validate
+
+    Returns:
+        List of error messages (empty if no duplicates found)
+    """
+    errors = []
+
+    # Detect all template variables
+    detected = detect_template_variables(content)
+
+    # Check for duplicates
+    for var_name, positions in detected.items():
+        if len(positions) > 1:
+            errors.append(
+                f"Template variable {{{var_name}}} appears {len(positions)} times "
+                f"(positions: {positions}). Each template variable must appear at most once."
+            )
+
+    return errors
+
+
+def add_automatic_template_variables(
+    content: str, is_field_description: bool = False
+) -> str:
+    """
+    Add {COLLECTED_CONTEXT} and {PROMPT_SUBTREE} to docstring if not already present.
+
+    Adds template variables in the correct order:
+    1. {COLLECTED_CONTEXT} - for sibling field values (added first)
+    2. {PROMPT_SUBTREE} - for current node's field structure (added second)
+
+    Args:
+        content: Docstring or field description content
+        is_field_description: If True, template variables will NOT be added.
+                             Template variables should only appear in node docstrings,
+                             not in field descriptions.
+
+    Returns:
+        Content with template variables added if they weren't present (unless is_field_description=True)
+    """
+    if not content:
+        content = ""
+
+    # Never add template variables to field descriptions
+    # Template variables only belong in node docstrings
+    if is_field_description:
+        return content
+
+    has_collected_context = COLLECTED_CONTEXT_PATTERN.search(content)
+    has_prompt_subtree = PROMPT_SUBTREE_PATTERN.search(content)
+
+    # If both are already present, return as-is
+    if has_collected_context and has_prompt_subtree:
+        return content
+
+    # Prepare content with proper spacing
+    if content.strip():
+        if not content.endswith("\n\n"):
+            content = content.rstrip() + "\n\n"
+    else:
+        # Empty content - add both template variables
+        return "{COLLECTED_CONTEXT}\n\n{PROMPT_SUBTREE}"
+
+    # Add missing template variables in order: COLLECTED_CONTEXT first, PROMPT_SUBTREE second
+    if not has_collected_context:
+        content += "{COLLECTED_CONTEXT}\n\n"
+
+    if not has_prompt_subtree:
+        content += "{PROMPT_SUBTREE}\n\n"
+
+    return content
+
+
 def add_automatic_prompt_subtree(content: str) -> str:
     """
     Add {PROMPT_SUBTREE} to docstring if not already present.
+
+    DEPRECATED: Use add_automatic_template_variables() instead which adds both
+    {COLLECTED_CONTEXT} and {PROMPT_SUBTREE} in the correct order.
 
     Args:
         content: Docstring content
@@ -414,18 +726,35 @@ def field_name_to_title(field_name: str, heading_level: int = 1) -> str:
     """
     Convert a field name to a proper heading title.
 
+    Handles underscore_case, camelCase, and numbers in field names.
+
     Args:
-        field_name: Field name to convert (e.g., 'main_analysis')
-        heading_level: Markdown heading level (1-6)
+        field_name: Field name to convert (e.g., 'main_analysis', 'fieldName2')
+        heading_level: Markdown heading level (1-6+)
 
     Returns:
-        Formatted heading (e.g., '# Main Analysis')
+        Formatted heading (e.g., '# Main Analysis', '## Field Name 2')
     """
-    # Convert underscore to spaces and title case
-    title = field_name.replace("_", " ").title()
+    import re
+
+    # Insert space before uppercase letters (camelCase)
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", field_name)
+
+    # Insert space before numbers
+    spaced = re.sub(r"([a-zA-Z])(\d)", r"\1 \2", spaced)
+
+    # Insert space after numbers when followed by letters
+    spaced = re.sub(r"(\d)([a-zA-Z])", r"\1 \2", spaced)
+
+    # Replace underscores with spaces
+    spaced = spaced.replace("_", " ")
+
+    # Title case each word
+    title = spaced.title()
 
     # Generate heading markdown
-    heading_prefix = "#" * max(1, min(6, heading_level))
+    # Allow levels > 6 for deep nesting (invalid markdown but LLMs handle it)
+    heading_prefix = "#" * max(1, heading_level)
 
     return f"{heading_prefix} {title}"
 
@@ -445,7 +774,8 @@ def detect_heading_level(content: str, template_var_position: int) -> int:
     preceding_content = content[:template_var_position]
 
     # Look for existing headings in the preceding content
-    heading_pattern = re.compile(r"^(#{1,6})\s", re.MULTILINE)
+    # Allow any number of # for deep nesting (not just 1-6)
+    heading_pattern = re.compile(r"^(#+)\s", re.MULTILINE)
     headings = list(heading_pattern.finditer(preceding_content))
 
     if not headings:
@@ -457,7 +787,8 @@ def detect_heading_level(content: str, template_var_position: int) -> int:
     last_level = len(last_heading.group(1))
 
     # Return the next level down (for child content)
-    return min(6, last_level + 1)
+    # Allow levels > 6 for deep nesting
+    return last_level + 1
 
 
 def strip_acl_commands(content: str) -> str:
@@ -490,7 +821,9 @@ def strip_acl_commands(content: str) -> str:
 
 
 def process_template_variables(
-    content: str, node: Optional["StructureTreeNode"] = None
+    content: str,
+    node: Optional["StructureTreeNode"] = None,
+    is_field_description: bool = False,
 ) -> str:
     """
     Process template variables in content, applying automatic addition and validation.
@@ -501,6 +834,8 @@ def process_template_variables(
     Args:
         content: Docstring or field description content
         node: Optional structure tree node for context
+        is_field_description: If True, template variables will NOT be automatically added.
+                             Template variables should only appear in node docstrings.
 
     Returns:
         Processed content with template variables handled
@@ -516,8 +851,11 @@ def process_template_variables(
     # Strip LangTree DSL commands first to avoid conflicts with template variable processing
     clean_content = strip_acl_commands(content)
 
-    # Add automatic PROMPT_SUBTREE if not present
-    clean_content = add_automatic_prompt_subtree(clean_content)
+    # Add automatic template variables (COLLECTED_CONTEXT and PROMPT_SUBTREE) if not present
+    # Only for docstrings, not for field descriptions
+    clean_content = add_automatic_template_variables(
+        clean_content, is_field_description=is_field_description
+    )
 
     # Validate template variable names on clean content
     name_errors = validate_template_variable_names(clean_content)
@@ -531,6 +869,13 @@ def process_template_variables(
     if spacing_errors:
         raise TemplateVariableSpacingError(
             f"Template variable spacing errors: {'; '.join(spacing_errors)}"
+        )
+
+    # Validate no duplicate template variables
+    duplicate_errors = validate_no_duplicate_template_variables(clean_content)
+    if duplicate_errors:
+        raise TemplateVariableNameError(
+            f"Duplicate template variables: {'; '.join(duplicate_errors)}"
         )
 
     # Validate conflicts with Assembly Variables when node context is available
@@ -548,130 +893,9 @@ def process_template_variables(
     return add_automatic_prompt_subtree(content)
 
 
-def resolve_prompt_subtree(
-    node: "StructureTreeNode", base_heading_level: int = 1
-) -> str:
-    """
-    Resolve {PROMPT_SUBTREE} template variable for a given node.
-
-    Args:
-        node: Structure tree node to resolve subtree for
-        base_heading_level: Base heading level for field titles
-
-    Returns:
-        Resolved content with field titles and descriptions
-    """
-    if not node or not node.field_type:
-        return ""
-
-    content_parts = []
-
-    # Process each field in the node's type
-    for field_name, field_def in node.field_type.model_fields.items():
-        # Generate field title
-        field_title = field_name_to_title(field_name, base_heading_level)
-        content_parts.append(field_title)
-
-        # Add field description if available
-        if field_name in node.clean_field_descriptions:
-            description = node.clean_field_descriptions[field_name]
-            content_parts.append(description)
-        elif field_def.description:
-            # Use original description if clean version not available
-            content_parts.append(field_def.description)
-
-        # Add empty line after each field section
-        content_parts.append("")
-
-    # Join parts and clean up trailing empty lines
-    result = "\n\n".join(content_parts).rstrip()
-    return result
-
-
-def resolve_collected_context(
-    node: "StructureTreeNode", context_data: str | None = None
-) -> str:
-    """
-    Resolve {COLLECTED_CONTEXT} template variable for a given node.
-
-    Collects clean_docstring content from parent nodes up to (but not including)
-    the root StructureTreeRoot. Concatenates parent docstrings without adding
-    extra headings - just joins the existing clean content.
-
-    Args:
-        node: Structure tree node to resolve context for
-        context_data: Optional context data to include
-
-    Returns:
-        Resolved context content - concatenated parent docstrings, or empty string if no context
-    """
-    if context_data:
-        return context_data
-
-    # Return empty string if no node
-    if not node:
-        return ""
-
-    context_parts = []
-
-    # Collect context from parent nodes (stop at StructureTreeRoot)
-    # Walk up the parent chain, collecting from all TreeNode instances
-    # Stop when we hit StructureTreeRoot (which has field_type=None)
-    if hasattr(node, "parent") and node.parent:
-        current = node.parent
-        # Continue while we have a current node and it's a TreeNode (field_type is not None)
-        while (
-            current
-            and hasattr(current, "field_type")
-            and current.field_type is not None
-        ):
-            if hasattr(current, "clean_docstring") and current.clean_docstring:
-                # Just concatenate the clean_docstring - no extra headings
-                context_parts.append(current.clean_docstring)
-            # Move to parent (might be None or StructureTreeRoot with field_type=None)
-            current = current.parent if hasattr(current, "parent") else None
-
-    # If we have collected context, join parts with double newlines
-    if context_parts:
-        # Reverse to get top-down order (root first, immediate parent last)
-        context_parts.reverse()
-        return "\n\n".join(context_parts)
-
-    # Return empty string if no context collected
-    return ""
-
-
-def resolve_template_variables_in_content(
-    content: str, node: "StructureTreeNode"
-) -> str:
-    """
-    Resolve all template variables in content.
-
-    Args:
-        content: Content containing template variables
-        node: Structure tree node for context
-
-    Returns:
-        Content with template variables resolved
-    """
-    if not content:
-        return ""
-
-    result = content
-
-    # Resolve PROMPT_SUBTREE
-    def replace_prompt_subtree(match):
-        # Detect heading level at this position
-        position = match.start()
-        heading_level = detect_heading_level(content, position)
-        return resolve_prompt_subtree(node, heading_level)
-
-    result = PROMPT_SUBTREE_PATTERN.sub(replace_prompt_subtree, result)
-
-    # Resolve COLLECTED_CONTEXT
-    def replace_collected_context(match):
-        return resolve_collected_context(node)
-
-    result = COLLECTED_CONTEXT_PATTERN.sub(replace_collected_context, result)
-
-    return result
+# OLD STRING-BASED RESOLUTION FUNCTIONS REMOVED
+# These have been replaced with element-based resolution:
+# - resolve_prompt_subtree() → use resolve_prompt_subtree_elements()
+# - resolve_collected_context() → use resolve_collected_context_elements()
+# - resolve_template_variables_in_content() → use node.get_prompt(previous_values={...})
+# See StructureTreeNode.get_prompt() in langtree/structure/builder.py for production API

@@ -18,6 +18,10 @@ if TYPE_CHECKING:
         StructureTreeNode,
     )
 
+# Valid scope prefixes for target paths
+# These must match the scopes defined in execution.scopes
+VALID_SCOPE_PREFIXES = frozenset({"value", "outputs", "task", "prompt"})
+
 
 class AssemblyVariableConflictError(Exception):
     """Raised when attempting to assign to an existing Assembly Variable."""
@@ -433,6 +437,177 @@ class PendingTarget:
     target_path: str
     command: "ParsedCommand"
     source_node_tag: str
+
+
+@dataclass
+class ResolvedTarget:
+    """Information about a resolved target.
+
+    Tracks fields that have incoming data forwarded to them via commands.
+    This enables efficient lookup when generating {COLLECTED_CONTEXT} to check
+    which fields have incoming data.
+
+    Note: If a field is in this registry, it means data is being forwarded TO it.
+    Fields that are directly generated at their own node won't be in this registry.
+    """
+
+    target_path: str  # Full path to the target field (e.g., "task.analysis.summary")
+    source_node_tag: str  # Where the data comes from
+    command: "ParsedCommand"  # The command that forwards data to this field
+
+
+class ResolvedTargetRegistry:
+    """Registry for tracking resolved (populated) fields with node-level indexing.
+
+    Maintains a record of fields that have received data through commands,
+    indexed by node tag for efficient COLLECTED_CONTEXT generation.
+
+    Handles all scope prefixes (value.*, outputs.*, task.*) by extracting
+    the node portion from target paths.
+
+    Usage:
+        # When processing a command that forwards data to a target
+        registry.add_resolved(target_path, source_tag, command)
+
+        # Get all fields for a node (for COLLECTED_CONTEXT)
+        node_fields = registry.get_resolved_for_node("task.analysis")
+        # Returns: {"summary": [ResolvedTarget, ...], "title": [...]}
+    """
+
+    def __init__(self):
+        # Node-level index: node_tag -> {field_name -> [ResolvedTarget, ...]}
+        # Example: {"task.analysis": {"summary": [ResolvedTarget, ...], "title": [...]}}
+        self.targets_by_node: dict[str, dict[str, list[ResolvedTarget]]] = {}
+
+    def add_resolved(
+        self,
+        target_path: str,
+        source_node_tag: str,
+        command: "ParsedCommand",
+    ):
+        """
+        Record that a field has incoming data forwarded to it.
+
+        Params:
+            target_path: Full path to the target field (e.g., "value.analysis.summary", "outputs.task.processor.title")
+            source_node_tag: Tag of the node providing the data
+            command: The command that forwards data to this target
+        """
+        # Parse target_path to extract node and field
+        node_tag, field_name = self._parse_target_path(target_path)
+
+        # Initialize nested dicts if needed
+        if node_tag not in self.targets_by_node:
+            self.targets_by_node[node_tag] = {}
+        if field_name not in self.targets_by_node[node_tag]:
+            self.targets_by_node[node_tag][field_name] = []
+
+        # Add resolved target
+        self.targets_by_node[node_tag][field_name].append(
+            ResolvedTarget(target_path, source_node_tag, command)
+        )
+
+    def _parse_target_path(self, target_path: str) -> tuple[str, str]:
+        """
+        Parse target path to extract node tag and field name.
+
+        Handles scope prefixes (value.*, outputs.*, task.*, prompt.*) by stripping
+        them and extracting the underlying node tag and field name.
+
+        Examples:
+            "value.analysis.summary" -> ("analysis", "summary")
+            "outputs.task.processor.title" -> ("task.processor", "title")
+            "task.analysis.summary" -> ("task.analysis", "summary")
+            "analysis.summary" -> ("analysis", "summary")
+
+        Params:
+            target_path: Full path including optional scope prefix
+
+        Returns:
+            Tuple of (node_tag, field_name)
+        """
+        parts = target_path.split(".")
+
+        # Check if first part is a scope modifier
+        if parts[0] in VALID_SCOPE_PREFIXES:
+            remaining = parts[1:]
+        else:
+            remaining = parts
+
+        # Last part is field name, rest is node tag
+        if len(remaining) < 2:
+            # Malformed path - should have at least node.field
+            raise ValueError(
+                f"Invalid target path: {target_path}. Expected format: [scope.]node[.subnode].field"
+            )
+
+        field_name = remaining[-1]
+        node_tag = ".".join(remaining[:-1])
+
+        return node_tag, field_name
+
+    def get_resolved_for_node(self, node_tag: str) -> dict[str, list[ResolvedTarget]]:
+        """
+        Get all resolved fields for a specific node.
+
+        Useful for generating COLLECTED_CONTEXT - returns all fields that have
+        incoming data for the specified node.
+
+        Params:
+            node_tag: Tag of the node (e.g., "task.analysis", "processor")
+
+        Returns:
+            Dictionary mapping field names to lists of ResolvedTarget entries.
+            Empty dict if no fields have incoming data.
+
+        Example:
+            >>> registry.get_resolved_for_node("task.analysis")
+            {"summary": [ResolvedTarget(...), ...], "title": [ResolvedTarget(...)]}
+        """
+        return self.targets_by_node.get(node_tag, {})
+
+    def get_resolved_for_field(self, field_path: str) -> list[ResolvedTarget]:
+        """
+        Get all resolved targets for a specific field path.
+
+        Params:
+            field_path: Full path to the field (e.g., "task.analysis.summary", "value.analysis.summary")
+
+        Returns:
+            List of ResolvedTarget entries showing what data is being sent to this field.
+            Empty list if no data is being sent to this field.
+        """
+        node_tag, field_name = self._parse_target_path(field_path)
+        return self.targets_by_node.get(node_tag, {}).get(field_name, [])
+
+    def has_incoming_data(self, field_path: str) -> bool:
+        """
+        Check if a field has any incoming data.
+
+        Params:
+            field_path: Full path to the field
+
+        Returns:
+            True if at least one source sends data to this field, False otherwise
+        """
+        resolved = self.get_resolved_for_field(field_path)
+        return len(resolved) > 0
+
+    def get_all_resolved_paths(self) -> list[str]:
+        """
+        Get all field paths that have been resolved.
+
+        Returns:
+            List of all field paths that have incoming data (with original scope prefixes preserved)
+        """
+        paths = []
+        for node_tag, fields in self.targets_by_node.items():
+            for field_name, targets in fields.items():
+                # Use the original target_path from ResolvedTarget
+                for target in targets:
+                    if target.target_path not in paths:
+                        paths.append(target.target_path)
+        return paths
 
 
 class PendingTargetRegistry:

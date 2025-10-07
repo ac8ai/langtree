@@ -736,50 +736,24 @@ class PromptAssembler:
             Dictionary with prompt sections: system, context, task, output, input
         """
         # Get clean docstring and field descriptions
-        system_prompt = getattr(node, "clean_docstring", "")
         field_descriptions = getattr(node, "clean_field_descriptions", {})
 
-        # Process template variables in both system prompt and field descriptions
-        if system_prompt:
-            from langtree.templates.variables import (
-                resolve_template_variables_in_content,
+        # Use the new get_prompt() method to resolve template variables
+        try:
+            system_prompt = node.get_prompt(previous_values=None)
+        except Exception as e:
+            # Log template variable processing error but continue with original content
+            import logging
+
+            logging.warning(
+                f"Template variable processing failed for node {node.name}: {e}"
             )
+            # Fallback to clean docstring if get_prompt fails
+            system_prompt = getattr(node, "clean_docstring", "")
 
-            try:
-                system_prompt = resolve_template_variables_in_content(
-                    system_prompt, node
-                )
-            except Exception as e:
-                # Log template variable processing error but continue with original content
-                import logging
-
-                logging.warning(
-                    f"Template variable processing failed for node {node.name}: {e}"
-                )
-                # Continue with original system_prompt
-
-        # Process template variables in field descriptions
-        processed_field_descriptions = {}
-        if field_descriptions:
-            from langtree.templates.variables import (
-                resolve_template_variables_in_content,
-            )
-
-            for field_name, description in field_descriptions.items():
-                try:
-                    processed_field_descriptions[field_name] = (
-                        resolve_template_variables_in_content(description, node)
-                    )
-                except Exception as e:
-                    # Log template variable processing error but continue with original description
-                    import logging
-
-                    logging.warning(
-                        f"Template variable processing failed for field {field_name} in node {node.name}: {e}"
-                    )
-                    processed_field_descriptions[field_name] = description
-        else:
-            processed_field_descriptions = field_descriptions
+        # Field descriptions are processed as part of get_prompt() for PROMPT_SUBTREE
+        # For now, keep them as is (they're already cleaned and validated)
+        processed_field_descriptions = field_descriptions
 
         # Assemble context from parent hierarchy
         context_sections = self._assemble_context_hierarchy(node)

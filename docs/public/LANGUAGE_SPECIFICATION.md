@@ -526,6 +526,42 @@ class QuickNode(TreeNode):
 - **Default behavior**: If no modifier specified, defaults to @sequential
 - **Context sharing**: @sequential builds incremental context; @parallel shares static context
 
+### Output Formatting Commands
+
+**Purpose**: Control how field values are formatted in generated prompts, particularly for markdown-rich content.
+
+**Syntax**:
+```
+! @output_format("format_type")
+```
+
+**Available Formats**:
+- `"markdown"`: Preserves markdown formatting, wraps output in `<langtree-output>` tags
+- `"plain"`: Default format, no special wrapping
+
+**Constraints**:
+- Only valid on `str`-typed leaf fields (fields without nested TreeNode children)
+- Applied at class-level in docstring, affects prompt generation for all string fields
+- Format information must be available during both initial prompt assembly and structured generation
+
+**Example**:
+```python
+class AnalysisResult(TreeNode):
+    """
+    Detailed analysis with markdown formatting.
+    ! @output_format("markdown")
+    """
+    summary: str = Field(description="Executive summary")
+    findings: str = Field(description="Key findings with bullet points")
+    recommendations: str = Field(description="## Recommendations\n\nDetailed recommendations")
+```
+
+**Semantics**:
+- When `output_format` is "markdown", the generated content preserves markdown structure
+- The output is wrapped in `<langtree-output>` tags to delimit the formatted content
+- This information is carried through to structured generation for proper type hints
+- Default behavior (no command or "plain") treats output as regular text
+
 ### Comment Support
 
 **Purpose**: Add human-readable annotations to command lines and provide standalone documentation.
@@ -885,23 +921,165 @@ LangTree DSL provides two special template variables for automatic prompt assemb
 
 ### {COLLECTED_CONTEXT}
 
-**Purpose**: Placeholder for forwarded context data in prompts.
+**Purpose**: Placeholder for forwarded context data in prompts using tag references.
+
+**Resolution**: Replaced with **tag references** (like `{field_name}` or `{parent.child}`) for previously generated fields. The actual values are filled in at runtime during execution, not at prompt assembly time.
+
+**Tag Format**:
+- Simple fields: `{field_name}`
+- Nested TreeNode fields: `{parent.child.field}` (dot notation)
+- Values are resolved LIVE at runtime
+- Note: These internal tags can use dots, unlike user-defined runtime variables
 
 **Manual Addition**: Only added during "prompt with context" resolution if not explicitly present in docstring.
-
-**Resolution**: Replaced with context data from previous generations and forwarded outputs.
 
 **Automatic Fallback**: If `{COLLECTED_CONTEXT}` is not in docstring, system appends `"\n\n# Context\n\n{COLLECTED_CONTEXT}"` when context is needed.
 
 **Spacing Rules**: Same as `{PROMPT_SUBTREE}` - requires empty lines before and after.
 
-### Heading Level Detection
+**Example**:
+```markdown
+# Previous Results
 
-**Level Calculation**: System detects heading level of section containing template variables and adjusts child content accordingly.
+{COLLECTED_CONTEXT}
 
-**Tree Traversal**: Must be resolved level-by-level to determine correct heading depth for each node.
+## Instructions
+Continue from the context above.
+```
 
-**Title Generation**: Resolution always starts with title (class name or field name) followed by description.
+Resolves to (at assembly time):
+```markdown
+# Previous Results
+
+# Analysis
+
+{analysis}
+
+# Data Processing
+
+## Raw Data
+
+{data_processing.raw_data}
+
+## Cleaned Data
+
+{data_processing.cleaned_data}
+
+## Instructions
+Continue from the context above.
+```
+
+The tags `{analysis}` and `{data_processing.raw_data}` are then filled with actual values at runtime.
+
+### Heading Level Alignment
+
+LangTree DSL automatically maintains proper markdown heading hierarchy when embedding child content into parent prompts. This ensures that all prompts have consistent, readable structure with correct heading levels.
+
+#### Level Inheritance Rules
+
+**Template Variable Level Detection**:
+- Template variables (`{PROMPT_SUBTREE}`, `{COLLECTED_CONTEXT}`) inherit their level from the preceding heading in the docstring
+- If a template variable appears after `## Section Title` (level 2), content embedded at that location starts at level 3
+- If no preceding heading exists, template variables default to base level + 1
+
+**Example**:
+```python
+class TaskResearch(TreeNode):
+    """
+    Research task with structured process.
+
+    ## Research Process
+
+    Conduct thorough research.
+
+    {PROMPT_SUBTREE}
+    """
+    literature_review: LiteratureReview
+```
+
+Result: `literature_review` content starts at level 3 (one below `## Research Process`)
+
+#### Hierarchy Preservation
+
+**Child Content Embedding**:
+- When child node content is embedded into a parent, the relative hierarchy within the child is preserved
+- All heading levels in the child are shifted by the same amount to fit under the parent's embedding point
+- This prevents heading level collisions and maintains document structure
+
+**Example**:
+```python
+class LiteratureReview(TreeNode):
+    """
+    ## Analysis Method
+
+    Detailed methodology.
+
+    ### Data Sources
+
+    Primary and secondary sources.
+    """
+```
+
+When embedded at level 3, becomes:
+```
+### Literature Review
+#### Analysis Method
+Detailed methodology.
+##### Data Sources
+Primary and secondary sources.
+```
+
+#### Nested TreeNode Fields
+
+**COLLECTED_CONTEXT Expansion**:
+- When `{COLLECTED_CONTEXT}` expands TreeNode fields, child fields appear subordinate to their parent
+- Field hierarchy is preserved: if `source_analysis` contains `credible_sources`, the latter appears at level +1
+
+**Example**:
+```python
+class SourceAnalysis(TreeNode):
+    credible_sources: str
+    quality_assessment: str
+```
+
+When expanded in COLLECTED_CONTEXT:
+```
+## Source Analysis
+
+{task.research.source_analysis}
+
+### Credible Sources
+
+{task.research.source_analysis.credible_sources}
+
+### Quality Assessment
+
+{task.research.source_analysis.quality_assessment}
+```
+
+#### Level Calculation Algorithm
+
+The system uses a three-step process for heading level alignment:
+
+1. **Context Level Detection**: Track the current heading level as docstring is parsed
+2. **Template Variable Assignment**: Assign level = (current heading level + 1) to template variables
+3. **Content Shifting**: When embedding child content, find minimum level in child, calculate shift needed, apply to all child elements
+
+**Key Principle**: Relative heading differences within content are always preserved to maintain structural integrity.
+
+#### Automatic Adjustment
+
+**No Manual Intervention Required**:
+- Developers write natural markdown headings in docstrings
+- System automatically adjusts levels when embedding content
+- Works correctly regardless of nesting depth (tested to 5+ levels)
+- Handles complex scenarios like multiple template variables, mixed content, varying depths
+
+**This ensures**:
+- ✅ Consistent heading hierarchy throughout generated prompts
+- ✅ No heading level conflicts or gaps
+- ✅ Readable, well-structured markdown output
+- ✅ Proper subordination of child content to parent sections
 
 ### Assembly Types
 

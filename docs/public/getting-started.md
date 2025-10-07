@@ -144,6 +144,7 @@ structure.add(TaskDocumentAnalyzer)
 | `!repeat(n)` | Repeat processing | `! repeat(3)` |
 | `@each[path]` | Iterate over items | `@each[documents]->task.processor` |
 | `@all` | Aggregate all data | `@all->task.summarizer` |
+| `@output_format(type)` | Control output formatting | `! @output_format("markdown")` |
 
 ## Validation
 

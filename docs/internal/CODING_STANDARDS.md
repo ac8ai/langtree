@@ -282,16 +282,45 @@ valid_ids = [item.id for item in items if item.is_valid()]
 ### Test Organization Principles
 
 #### Structure Mirroring
-**Test structure exactly mirrors source structure**:
-- One test file per source file
+**Test structure should mirror source structure at the module level**:
+- One test file per source file (e.g., `module.py` → `test_module.py`)
 - Test package hierarchy matches source package hierarchy
 - Test class names relate directly to tested classes/modules
 
+**Exception: Feature and Integration Tests**
+Additional test files are acceptable for cross-cutting concerns:
+- **Feature tests**: Test complete features spanning multiple modules
+- **Integration tests**: Test interactions between multiple components
+- **Bug regression tests**: Document and prevent specific bugs
+- **Behavioral tests**: Document complex behavioral requirements
+
+**Naming conventions for additional tests**:
+- Feature tests: `test_<feature_name>.py` (e.g., `test_heading_level_alignment.py`)
+- Integration tests: `test_<integration_scenario>.py` (e.g., `test_get_prompt_chain.py`)
+- Bug tests: `test_<bug_description>.py` (e.g., `test_collected_context_bug.py`)
+
+**Example structure**:
+```
+src/langtree/templates/
+├── element_resolution.py     # Module
+├── prompt_parser.py          # Module
+└── variables.py              # Module
+
+tests/templates/
+├── test_element_resolution.py         # ✓ Direct mapping
+├── test_prompt_parser.py              # ✓ Direct mapping
+├── test_variables.py                  # ✓ Direct mapping
+├── test_heading_level_alignment.py    # ✓ Feature test (uses multiple modules)
+└── test_get_prompt_chain.py           # ✓ Integration test (full chain behavior)
+```
+
 #### When to Create New Test Files
 **Create new test file when**:
-- Testing a new source module
+- Testing a new source module (1:1 mapping)
 - Existing test file would become unwieldy (>500 lines)
-- Testing fundamentally different functionality that requires different fixtures
+- Testing a feature that spans multiple modules
+- Testing integration between components
+- Documenting a specific bug with regression tests
 
 #### Test Grouping Within Files
 **Group tests by**:

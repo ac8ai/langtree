@@ -125,8 +125,10 @@ class TestTemplateVariableSystem:
 
     def test_prompt_subtree_resolution(self):
         """Test that {PROMPT_SUBTREE} is resolved into field titles and descriptions."""
-        from langtree.templates.variables import (
-            resolve_template_variables_in_content,
+        from langtree.templates.element_resolution import (
+            elements_to_markdown,
+            parse_docstring_to_elements,
+            resolve_template_elements,
         )
 
         class TaskWithFields(TreeNode):
@@ -144,38 +146,31 @@ class TestTemplateVariableSystem:
         task_node = self.structure.get_node("task.with_fields")
         assert task_node is not None, "Task node should be found"
 
-        # Test template variable resolution
+        # Test template variable resolution using element-based API
         content = "Task description:\n\n{PROMPT_SUBTREE}\n\nEnd of task."
-        resolved_content = resolve_template_variables_in_content(content, task_node)
+        elements = parse_docstring_to_elements(content)
+        resolved_elements = resolve_template_elements(
+            elements, task_node, None, None, output_field_prefix="To generate: "
+        )
+        resolved_content = elements_to_markdown(resolved_elements)
 
         # Check that PROMPT_SUBTREE was resolved
         assert "{PROMPT_SUBTREE}" not in resolved_content, (
             "Template variable should be resolved"
         )
 
-        # Check that field titles and descriptions are included
+        # Check that ONLY the first field is included (current leaf)
         assert (
             "field1" in resolved_content.lower()
             or "field 1" in resolved_content.lower()
-        )
-        assert (
+        ), "Should include first field"
+        # Sibling field should NOT be included
+        assert not (
             "field2" in resolved_content.lower()
             or "field 2" in resolved_content.lower()
-        )
+        ), "Should NOT include sibling field"
         assert "First field description" in resolved_content
-        assert "Second field description" in resolved_content
-
-        # Check that field titles and descriptions are included
-        assert (
-            "field1" in resolved_content.lower()
-            or "field 1" in resolved_content.lower()
-        )
-        assert (
-            "field2" in resolved_content.lower()
-            or "field 2" in resolved_content.lower()
-        )
-        assert "First field description" in resolved_content
-        assert "Second field description" in resolved_content
+        assert "Second field description" not in resolved_content
 
     def test_prompt_subtree_manual_placement(self):
         """Test that manually placed {PROMPT_SUBTREE} is preserved."""
@@ -474,19 +469,19 @@ class TestTemplateVariableSystem:
         node = self.structure.get_node("task.complex_integration")
         assert node is not None, "Node should be added to structure"
 
-        # Verify template variables are properly processed
-        from langtree.templates.variables import (
-            process_template_variables,
-            resolve_template_variables_in_content,
+        # Verify template variables are properly processed using element-based API
+        from langtree.templates.element_resolution import (
+            elements_to_markdown,
+            resolve_node_prompt_elements,
         )
 
         # Test 1: Template variable processing should work without errors
         clean_content = node.clean_docstring or ""
-        processed_content = process_template_variables(clean_content, node)
-        assert isinstance(processed_content, str), "Should process without errors"
+        resolved_elements = resolve_node_prompt_elements(node)
+        assert resolved_elements is not None, "Should resolve elements without errors"
 
         # Test 2: Template variables should be resolved in content
-        resolved_content = resolve_template_variables_in_content(clean_content, node)
+        resolved_content = elements_to_markdown(resolved_elements)
 
         # Template variables should be resolved to actual field content
         assert "{PROMPT_SUBTREE}" not in resolved_content, (
@@ -497,12 +492,18 @@ class TestTemplateVariableSystem:
         )
 
         # Test 3: Field content should be properly included in PROMPT_SUBTREE resolution
-        assert "Data Extraction" in resolved_content, "Should include field titles"
+        # PROMPT_SUBTREE now shows only the current leaf field (first field)
+        assert "Data Extraction" in resolved_content, "Should include first field title"
         assert "Extract data from source files" in resolved_content, (
-            "Should include field descriptions"
+            "Should include first field description"
         )
-        assert "Data Validation" in resolved_content, "Should include all fields"
-        assert "Result Generation" in resolved_content, "Should include all fields"
+        # Sibling fields should NOT be shown
+        assert "Data Validation" not in resolved_content, (
+            "Should NOT include sibling fields"
+        )
+        assert "Result Generation" not in resolved_content, (
+            "Should NOT include sibling fields"
+        )
 
         # Test 4: Original structure and spacing should be preserved
         assert "## Context Information" in resolved_content, (
@@ -521,14 +522,20 @@ class TestTemplateVariableSystem:
         )
 
         # Test 6: Verify proper heading levels in PROMPT_SUBTREE resolution
-        from langtree.templates.variables import resolve_prompt_subtree
-
-        prompt_result = resolve_prompt_subtree(node, base_heading_level=3)
-        assert "### Data Extraction" in prompt_result, (
-            "Should use correct heading level"
+        # PROMPT_SUBTREE now shows only the current leaf field (first field when no previous_values)
+        from langtree.templates.element_resolution import (
+            generate_prompt_subtree_with_children,
         )
-        assert "### Data Validation" in prompt_result, (
-            "Should use consistent heading levels"
+
+        prompt_elements = generate_prompt_subtree_with_children(
+            node, base_heading_level=3
+        )
+        prompt_result = elements_to_markdown(prompt_elements)
+        assert "### Data Extraction" in prompt_result, (
+            "Should use correct heading level for first field"
+        )
+        assert "### Data Validation" not in prompt_result, (
+            "Should NOT include sibling fields"
         )
 
 
@@ -765,15 +772,17 @@ class TestTemplateVariableIntegration:
         assert node is not None
 
         # Test template variable processing doesn't break runtime variables
-        from langtree.templates.variables import (
-            process_template_variables,
-            resolve_template_variables_in_content,
+        from langtree.templates.element_resolution import (
+            elements_to_markdown,
+            resolve_node_prompt_elements,
         )
 
         clean_content = node.clean_docstring or ""
 
         # Test 1: Template variables are properly resolved
-        resolved_content = resolve_template_variables_in_content(clean_content, node)
+        resolved_elements = resolve_node_prompt_elements(node)
+        resolved_content = elements_to_markdown(resolved_elements)
+
         assert "{PROMPT_SUBTREE}" not in resolved_content, (
             "Template variables should be resolved"
         )
@@ -796,15 +805,19 @@ class TestTemplateVariableIntegration:
         )
 
         # Test 3: Template variable resolution includes field content
-        assert "Analysis Step" in resolved_content, (
-            "PROMPT_SUBTREE should include field titles"
+        # PROMPT_SUBTREE now shows only the current leaf field (first field)
+        assert "Model Name" in resolved_content, (
+            "PROMPT_SUBTREE should include first field title"
         )
-        assert "Primary analysis processing" in resolved_content, (
-            "Should include field descriptions"
+        assert "Model name for processing" in resolved_content, (
+            "Should include first field description"
         )
-        assert "Validation Step" in resolved_content, "Should include all field titles"
-        assert "Data validation processing" in resolved_content, (
-            "Should include all field descriptions"
+        # Sibling fields should NOT be shown
+        assert "Analysis Step" not in resolved_content, (
+            "Should NOT include sibling field titles"
+        )
+        assert "Validation Step" not in resolved_content, (
+            "Should NOT include sibling field titles"
         )
 
         # Test 4: Original document structure is preserved
@@ -818,9 +831,8 @@ class TestTemplateVariableIntegration:
             "Should preserve all content"
         )
 
-        # Test 5: Template variable processing works without errors
-        processed_content = process_template_variables(clean_content, node)
-        assert isinstance(processed_content, str), "Should process without errors"
+        # Test 5: Template variable processing works without errors (already tested above)
+        assert isinstance(resolved_content, str), "Should process without errors"
 
         # Test 6: Assembly variables in original docstring are preserved
         assert "data_source" in clean_content, (

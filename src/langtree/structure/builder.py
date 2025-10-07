@@ -8,11 +8,15 @@ class that coordinates tree building and command processing.
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, Optional, get_args, get_origin
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional, get_args, get_origin
 
 from pydantic import BaseModel
 
 from langtree.core.tree_node import TreeNode
+
+if TYPE_CHECKING:
+    from langtree.structure.format_descriptions import OutputFormatDescriptions
 from langtree.exceptions import DuplicateTargetError, FieldTypeError
 from langtree.exceptions.core import ErrorContext, ErrorLevel
 from langtree.parsing.parser import (
@@ -27,6 +31,7 @@ from langtree.structure.registry import (
     AssemblyVariableRegistry,
     PendingTarget,
     PendingTargetRegistry,
+    ResolvedTargetRegistry,
     VariableRegistry,
 )
 from langtree.structure.type_mapping import (
@@ -37,7 +42,10 @@ from langtree.structure.type_mapping import (
     create_type_mapping_config,
 )
 from langtree.templates.utils import extract_commands, get_root_tag
-from langtree.templates.variables import process_template_variables
+from langtree.templates.variables import (
+    collect_inherited_docstrings,
+    process_template_variables,
+)
 
 # Type aliases
 PromptValue = str | int | float | bool | list | dict | None
@@ -73,11 +81,100 @@ class StructureTreeNode:
     field_type: type[TreeNode] | None = None
     parent: Optional["StructureTreeNode"] = None
     children: dict[str, "StructureTreeNode"] = field(default_factory=dict)
+
+    # String storage (original)
     clean_docstring: str | None = field(default=None)
     clean_field_descriptions: dict[str, str] = field(default_factory=dict)
+
+    # Element storage (parsed) - NEVER mutate these lists, always copy first!
+    clean_docstring_elements: list | None = field(default=None)  # list[PromptElement]
+    clean_field_description_elements: dict[str, list] = field(
+        default_factory=dict
+    )  # dict[str, list[PromptElement]]
+
     extracted_commands: list[ParsedCommandUnion] = field(default_factory=list)
     definition_file: str | None = field(default=None)
     definition_line: int | None = field(default=None)
+
+    # Configuration from RunStructure
+    format_descriptions: "OutputFormatDescriptions | None" = field(default=None)
+
+    def get_prompt(self, previous_values: dict[str, Any] | None = None) -> str:
+        """
+        Generate the final prompt for this node by resolving template variables.
+
+        Uses cached parsed elements if available, otherwise parses docstring.
+        Resolves COLLECTED_CONTEXT and PROMPT_SUBTREE template variables.
+
+        IMPORTANT: This walks up the entire parent chain from current node to root,
+        embedding child elements into parent PROMPT_SUBTREE recursively.
+
+        Params:
+            previous_values: Optional dictionary of previously computed field values for COLLECTED_CONTEXT
+
+        Returns:
+            Final markdown prompt string with all template variables resolved,
+            including full chain from root to current node
+        """
+        from langtree.templates.element_resolution import (
+            elements_to_markdown,
+            resolve_node_prompt_elements,
+        )
+
+        # Build the parent chain from current node up to root (leaf-to-root order)
+        # Stop before reaching synthetic root nodes (field_type=None)
+        chain = []
+        current = self
+        while current is not None:
+            # Skip synthetic root nodes (they have no docstring/field_type)
+            if current.field_type is None:
+                break
+            chain.append(current)
+            current = getattr(current, "parent", None)
+
+        # Resolve from bottom up (leaf to root): each level's elements get embedded into parent
+        # Chain is already in leaf-to-root order, so iterate forward
+        resolved_elements = None
+
+        for i, node in enumerate(chain):
+            # Build child_resolutions dict and previous_values for this node
+            child_resolutions = {}
+            node_previous_values = None
+
+            if i == 0:
+                # Leaf node - use the actual previous_values from user
+                node_previous_values = previous_values
+            elif i > 0:
+                # Parent node - we're embedding a child
+                child_node = chain[i - 1]
+
+                # Find which field corresponds to this child
+                child_field_name = None
+                for field_name, child_obj in node.children.items():
+                    if child_obj is child_node:
+                        child_field_name = field_name
+                        child_resolutions[field_name] = resolved_elements
+                        break
+
+                # Build previous_values for this parent: include all fields BEFORE the child field
+                if child_field_name and hasattr(node.field_type, "model_fields"):
+                    node_previous_values = {}
+                    for field_name in node.field_type.model_fields.keys():
+                        if field_name == child_field_name:
+                            break
+                        # Mark all previous fields as "generated" so current_field becomes child_field_name
+                        node_previous_values[field_name] = None
+
+            # Resolve this node with its child embedded
+            resolved_elements = resolve_node_prompt_elements(
+                node,
+                previous_values=node_previous_values,
+                child_resolutions=child_resolutions,
+                format_descriptions=node.format_descriptions,
+            )
+
+        # Convert final resolved elements to markdown
+        return elements_to_markdown(resolved_elements)
 
 
 @dataclass
@@ -110,6 +207,8 @@ class RunStructure:
         self,
         type_mapping_config: TypeMappingConfig | dict | None = None,
         error_level: ErrorLevel | str = ErrorLevel.USER,
+        output_field_prefix: str | None = "To generate",
+        format_descriptions: "OutputFormatDescriptions | dict | Path | str | None" = None,
     ):
         """
         Initialize the RunStructure.
@@ -117,10 +216,19 @@ class RunStructure:
         Params:
             type_mapping_config: Configuration for type mapping and validation
             error_level: Error message detail level (USER or DEVELOPER), can be ErrorLevel enum or string
+            output_field_prefix: Optional prefix for output field titles (e.g., "To generate").
+                               Colon will be added automatically. Set to None to disable prefix.
+                               Defaults to "To generate"
+            format_descriptions: Configuration for output format descriptions. Can be:
+                               - OutputFormatDescriptions instance
+                               - dict with partial overrides
+                               - Path/str to YAML file
+                               - None for defaults
         """
         self._root_nodes = {}
         self._variable_registry = VariableRegistry()
         self._pending_target_registry = PendingTargetRegistry()
+        self._resolved_target_registry = ResolvedTargetRegistry()
         self._assembly_variable_registry = AssemblyVariableRegistry()
 
         # Initialize type mapping system
@@ -132,6 +240,30 @@ class RunStructure:
             self.error_level = ErrorLevel(error_level)
         else:
             self.error_level = error_level
+
+        # Set output field prefix
+        self.output_field_prefix = output_field_prefix
+
+        # Initialize format descriptions
+        from langtree.structure.format_descriptions import OutputFormatDescriptions
+
+        if format_descriptions is None:
+            self.format_descriptions = OutputFormatDescriptions()
+        elif isinstance(format_descriptions, OutputFormatDescriptions):
+            self.format_descriptions = format_descriptions
+        elif isinstance(format_descriptions, dict):
+            self.format_descriptions = OutputFormatDescriptions.from_dict(
+                format_descriptions
+            )
+        elif isinstance(format_descriptions, Path | str):
+            self.format_descriptions = OutputFormatDescriptions.from_yaml(
+                format_descriptions
+            )
+        else:
+            raise TypeError(
+                f"format_descriptions must be OutputFormatDescriptions, dict, Path, str, or None. "
+                f"Got {type(format_descriptions)}"
+            )
 
     def _create_error_context(
         self, command: ParsedCommand | None
@@ -216,6 +348,7 @@ class RunStructure:
             parent=parent,
             definition_file=definition_file,
             definition_line=definition_line,
+            format_descriptions=self.format_descriptions,
         )
         field_name = tag.split(".")[-1]
 
@@ -233,11 +366,26 @@ class RunStructure:
         for resolved_target in resolved_targets:
             self._complete_pending_command_processing(resolved_target)
 
-        if subtree.__doc__:
-            commands, clean_content = extract_commands(subtree.__doc__)
+        # Collect docstring from entire inheritance chain (parents + current class)
+        inherited_docstring = collect_inherited_docstrings(subtree)
 
-            processed_content = process_template_variables(clean_content, node)
+        if inherited_docstring:
+            commands, clean_content = extract_commands(inherited_docstring)
+
+            processed_content = process_template_variables(
+                clean_content, node, is_field_description=False
+            )
             node.clean_docstring = processed_content
+
+            # Parse to elements for template resolution
+            if processed_content:
+                from langtree.templates.element_resolution import (
+                    parse_docstring_to_elements,
+                )
+
+                node.clean_docstring_elements = parse_docstring_to_elements(
+                    processed_content
+                )
 
             for cmd in commands:
                 parsed_command = parse_command(cmd.text)
@@ -260,8 +408,19 @@ class RunStructure:
             if field_def.description:
                 commands, clean_content = extract_commands(field_def.description)
                 if clean_content:
-                    processed_content = process_template_variables(clean_content, node)
+                    processed_content = process_template_variables(
+                        clean_content, node, is_field_description=True
+                    )
                     node.clean_field_descriptions[field_name_inner] = processed_content
+
+                    # Parse to elements for template resolution
+                    from langtree.templates.element_resolution import (
+                        parse_docstring_to_elements,
+                    )
+
+                    node.clean_field_description_elements[field_name_inner] = (
+                        parse_docstring_to_elements(processed_content)
+                    )
 
                 for cmd in commands:
                     parsed_command = parse_command(cmd.text)
