@@ -19,7 +19,6 @@ from langtree.parsing.parser import (
     VariableMapping,
     parse_command,
 )
-from langtree.parsing.path_resolver import analyze_scope_coverage
 from langtree.parsing.validation import validate_field_types
 
 __all__ = [
@@ -35,6 +34,5 @@ __all__ = [
     "VariableAssignmentCommand",
     "VariableMapping",
     "parse_command",
-    "analyze_scope_coverage",
     "validate_field_types",
 ]
